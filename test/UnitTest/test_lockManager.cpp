@@ -23,6 +23,7 @@
 
 #include "constants.hpp"
 #include "logCapture.hpp"
+#include "osPlatform.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
@@ -40,6 +41,12 @@ std::string unstablePath;
 int openAttempts = 0;
 std::string failingPath;
 int failingErrno = 0;
+std::string trackedPath;
+int trackedFd = -1;
+enum class LockFault { None, Stat, Flock, Relink, Truncate, Seek, Write, Sync, ZeroWrite, ShortWrite };
+LockFault lockFault = LockFault::None;
+int relinkChecks    = 0;
+int writes          = 0;
 
 class LockFileSafety : public ::testing::Test {
  protected:
@@ -55,6 +62,9 @@ class LockFileSafety : public ::testing::Test {
   void TearDown() override {
     unstablePath.clear();
     failingPath.clear();
+    trackedPath.clear();
+    trackedFd = -1;
+    lockFault = LockFault::None;
     std::filesystem::remove_all(dir);
   }
   static std::string contents(const std::filesystem::path &file) {
@@ -93,7 +103,79 @@ extern "C" int __wrap_open(const char *path, int flags, ...) {
     errno = failingErrno;
     return -1;
   }
-  return __real_open(path, flags, mode);
+  const int fd = __real_open(path, flags, mode);
+  if (!trackedPath.empty() && trackedPath == path) trackedFd = fd;
+  return fd;
+}
+
+extern "C" int __real_fstat(int fd, struct stat *info);
+extern "C" int __real_lstat(const char *path, struct stat *info);
+extern "C" int __real_flock(int fd, int operation);
+extern "C" int __real_ftruncate(int fd, off_t length);
+extern "C" off_t __real_lseek(int fd, off_t offset, int whence);
+extern "C" ssize_t __real_write(int fd, const void *data, size_t length);
+extern "C" int __real_fsync(int fd);
+RDB_WRAP_SYSCALL(int, fstat, (int fd, struct stat *info), (fd, info));
+RDB_WRAP_SYSCALL(int, lstat, (const char *path, struct stat *info), (path, info));
+RDB_WRAP_SYSCALL(int, flock, (int fd, int operation), (fd, operation));
+RDB_WRAP_SYSCALL(int, ftruncate, (int fd, off_t length), (fd, length));
+RDB_WRAP_SYSCALL(off_t, lseek, (int fd, off_t offset, int whence), (fd, offset, whence));
+RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *data, size_t length), (fd, data, length));
+RDB_WRAP_SYSCALL(int, fsync, (int fd), (fd));
+extern "C" int __wrap_fstat(int fd, struct stat *info) {
+  if (fd == trackedFd && lockFault == LockFault::Stat) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_fstat(fd, info);
+}
+extern "C" int __wrap_lstat(const char *path, struct stat *info) {
+  if (lockFault == LockFault::Relink && trackedPath == path) {
+    ++relinkChecks;
+    errno = ENOENT;
+    return -1;
+  }
+  return __real_lstat(path, info);
+}
+extern "C" int __wrap_flock(int fd, int operation) {
+  if (fd == trackedFd && lockFault == LockFault::Flock) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_flock(fd, operation);
+}
+extern "C" int __wrap_ftruncate(int fd, off_t length) {
+  if (fd == trackedFd && lockFault == LockFault::Truncate) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_ftruncate(fd, length);
+}
+extern "C" off_t __wrap_lseek(int fd, off_t offset, int whence) {
+  if (fd == trackedFd && lockFault == LockFault::Seek) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_lseek(fd, offset, whence);
+}
+extern "C" ssize_t __wrap_write(int fd, const void *data, size_t length) {
+  if (fd == trackedFd && !trackedPath.empty()) {
+    ++writes;
+    if (lockFault == LockFault::Write) {
+      errno = EIO;
+      return -1;
+    }
+    if (lockFault == LockFault::ZeroWrite) return 0;
+    if (lockFault == LockFault::ShortWrite) return __real_write(fd, data, 1);
+  }
+  return __real_write(fd, data, length);
+}
+extern "C" int __wrap_fsync(int fd) {
+  if (fd == trackedFd && lockFault == LockFault::Sync) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_fsync(fd);
 }
 
 #if !RDB_HAS_LD_WRAP
@@ -240,6 +322,16 @@ TEST_F(LockFileSafety, ReplacementSymlinkDoesNotIdentifyHeldInode) {
   lockfile::removeAndRelease(path.string(), fd);
   EXPECT_TRUE(std::filesystem::is_symlink(path));
   EXPECT_TRUE(std::filesystem::exists(moved));
+  std::filesystem::remove(path);
+  std::ofstream(path) << "replacement";
+  const int old = open(moved.c_str(), O_RDONLY);
+  ASSERT_GE(old, 0);
+  EXPECT_EQ(flock(old, LOCK_EX | LOCK_NB), 0);
+  EXPECT_FALSE(lockfile::stillLinked(old, path.string()));
+  lockfile::removeAndRelease(path.string(), old);
+  EXPECT_EQ(contents(path), "replacement") << "zwolnienie starej blokady usunelo nowy zwykly plik";
+  EXPECT_EQ(fcntl(old, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
 }
 
 // EPERM z samego open() (np. plik niezmienny) to blad systemu, nie obcy wlasciciel.
@@ -272,6 +364,168 @@ TEST_F(LockFileSafety, OpenCreateRaceHasAnInternalRetryLimit) {
   EXPECT_FALSE(std::filesystem::exists(path));
 }
 
+TEST_F(LockFileSafety, NewLockIgnoresUmaskAndUsesTheRequestedAccessMode) {
+  const mode_t previous = umask(0077);
+  for (const bool writable : {false, true}) {
+    int fd            = -1;
+    const auto result = lockfile::acquire(path.string(), true, writable, fd);
+    EXPECT_EQ(result, lockfile::Result::Acquired);
+    if (fd == -1) continue;
+    struct stat info{};
+    EXPECT_EQ(fstat(fd, &info), 0);
+    EXPECT_EQ(info.st_mode & 0777, 0644U);
+    EXPECT_EQ(fcntl(fd, F_GETFL) & O_ACCMODE, writable ? O_RDWR : O_RDONLY);
+    EXPECT_TRUE(lockfile::stillLinked(fd, path.string()));
+    lockfile::removeAndRelease(path.string(), fd);
+    EXPECT_EQ(fcntl(fd, F_GETFD), -1);
+    EXPECT_EQ(errno, EBADF);
+  }
+  umask(previous);
+}
+
+TEST_F(LockFileSafety, StatAndFlockSystemErrorsCloseTheCandidateDescriptor) {
+  trackedPath = path.string();
+  for (const auto fault : {LockFault::Stat, LockFault::Flock}) {
+    lockFault = fault;
+    int fd    = -1;
+    EXPECT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Error);
+    EXPECT_EQ(errno, EIO);
+    EXPECT_EQ(fd, -1);
+    lockFault = LockFault::None;
+    EXPECT_EQ(fcntl(trackedFd, F_GETFD), -1);
+    EXPECT_EQ(errno, EBADF);
+  }
+}
+
+TEST_F(LockFileSafety, RelinkingAfterSuccessfulFlockStopsAtOneHundredAttempts) {
+  trackedPath  = path.string();
+  lockFault    = LockFault::Relink;
+  relinkChecks = 0;
+  int fd       = -1;
+  EXPECT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Error);
+  EXPECT_EQ(errno, ESTALE);
+  EXPECT_EQ(relinkChecks, 100);
+  EXPECT_EQ(fd, -1);
+  lockFault = LockFault::None;
+  EXPECT_EQ(fcntl(trackedFd, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
+}
+
+TEST_F(LockFileSafety, SweepCallbackRunsUnderExclusiveLockAndCountsOnlyAcceptedFiles) {
+  std::ofstream(path) << "abandoned";
+  std::ofstream(dir / "unrelated") << "kept";
+  int callbacks = 0;
+  EXPECT_EQ(lockfile::sweep(
+                dir.string(), [&](std::string_view name) { return name == path.filename().string(); },
+                [&](std::string_view name) {
+                  ++callbacks;
+                  EXPECT_EQ(name, path.filename().string());
+                  EXPECT_TRUE(lockfile::isHeld(path.string()));
+                  EXPECT_EQ(lockfile::claimAbandoned(path.string()), -1);
+                }),
+            1U);
+  EXPECT_EQ(callbacks, 1);
+  EXPECT_FALSE(std::filesystem::exists(path));
+  EXPECT_TRUE(std::filesystem::exists(dir / "unrelated"));
+  EXPECT_EQ(
+      lockfile::sweep((dir / "absent").string(), [](std::string_view) { return true; }, [](std::string_view) { ADD_FAILURE(); }),
+      0U);
+  EXPECT_EQ(lockfile::claimAbandoned(path.string()), -1);
+  EXPECT_FALSE(std::filesystem::exists(path));
+  std::ofstream(path) << "unheld";
+  trackedPath = path.string();
+  lockFault   = LockFault::Relink;
+  EXPECT_EQ(lockfile::claimAbandoned(path.string()), -1) << "sprzatacz przejal podmieniony i-wezel";
+  lockFault = LockFault::None;
+  EXPECT_EQ(fcntl(trackedFd, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
+}
+
+TEST_F(LockFileSafety, TruncateFailureDuringAcquireKeepsTheLockAndReportsWarning) {
+  std::ofstream(path) << "previous";
+  trackedPath = path.string();
+  lockFault   = LockFault::Truncate;
+  const LogCapture log;
+  spdlog::default_logger()->set_level(spdlog::level::debug);
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  EXPECT_TRUE(guard.acquireLock());
+  EXPECT_TRUE(guard.isLockActive());
+  EXPECT_TRUE(lockfile::isHeld(path.string()));
+  EXPECT_EQ(contents(path), "previous");
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+  EXPECT_NE(log.text().find("Cannot truncate lock file"), std::string::npos);
+#else
+  EXPECT_EQ(log.text().find("Cannot truncate lock file"), std::string::npos);
+#endif
+  lockFault = LockFault::None;
+}
+
+TEST_F(LockFileSafety, PublishingChecksEveryIoBoundaryAndUsesOneWrite) {
+  trackedPath = path.string();
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  EXPECT_FALSE(guard.publishLockInfo());
+  ASSERT_TRUE(guard.acquireLock());
+  for (const auto fault : {LockFault::Truncate, LockFault::Seek, LockFault::Write, LockFault::Sync}) {
+    lockFault = fault;
+    EXPECT_FALSE(guard.publishLockInfo());
+    EXPECT_TRUE(guard.isLockActive());
+  }
+  lockFault = LockFault::None;
+  writes    = 0;
+  ASSERT_TRUE(guard.publishLockInfo());
+  EXPECT_EQ(writes, 1);
+  const auto text = contents(path);
+  EXPECT_NE(text.find("PID: " + std::to_string(getpid()) + "\n"), std::string::npos);
+  EXPECT_NE(text.find("PPID: " + std::to_string(getppid()) + "\n"), std::string::npos);
+  const auto identity = detectSystemdIdentity();
+  EXPECT_NE(text.find(identity.unit ? "MODE: service\n" : "MODE: process\n"), std::string::npos);
+  if (identity.unit) {
+    EXPECT_NE(text.find("UNIT: " + *identity.unit + "\n"), std::string::npos);
+    EXPECT_NE(text.find(identity.userScope ? "SCOPE: user\n" : "SCOPE: system\n"), std::string::npos);
+  }
+  EXPECT_EQ(text.find("QUERYFILE:"), std::string::npos);
+}
+
+TEST_F(LockFileSafety, DocumentedShortWritesAreAcceptedWithoutRetry) {
+  trackedPath = path.string();
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  ASSERT_TRUE(guard.acquireLock());
+  for (const auto fault : {LockFault::ZeroWrite, LockFault::ShortWrite}) {
+    lockFault = fault;
+    writes    = 0;
+    EXPECT_TRUE(guard.publishLockInfo());
+    EXPECT_EQ(writes, 1);
+    EXPECT_EQ(contents(path), fault == LockFault::ZeroWrite ? "" : "P");
+  }
+  lockFault = LockFault::None;
+}
+
+TEST_F(LockFileSafety, IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice) {
+  FlockServiceGuard guard(service);
+  EXPECT_EQ(guard.lockDirectory(), std::filesystem::temp_directory_path().string());
+  guard.setLockDir(dir.string());
+  EXPECT_EQ(guard.lockDirectory(), dir.string());
+  EXPECT_FALSE(guard.acquireIpcLock("contract", dir.string()));
+  ASSERT_TRUE(guard.acquireLock());
+  EXPECT_TRUE(guard.acquireIpcLock("contract", dir.string()));
+  EXPECT_FALSE(guard.acquireIpcLock("other", dir.string()));
+  guard.releaseLock();
+  guard.releaseLock();
+  EXPECT_FALSE(guard.isLockActive());
+  EXPECT_FALSE(std::filesystem::exists(path));
+  EXPECT_FALSE(std::filesystem::exists(ipc::identityLockPath("contract", dir.string())));
+}
+
+TEST(LockManagerIdentity, CopiesThePlatformServiceIdentity) {
+  const auto platform = osplat::detectServiceIdentity();
+  const auto guard    = detectSystemdIdentity();
+  EXPECT_EQ(guard.unit, platform.unit);
+  EXPECT_EQ(guard.userScope, platform.userScope);
+}
+
 // Straznik nie zmienia ani wlasciciela deskryptorow, ani adresu (serviceGuardPtr) - R-01, #274.
 static_assert(!std::is_copy_constructible_v<FlockServiceGuard>);
 static_assert(!std::is_copy_assignable_v<FlockServiceGuard>);
@@ -291,6 +545,7 @@ TEST(LockManagerPeerInfo, parses_service_with_unit_scope_and_queryfile) {
   guard.setLockDir(dir);
   const FlockServiceGuard::PeerInfo info = guard.readPeerInfo();
 
+  EXPECT_EQ(info.pid, 1234);
   EXPECT_EQ(info.kind, FlockServiceGuard::PeerInfo::Kind::Service);
   EXPECT_EQ(info.scope, FlockServiceGuard::PeerInfo::Scope::System);
   EXPECT_EQ(info.unit, "xretractor.service");
@@ -331,11 +586,24 @@ TEST(LockManagerPeerInfo, plain_process_lock_yields_process_kind) {
 }
 
 TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
+  const std::string dir = (std::filesystem::temp_directory_path() / ("ut_lockmgr_absent_" + std::to_string(getpid()))).string();
   FlockServiceGuard guard("ut_absent");
-  guard.setLockDir((std::filesystem::temp_directory_path() / "ut_lockmgr_absent").string());
+  guard.setLockDir(dir);
   const FlockServiceGuard::PeerInfo info = guard.readPeerInfo();
 
   EXPECT_EQ(info.kind, FlockServiceGuard::PeerInfo::Kind::Unknown);
+  EXPECT_EQ(info.pid, 0);
+  EXPECT_EQ(info.scope, FlockServiceGuard::PeerInfo::Scope::Unknown);
+  EXPECT_TRUE(info.unit.empty());
+  EXPECT_TRUE(info.queryFile.empty());
+  writeLockFile(dir, "ut_absent", "UNRELATED: ignored\n");
+  const auto partial = guard.readPeerInfo();
+  EXPECT_EQ(partial.kind, FlockServiceGuard::PeerInfo::Kind::Unknown);
+  EXPECT_EQ(partial.pid, 0);
+  EXPECT_EQ(partial.scope, FlockServiceGuard::PeerInfo::Scope::Unknown);
+  EXPECT_TRUE(partial.unit.empty());
+  EXPECT_TRUE(partial.queryFile.empty());
+  std::filesystem::remove_all(dir);
 }
 
 TEST(LockManagerFlock, releaseRemovesFileAndOrphanedOpenerCannotWin) {

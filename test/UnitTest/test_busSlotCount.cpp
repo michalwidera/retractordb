@@ -8,9 +8,15 @@
 
 #include "busRepairSeqlockTests.hpp"
 #include "busSlotCountTests.hpp"
+#include "syscallWrap.hpp"
 
 #if RDB_HAS_ROBUST_MUTEX
 namespace {
+
+bus::Slot *observedSlot            = nullptr;
+std::uint32_t sequenceAtConsistent = 0;
+bool zeroAtConsistent              = false;
+int consistentCalls                = 0;
 
 // Logger wraca na miejsce takze po ASSERT: pozostale testy zachowuja swoj plik logu.
 struct BusLogCapture {
@@ -28,6 +34,39 @@ struct BusLogCapture {
 };
 
 }  // namespace
+
+extern "C" int __real_pthread_mutex_consistent(pthread_mutex_t *mutex);
+RDB_WRAP_SYSCALL(int, pthread_mutex_consistent, (pthread_mutex_t * mutex), (mutex));
+extern "C" int __wrap_pthread_mutex_consistent(pthread_mutex_t *mutex) {
+  if (observedSlot != nullptr) {
+    ++consistentCalls;
+    sequenceAtConsistent = std::atomic_ref<std::uint32_t>(observedSlot->seq).load();
+    const auto *bytes    = reinterpret_cast<const char *>(observedSlot);
+    zeroAtConsistent =
+        std::all_of(bytes + sizeof(observedSlot->seq), bytes + sizeof(*observedSlot), [](char byte) { return byte == 0; });
+  }
+  return __real_pthread_mutex_consistent(mutex);
+}
+
+TEST_F(BusRepairSeqlock, InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent) {
+  bus::Bus candidate(name);
+  ASSERT_TRUE(candidate.attached());
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment     = static_cast<bus::Segment *>(mapping.get_address());
+  const auto before = segment->slots[kVictim].seq;
+  dieMidWrite(segment);
+  ASSERT_FALSE(HasFatalFailure());
+  observedSlot     = &segment->slots[kVictim];
+  consistentCalls  = 0;
+  zeroAtConsistent = false;
+  EXPECT_EQ(candidate.claim({.name = "candidate", .streams = {"fresh"}}).status, bus::ClaimStatus::Claimed);
+  observedSlot = nullptr;
+  EXPECT_EQ(consistentCalls, 1);
+  EXPECT_EQ(sequenceAtConsistent & 1U, 0U);
+  EXPECT_NE(sequenceAtConsistent, before);
+  EXPECT_TRUE(zeroAtConsistent);
+}
 
 // ENOTRECOVERABLE powstaje po unlock bez consistent, nie po samej smierci naprawiajacego.
 TEST_F(BusRepairSeqlock, UnrecoverableMutexReportsRecoveryInstructions) {

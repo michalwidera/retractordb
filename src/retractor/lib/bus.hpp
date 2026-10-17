@@ -351,7 +351,7 @@ struct ClaimRequest {
 /// - przez instances zwracać migawkę żywych instancji czytaną seqlockiem, bez muteksu i bez kontaktu z serwerami, pomijając sloty w trakcie zapisu i sloty martwe.
 ///   Test: `BusFixture.ClaimPublishesInstance`, `BusFixture.ZombieSlotIsFreeAgain`, `FallbackLock.InstancesSkipSlotMidWriteWithoutTakingLock` (ut_busFallback; odczyt wspolny dla obu galezi zamka).
 /// - po przejęciu muteksu porzuconego przez zmarłego właściciela unieważniać sloty przerwane w trakcie zapisu przed oznaczeniem stanu jako spójnego.
-///   Test: `BusRepairSeqlock.RepairPublishesFreshEvenSequence` (ut_busSlotCount i ut_busFallback), `BusRepairSeqlock.InterruptedRepairRemainsRecoverable` (ut_busSlotCount), `FallbackLock.DeadOwnerIsRecoveredAndInterruptedSlotInvalidated`; kolejnosc naprawy przed pthread_mutex_consistent bez asercji - okno miedzy nimi bez haka RDB_FAULT_*.
+///   Test: `BusRepairSeqlock.RepairPublishesFreshEvenSequence` (ut_busSlotCount i ut_busFallback), `BusRepairSeqlock.InterruptedRepairRemainsRecoverable` (ut_busSlotCount), `FallbackLock.DeadOwnerIsRecoveredAndInterruptedSlotInvalidated`, `BusRepairSeqlock.InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent` (ut_busSlotCount, przechwycenie pthread_mutex_consistent bez haka w produkcji).
 /// - przy zniszczeniu zwalniać slot i odwzorowanie, a segment i plik obecności usuwać wyłącznie wtedy, gdy uda się zająć wyłączną blokadę obecności, czyli segmentu nie mapuje nikt inny.
 ///   Test: `BusPresence.LastMapperRemovesSegment`, `BusFixture.ReleaseFreesTheName`.
 /// - uniemożliwiać kopiowanie obiektu.

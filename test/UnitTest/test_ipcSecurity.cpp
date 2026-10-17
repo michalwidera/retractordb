@@ -33,6 +33,12 @@ std::string foreignPath;
 int foreignFd      = -1;
 ino_t foreignLock  = 0;
 int rejectedLockFd = -1;
+std::string namespaceFaultPath;
+int namespaceError   = 0;
+mode_t namespaceMode = 0;
+int objectLstats     = 0;
+std::string changedObjectPath;
+bool cleanupIoError = false;
 uid_t otherUid() { return geteuid() == 65534 ? 65533 : 65534; }
 
 std::string pathFor(const std::string &name) {
@@ -53,17 +59,25 @@ class IpcSecurity : public ::testing::Test {
     foreignPath.clear();
     foreignFd   = -1;
     foreignLock = 0;
+    namespaceFaultPath.clear();
+    namespaceError = 0;
+    namespaceMode  = 0;
+    changedObjectPath.clear();
+    cleanupIoError = false;
     IPC::shared_memory_object::remove(names.shmemSegment.c_str());
     IPC::message_queue::remove(names.queryQueue.c_str());
     IPC::message_queue::remove(names.responseQueue(getpid()).c_str());
+    std::filesystem::remove(pathFor(names.shmemSegment) + ".alias");
   }
 };
 }  // namespace
 
 extern "C" int __real_fstat(int fd, struct stat *info);
 extern "C" int __real_lstat(const char *path, struct stat *info);
+extern "C" int __real_stat(const char *path, struct stat *info);
 RDB_WRAP_SYSCALL(int, fstat, (int fd, struct stat *info), (fd, info));
 RDB_WRAP_SYSCALL(int, lstat, (const char *path, struct stat *info), (path, info));
+RDB_WRAP_SYSCALL(int, stat, (const char *path, struct stat *info), (path, info));
 
 extern "C" int __wrap_fstat(int fd, struct stat *info) {
   const int result = __real_fstat(fd, info);
@@ -75,8 +89,25 @@ extern "C" int __wrap_fstat(int fd, struct stat *info) {
 }
 
 extern "C" int __wrap_lstat(const char *path, struct stat *info) {
+  if (!namespaceFaultPath.empty() && namespaceFaultPath == path && namespaceError != 0) {
+    errno = namespaceError;
+    return -1;
+  }
+  if (cleanupIoError && changedObjectPath == path) {
+    errno = EIO;
+    return -1;
+  }
   const int result = __real_lstat(path, info);
   if (result == 0 && !foreignPath.empty() && foreignPath == path) info->st_uid = otherUid();
+  // openMemory sprawdza wpis i deskryptor (trzy lstat); czwarty jest PO otwarciu kolejki.
+  if (result == 0 && !changedObjectPath.empty() && changedObjectPath == path && ++objectLstats == 4) ++info->st_ino;
+  return result;
+}
+
+extern "C" int __wrap_stat(const char *path, struct stat *info) {
+  const int result = __real_stat(path, info);
+  if (result == 0 && !namespaceFaultPath.empty() && namespaceFaultPath == path && namespaceMode != 0)
+    info->st_mode = namespaceMode;
   return result;
 }
 
@@ -86,7 +117,90 @@ TEST_F(IpcSecurity, ExclusiveCollisionPreservesQueueAndItsContents) {
   EXPECT_THROW(sec::createQueue(names.queryQueue, 9, 32), sec::Rejected);
   const auto reopened = sec::openQueue(names.queryQueue);
   EXPECT_EQ(reopened->get_max_msg(), 3U);
+  EXPECT_EQ(reopened->get_max_msg_size(), 16U);
   EXPECT_EQ(reopened->get_num_msg(), 1U);
+}
+
+TEST_F(IpcSecurity, NamespaceRejectsWritableNonstickyAndNondirectoryTargets) {
+  const auto memory  = sec::createMemory(names.shmemSegment);
+  namespaceFaultPath = std::filesystem::path(pathFor(names.shmemSegment)).parent_path().string();
+  for (const mode_t mode : {mode_t(S_IFDIR | 0777), mode_t(S_IFREG | 0600)}) {
+    namespaceMode = mode;
+    EXPECT_THROW(sec::checkNamespace(names.shmemSegment), sec::Rejected);
+  }
+  namespaceMode = S_IFDIR | S_ISVTX | 0777;
+  EXPECT_NO_THROW(sec::checkNamespace(names.shmemSegment));
+  namespaceMode = S_IFDIR | 0700;
+  EXPECT_NO_THROW(sec::checkNamespace(names.shmemSegment));
+}
+
+TEST_F(IpcSecurity, NamespaceDistinguishesMissingDirectoryFromInspectionFailure) {
+  const auto memory  = sec::createMemory(names.shmemSegment);
+  namespaceFaultPath = std::filesystem::path(pathFor(names.shmemSegment)).parent_path().string();
+  namespaceError     = ENOENT;
+  try {
+    sec::checkNamespace(names.shmemSegment);
+    ADD_FAILURE() << "brak katalogu nie zostal zgloszony";
+  } catch (const IPC::interprocess_exception &error) {
+    EXPECT_EQ(error.get_native_error(), ENOENT);
+  }
+  namespaceError = EACCES;
+  EXPECT_THROW(sec::checkNamespace(names.shmemSegment), sec::Rejected);
+}
+
+TEST_F(IpcSecurity, HardlinkAndSymlinkObjectsAreRejectedWithoutDamagingTheirTarget) {
+  auto memory = sec::createMemory(names.shmemSegment);
+  memory.truncate(16);
+  const auto path  = std::filesystem::path(pathFor(names.shmemSegment));
+  const auto alias = std::filesystem::path(path.string() + ".alias");
+  std::filesystem::create_hard_link(path, alias);
+  EXPECT_THROW(sec::openMemory(names.shmemSegment, IPC::read_only), sec::Rejected);
+  EXPECT_FALSE(sec::removeOwned(names.shmemSegment));
+  EXPECT_TRUE(std::filesystem::exists(path));
+  std::filesystem::remove(alias);
+  std::filesystem::rename(path, alias);
+  std::filesystem::create_symlink(alias, path);
+  EXPECT_THROW(sec::openMemory(names.shmemSegment, IPC::read_only), sec::Rejected);
+  EXPECT_FALSE(sec::removeOwned(names.shmemSegment));
+  EXPECT_TRUE(std::filesystem::is_symlink(path));
+  EXPECT_EQ(std::filesystem::file_size(alias), 16U);
+  std::filesystem::remove(path);
+  std::filesystem::remove(alias);
+}
+
+TEST_F(IpcSecurity, OpenedDescriptorMustStillBeTheNamedObject) {
+  const auto memory = sec::createMemory(names.shmemSegment);
+  const auto path   = std::filesystem::path(pathFor(names.shmemSegment));
+  const auto alias  = std::filesystem::path(path.string() + ".alias");
+  std::filesystem::rename(path, alias);
+  {
+    const auto replacement = sec::createMemory(names.shmemSegment);
+    EXPECT_THROW(sec::checkOpened(memory, names.shmemSegment), sec::Rejected);
+    EXPECT_NO_THROW(sec::checkOpened(replacement, names.shmemSegment));
+  }
+  std::filesystem::remove(alias);
+}
+
+TEST_F(IpcSecurity, QueueOpenRejectsNameReplacementAfterOpening) {
+  const auto queue  = sec::createQueue(names.queryQueue, 1, 16);
+  changedObjectPath = pathFor(names.queryQueue);
+  objectLstats      = 0;
+  EXPECT_THROW(sec::openQueue(names.queryQueue), sec::Rejected);
+  EXPECT_EQ(objectLstats, 4);
+  changedObjectPath.clear();
+  EXPECT_NO_THROW(sec::openQueue(names.queryQueue));
+}
+
+TEST_F(IpcSecurity, CleanupIoFailureLogsAndReturnsFalseWithoutRemovingTheObject) {
+  const auto memory = sec::createMemory(names.shmemSegment);
+  changedObjectPath = pathFor(names.shmemSegment);
+  cleanupIoError    = true;
+  const LogCapture log;
+  EXPECT_FALSE(sec::removeOwned(names.shmemSegment));
+  EXPECT_NE(log.text().find("cannot inspect object for cleanup"), std::string::npos);
+  cleanupIoError = false;
+  changedObjectPath.clear();
+  EXPECT_TRUE(sec::removeOwned(names.shmemSegment));
 }
 
 TEST_F(IpcSecurity, InvalidNamesMissingObjectsAndExclusiveMemoryCreation) {

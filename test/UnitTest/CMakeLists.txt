@@ -87,11 +87,32 @@ foreach(item ${V_GLOB})
                           -Wl,--wrap=pread -Wl,--wrap=write -Wl,--wrap=pwrite)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_lockManager")
-      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=open)
+      target_link_options(
+        ${OUTPUT_FILE_NOEXT}
+        PRIVATE
+        -Wl,--wrap=open
+        -Wl,--wrap=fstat
+        -Wl,--wrap=lstat
+        -Wl,--wrap=flock
+        -Wl,--wrap=ftruncate
+        -Wl,--wrap=lseek
+        -Wl,--wrap=write
+        -Wl,--wrap=fsync)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcResponses")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=getenv)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_busSlotCount" AND RDB_HAS_ROBUST_MUTEX)
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE
+                          -Wl,--wrap=pthread_mutex_consistent)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcServer")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=shm_open
+                          -Wl,--wrap=fstatvfs -Wl,--wrap=statvfs)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcSecurity")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
-                          -Wl,--wrap=lstat)
+                          -Wl,--wrap=lstat -Wl,--wrap=stat)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_storageRotation")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=rename

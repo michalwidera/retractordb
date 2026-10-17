@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -17,12 +18,18 @@
 #include "constants.hpp"
 #include "ipcResponses.hpp"
 #include "ipcSecurity.hpp"
+#include "logCapture.hpp"
 #include "osPlatform.hpp"
+#include "syscallWrap.hpp"
 
 namespace {
 
 namespace IPC  = boost::interprocess;
 namespace resp = ipc::responses;
+
+// Istniejacy punkt diagnostyczny po READY -> READING pozwala wymusic utrate
+// slotu przed koncowym CAS, bez dodawania haka do implementacji.
+resp::Slot *lostReadSlot = nullptr;
 
 resp::Owner self(std::uint64_t seq) {
   const auto pid = static_cast<std::int32_t>(getpid());
@@ -63,10 +70,25 @@ void fillWith(resp::Segment &segment, const resp::Owner &owner) {
 
 }  // namespace
 
+extern "C" char *__real_getenv(const char *name);
+RDB_WRAP_SYSCALL(char *, getenv, (const char *name), (name));
+extern "C" char *__wrap_getenv(const char *name) {
+  if (lostReadSlot != nullptr && std::string_view(name) == "RDB_FAULT_CLIENT_READ_DELAY") {
+    lostReadSlot->state = static_cast<std::uint32_t>(resp::SlotState::Writing);
+    lostReadSlot        = nullptr;
+    return nullptr;
+  }
+  return __real_getenv(name);
+}
+
 TEST(IpcResponses, publish_then_take_frees_the_slot) {
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "odpowiedz"), resp::PublishStatus::Published);
   EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Ready);
+  EXPECT_EQ(segment->slots[0].pid, self(1).pid);
+  EXPECT_EQ(segment->slots[0].startTime, self(1).startTime);
+  EXPECT_EQ(segment->slots[0].seq, 1U);
+  EXPECT_EQ(segment->slots[0].length, 9U);
 
   EXPECT_EQ(resp::tryTake(*segment, self(1)), "odpowiedz");
   EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Free);
@@ -152,6 +174,7 @@ TEST(IpcResponses, free_slot_is_preferred_over_reclaim) {
 
 // Zywego wlasciciela nie wolno wywlaszczyc - jego odbior moze wlasnie trwac.
 TEST(IpcResponses, live_owners_are_never_reclaimed) {
+  const LogCapture log;
   auto segment = freshSegment();
   fillWith(*segment, self(1));
 
@@ -160,9 +183,11 @@ TEST(IpcResponses, live_owners_are_never_reclaimed) {
     EXPECT_EQ(stateOf(segment->slots[i]), resp::SlotState::Ready);
     EXPECT_EQ(segment->slots[i].seq, 1 + i) << "slot " << i << " zywego klienta nadpisany";
   }
+  EXPECT_NE(log.text().find("dropped: all"), std::string::npos);
 }
 
 TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
+  const LogCapture log;
   auto segment = freshSegment();
   const std::string huge(ipc::kResponseSlotDataSize + 1, 'a');
   ASSERT_EQ(resp::publish(*segment, self(1), huge), resp::PublishStatus::Published);
@@ -173,6 +198,78 @@ TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
   boost::property_tree::ptree pt;
   read_info(stream, pt);
   EXPECT_EQ(pt.get<std::string>("error.response", ""), "response too large (32769 B > 32768 B)");
+  EXPECT_NE(log.text().find("replaced with an error"), std::string::npos);
+}
+
+TEST(IpcResponses, live_readers_are_not_reclaimed_or_modified) {
+  auto segment = freshSegment();
+  fillWith(*segment, self(1));
+  for (auto &slot : segment->slots)
+    slot.state = static_cast<std::uint32_t>(resp::SlotState::Reading);
+  EXPECT_EQ(resp::publish(*segment, self(100), "replacement"), resp::PublishStatus::Full);
+  for (std::size_t i = 0; i < ipc::kResponseSlotCount; ++i) {
+    EXPECT_EQ(stateOf(segment->slots[i]), resp::SlotState::Reading);
+    EXPECT_EQ(segment->slots[i].seq, i + 1);
+    EXPECT_EQ(segment->slots[i].data[0], 'x');
+  }
+}
+
+TEST(IpcResponses, failed_release_discards_the_copy_and_keeps_scanning) {
+  auto segment = freshSegment();
+  ASSERT_EQ(resp::publish(*segment, self(1), "untrusted"), resp::PublishStatus::Published);
+  ASSERT_EQ(resp::publish(*segment, self(1), "trusted"), resp::PublishStatus::Published);
+  lostReadSlot = &segment->slots[0];
+  EXPECT_EQ(resp::tryTake(*segment, self(1)), "trusted");
+  EXPECT_EQ(lostReadSlot, nullptr);
+  lostReadSlot = nullptr;
+  EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Writing);
+  EXPECT_EQ(stateOf(segment->slots[1]), resp::SlotState::Free);
+}
+
+TEST(IpcResponses, take_returns_a_ready_answer_without_waiting_for_the_deadline) {
+  auto segment = freshSegment();
+  ASSERT_EQ(resp::publish(*segment, self(9), "ready"), resp::PublishStatus::Published);
+  EXPECT_EQ(
+      resp::take(*segment, self(9), std::chrono::steady_clock::now() + std::chrono::seconds(5), std::chrono::milliseconds(1)),
+      "ready");
+  EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Free);
+}
+
+TEST(IpcResponses, mapping_checks_size_and_every_header_field_without_reinitializing_slots) {
+  const std::string name = "ut_ipcResponses_layout_" + std::to_string(getpid());
+  IPC::shared_memory_object::remove(name.c_str());
+  {
+    auto memory = ipc::security::createMemory(name);
+    memory.truncate(sizeof(resp::Segment) - 1);
+    EXPECT_FALSE(resp::Mapping(IPC::open_only, name).valid());
+  }
+  ASSERT_TRUE(IPC::shared_memory_object::remove(name.c_str()));
+  {
+    const auto empty = ipc::security::createMemory(name);
+    EXPECT_THROW(resp::Mapping(IPC::open_only, name), IPC::interprocess_exception);
+  }
+  ASSERT_TRUE(IPC::shared_memory_object::remove(name.c_str()));
+  {
+    const resp::Mapping server(IPC::create_only, name);
+    for (const auto &slot : server.segment().slots)
+      EXPECT_EQ(stateOf(slot), resp::SlotState::Free);
+    ASSERT_EQ(resp::publish(server.segment(), self(7), "preserved"), resp::PublishStatus::Published);
+    const resp::Mapping client(IPC::open_only, name);
+    const auto original = server.segment().header;
+    for (const int field : {0, 1, 2, 3}) {
+      server.segment().header = original;
+      auto &header            = server.segment().header;
+      if (field == 0) ++header.magic;
+      if (field == 1) ++header.layoutVersion;
+      if (field == 2) ++header.slotCount;
+      if (field == 3) ++header.slotSize;
+      EXPECT_FALSE(client.valid()) << field;
+    }
+    server.segment().header = original;
+    EXPECT_TRUE(client.valid());
+    EXPECT_EQ(resp::tryTake(client.segment(), self(7)), "preserved");
+  }
+  EXPECT_TRUE(IPC::shared_memory_object::remove(name.c_str()));
 }
 
 TEST(IpcResponses, response_of_exactly_slot_size_fits) {
