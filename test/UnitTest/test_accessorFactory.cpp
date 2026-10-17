@@ -74,6 +74,7 @@ TEST(AccessorFactoryTest, source_kind_mismatch_by_file_type) {
 TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
   // covers: accessorfactory.fabryki.1~1, accessorfactory.make-accessor.1~1, faccposix.posix-binary-file.1~1
   // covers: faccposixshd.posix-binary-file-with-shadow.8~1, faccposixshd.posix-binary-file-with-shadow.13~1, storage.storage.3~1
+  // covers: faccfs.generic-binary-file.2~1
   auto desc = testDescriptor();
 
   auto posix = rdbtest::ok(rdb::makeAccessor("POSIX", "af_posix.bin", desc, false, -1));
