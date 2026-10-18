@@ -36,6 +36,9 @@ namespace rdb {
 ///   (fill()) w prywatnym buforze, który przeżywa krótki odczyt i timeout, a w read() oddawać rekord
 ///   skompletowany albo all-null; czekanie z terminem należy do awaitRecords(), poza blokadami modelu.
 ///
+/// - [faccbindev.binary-device-ro.14~1] przy nieudanym otwarciu BINFILE albo DEVICE udostepniac opis ze slowem zrodla, sciezka
+///   i przyczyna przez initializationError() oraz errno przez initializationErrno(), aby magazyn odmowil z klasa Environment (#488).
+///
 /// EOF dla DEVICE to `read() == 0` i nic innego - POLLHUP służy wyłącznie budzeniu, co znosi różnicę
 /// Linux/Darwin w poll() na FIFO bez pisarza. Bez ONESHOT EOF znaczy "w tej chwili nie ma pisarza":
 /// takt dostaje all-null, źródło zostaje otwarte, a ponowne podłączenie pisarza wznawia dane. Z ONESHOT
@@ -62,6 +65,7 @@ class binaryDeviceRO : public FileInterface {
   std::string filename_;
   std::string storageType_;
   std::string initializationError_;
+  int initializationErrno_ = 0;
   const ssize_t recordSize_;
   Descriptor descriptor_;
   /**
@@ -119,6 +123,7 @@ class binaryDeviceRO : public FileInterface {
   [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] int initializationErrno() const override { return initializationErrno_; }
 
   [[nodiscard]] const std::vector<bool> &lastNullBitset() const;
 

@@ -1,9 +1,6 @@
 #include "rdb/embed/engine.hpp"
 
-#include <fcntl.h>
-
 #include <algorithm>
-#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -27,7 +24,6 @@
 #include "fldType.hpp"
 #include "rdb/embed/storageGuard.hpp"
 #include "rdb/error.hpp"
-#include "rdb/storageFile.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"
@@ -179,14 +175,6 @@ Result<> Engine::compile(const std::string_view rql, const bool untilEof) {
       const std::filesystem::path sourcePath(source);
       if (std::ranges::mismatch(storagePath, sourcePath).in1 == storagePath.end())
         return fail(Errc::Compile, "source must be outside the Engine storage directory: " + source);
-      // Serwis daje przy braku zrodla rekordy NULL (#346); granica osadzona odmawia (#451), bo w
-      // Release ostrzezenie facctxtsrc jest wyciete i kolumna NULL nie zostawilaby sladu.
-      const StorageFd input(source, O_RDONLY | O_NONBLOCK, kStreamFileMode, true);
-      if (const int err = errno; !input.isOpen()) {
-        if (err == ENOENT || err == ENOTDIR)
-          return fail(Errc::IO, std::format("stream '{}': source file does not exist: {}", qry.id, source), err);
-        return fail(Errc::IO, "cannot open embedded source: " + source, err);
-      }
       RDB_TRY(plan->guard->checkPath((storagePath / (qry.id + ".meta")).string()));
       continue;
     }

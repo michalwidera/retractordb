@@ -1134,4 +1134,25 @@ TEST(xrdb, storage_caller_ref_symlink_works) {
   EXPECT_EQ(std::filesystem::file_size(target), sizeof(int));
 }
 
+// Status akcesora nie moze zamienic nieudanego otwarcia w pusty strumien (#488).
+TEST(xrdb, declared_source_open_failure_is_io_with_the_original_errno) {
+  const std::filesystem::path root = "ut-missing-source";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directory(root);
+  std::ofstream(root / "file") << "1\n";
+  for (const std::string type : {"TEXTSOURCE", "BINFILE", "DEVICE"}) {
+    for (const auto &[path, expected] : std::vector<std::pair<std::string, int>>{{(root / "absent").string(), ENOENT},
+                                                                                 {(root / "file/input").string(), ENOTDIR}}) {
+      auto storage          = rdbtest::ok(rdb::storage::create("src", "unused", root.string(), type));
+      const auto descriptor = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor(path, 0, 0, rdb::REF);
+      const auto result     = storage->attachDescriptor(&descriptor);
+      ASSERT_RDB_ERROR(result, rdb::Errc::IO, path);
+      EXPECT_EQ(result.error().err(), expected);
+      // Kolejna odmowa ma znowu czytac sciezke z planu, a nie zachowany .desc.
+      std::filesystem::remove(root / "src.desc");
+    }
+  }
+  std::filesystem::remove_all(root);
+}
+
 // NOLINTEND(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

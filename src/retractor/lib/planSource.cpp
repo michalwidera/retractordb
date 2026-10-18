@@ -284,14 +284,25 @@ rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::stri
     struct stat info{};
     if (::stat(q.filename.c_str(), &info) != 0) {
       const int err = errno;
-      // Brak zrodla nadal daje NULL, jak dotad (#346); pozostale porazki maja klase K4.
-      if (err == ENOENT || err == ENOTDIR) continue;
+      if (err == ENOENT || err == ENOTDIR)
+        return {.cls     = rdb::ErrorClass::Environment,
+                .message = std::format("stream '{}': source file does not exist: {} ({})", q.id, q.filename, std::strerror(err)),
+                .err     = err};
       return {.cls     = rdb::ErrorClass::Environment,
               .message = std::format("cannot inspect source '{}' for stream '{}': {}", q.filename, q.id, std::strerror(err)),
               .err     = err};
     }
     const std::string mismatch = rdb::sourceKindMismatch(type, q.filename, info.st_mode);
-    if (mismatch.empty()) continue;
+    if (mismatch.empty()) {
+      // Kontrola przed usuwaniem wynikow, bez probnego otwierania urzadzenia (#488).
+      if (::access(q.filename.c_str(), R_OK) != 0) {
+        const int err = errno;
+        return {.cls     = rdb::ErrorClass::Environment,
+                .message = std::format("cannot read source '{}' for stream '{}': {}", q.filename, q.id, std::strerror(err)),
+                .err     = err};
+      }
+      continue;
+    }
     if (!q.isDeprecatedFile) return {.cls = rdb::ErrorClass::Plan, .message = std::format("stream '{}': {}", q.id, mismatch)};
 
     // Forma przestarzala: autor napisal FILE, wiec komunikat mowi, jakie slowo wybrala regula

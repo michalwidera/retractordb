@@ -39,7 +39,9 @@ binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
 
   fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC | (isDevice_ ? O_NONBLOCK : 0), kDefaultFileMode);
   if (fd_ < 0) {
-    SPDLOG_WARN("Unable to open binary device source: {}", filename_);
+    initializationErrno_ = errno;
+    initializationError_ =
+        fmt::format("cannot open {} source '{}': {}", storageType_, filename_, std::strerror(initializationErrno_));
     return;
   }
   // Rodzaj tego, co faktycznie otwarto - sciezka mogla zmienic sie po stat().

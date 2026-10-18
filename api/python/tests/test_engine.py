@@ -534,8 +534,8 @@ def test_source_in_storage_preserves_the_previous_artifacts(rdb, plan_dir: Path)
         assert storage_bytes(directory) == before
 
 
-def test_missing_source_is_a_typed_error_unlike_the_service(rdb, plan_dir: Path) -> None:
-    # Serwis daje przy braku pliku zrodla rekordy NULL (#346); granica osadzona odmawia (#451).
+def test_missing_source_is_a_typed_error(rdb, plan_dir: Path) -> None:
+    # Brak pliku zrodla to IO z errno, takze w trybie samodzielnym (#488).
     source = plan_dir / "input.txt"
     source.write_text("1\n2\n")
     with rdb.Engine() as engine:

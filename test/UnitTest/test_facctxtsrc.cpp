@@ -716,11 +716,19 @@ TEST_F(TextSourceROTest, textfile_refuses_a_character_device) {
   EXPECT_EQ(src.initializationError(), "TEXTFILE '/dev/null' is a character device, not a regular file");
 }
 
-// Brak pliku nie jest odmowa (#346): ostrzezenie i rekordy NULL jak dotad.
-TEST_F(TextSourceROTest, missing_file_is_not_a_kind_refusal) {
+// Nieudane open zachowuje errno do odmowy K4, takze po udanym preflight (#488).
+TEST_F(TextSourceROTest, missing_file_reports_initialization_error_and_errno) {
+  // covers: facctxtsrc.text-source-ro.16~1
+  const auto regular = createTestFile("source_parent.txt", "1");
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  rdb::textSourceRO src(std::string("does_not_exist_kind.txt"), desc, true);
-  EXPECT_EQ(src.initializationError(), "");
+  for (const auto &[path, expected] :
+       std::vector<std::pair<std::string, int>>{{"does_not_exist_kind.txt", ENOENT}, {regular + "/input", ENOTDIR}}) {
+    rdb::textSourceRO src(path, desc, true);
+    EXPECT_EQ(src.initializationErrno(), expected);
+    EXPECT_TRUE(src.initializationError().contains(path));
+    EXPECT_TRUE(src.initializationError().contains(std::strerror(expected)));
+    EXPECT_FALSE(src.exhausted());
+  }
 }
 
 // ============================================================

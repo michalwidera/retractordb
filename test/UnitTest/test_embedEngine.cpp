@@ -397,9 +397,9 @@ TEST(embedStorageGuard, failed_marker_write_leaves_directory_claimable) {
   rdb::embed::removeTemporaryStorage(directory);
 }
 
-// Serwis daje przy braku zrodla rekordy NULL (#346); silnik osadzony zwraca Errc::IO
-// z errno (#451), a po poprawionym planie pracuje dalej.
-TEST(embedEnginePlan, missing_source_is_refused_unlike_the_service) {
+// Brak zrodla jest K4 zarowno w serwisie, jak i w silniku osadzonym (#488).
+// Po poprawionym planie ta sama instancja pracuje dalej.
+TEST(embedEnginePlan, missing_source_is_refused_with_the_original_errno) {
   // covers: engine.engine.8~1, engine.engine.15~1, engine.engine.22~1
   writeSource("ownership_source.txt", {3, 4});
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());

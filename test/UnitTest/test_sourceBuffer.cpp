@@ -152,7 +152,7 @@ TEST(SourceBufferTest, history_preserves_nulls_independently_of_the_output) {
 }
 
 TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_the_cause) {
-  // covers: sourcebuffer.source-buffer.3~1
+  // covers: sourcebuffer.source-buffer.3~2
   const std::string file = "sb_invalid_content.txt";
   createTextFile(file, "12 invalid\n");
   const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"missing", 0, 1, rdb::NULLTYPE}};
@@ -169,23 +169,31 @@ TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_th
   std::filesystem::remove(file);
 }
 
-TEST(SourceBufferTest, read_failure_warning_preserves_the_null_row) {
-  // covers: sourcebuffer.source-buffer.3~1
-  const std::string file = "sb_missing_warning.txt";
-  std::filesystem::remove(file);
+TEST(SourceBufferTest, read_failure_warns_once_per_source_and_preserves_the_null_row) {
+  // covers: sourcebuffer.source-buffer.3~2
   auto descriptor = intDescriptor();
-  rdb::textSourceRO source(file, descriptor, false);
-  rdb::SourceBuffer buffer;
-  buffer.attach(descriptor);
-  rdb::payload out(descriptor);
   LogCapture log;
-  ASSERT_RDB_OK(buffer.readCurrent(source, out));
-  EXPECT_EQ(valueOf(out), 0);
-  EXPECT_EQ(out.getNullBitset(), std::vector<bool>{true});
+  for (const std::string file : {"sb_empty_warning.txt", "sb_other_warning.txt"}) {
+    createTextFile(file, "");
+    rdb::textSourceRO source(file, descriptor, true);
+    ASSERT_TRUE(source.initializationError().empty());
+    rdb::SourceBuffer buffer;
+    buffer.attach(descriptor);
+    rdb::payload out(descriptor);
+    for (int attempt = 0; attempt < 4; ++attempt) {
+      out.setItem(0, 42);
+      ASSERT_RDB_OK(buffer.readCurrent(source, out));
+      EXPECT_EQ(valueOf(out), 0);
+      EXPECT_EQ(out.getNullBitset(), std::vector<bool>{true});
+    }
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
-  EXPECT_TRUE(log.text().contains("Read failure from declared source"));
+    const std::string warning = "Read failure from declared source " + file + ". Returning null row.";
+    const auto text           = log.text();
+    ASSERT_NE(text.find(warning), std::string::npos);
+    EXPECT_EQ(text.find(warning), text.rfind(warning));
 #endif
-  std::filesystem::remove(file);
+    std::filesystem::remove(file);
+  }
 }
 
 TEST(SourceBufferDeathTest, fire_without_capacity_is_an_invariant_failure) {
