@@ -130,6 +130,76 @@ fatal_in_slot() {
 fatal_in_slot "blad krytyczny w slocie bez klienta" ""
 fatal_in_slot "blad krytyczny w slocie z komenda klienta na blokadzie epoki" client
 
+# --- Sciezka 5: WYJATEK POZA granica bledu handlera komendy (#486). ---
+#
+# commandProcessor() ma wlasny catch(std::exception) i sam opisuje awarie klientowi -- pilnuje
+# tego it_show_handler_failure przez hak RDB_FAULT_SHOW. Ta sciezka bada pietro NIZEJ: wyjatek,
+# ktory przechodzi OBOK tego catch-a. Bez zapory wokol onCommand w IpcServer::commandLoop()
+# lapal go dopiero catch calej wiadomosci: wpis "IPC message dropped" i zadnej odpowiedzi, wiec
+# klient czekal w ciszy do limitu czasu na odpowiedz, ktora nigdy nie przychodzila.
+#
+# Hak RDB_FAULT_THROW_IN_COMMAND rzuca z lambdy .onCommand, czyli dokladnie tam: za granica
+# handlera, przed transportem. Jest zawezony do NAZWY komendy, zeby 'kill' pozostalo osiagalne.
+# Sprawdzamy caly kontrakt zapory: usluga zyje, klient dostaje POWOD (a nie cisze), kolejne
+# komendy nadal dzialaja, a zatrzymanie jest regularne (kod 0).
+rm -rf ./temp && mkdir -p ./temp
+rm -f ./*.desc ./*.meta ./*.shadow
+xretractor query.rql -c >/dev/null
+
+# Log klienta jest wspolny dla przestrzeni nazw i DOPISYWANY -- bez oproznienia sprawdzenie
+# ponizej lapaloby zdanie sasiada z tego samego slotu puli (patrz it_show_handler_failure).
+QRY_LOG="${TMPDIR:-/tmp}/xqry.log"
+: > "$QRY_LOG"
+
+# Hak czyta wylacznie serwer; klient dostaje juz srodowisko bez niego, zeby bylo
+# widac, ze powod przyszedl po linii IPC, a nie ze zmiennej.
+export RDB_FAULT_THROW_IN_COMMAND=show
+server_start query.rql -m 400 -k -r 2>command.err
+unset RDB_FAULT_THROW_IN_COMMAND
+
+rc=0
+run_timeout 30 xqry -s w -m 2 >/dev/null 2>&1 || rc=$?
+
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "wyjatek poza granica handlera zabil serwer - brak zapory w IpcServer::commandLoop()"
+  exit 1
+fi
+
+# no_stream_resources = selectResult::clientQueueMissing. Kod NIE odroznia powodu od ciszy:
+# brak odpowiedzi na 'show' klient tez melduje jako odmowe ("server not found"). Wyklucza
+# tylko inne awarie klienta i limit run_timeout; sedno sprawdza grep ponizej.
+expected_rc=$(errno_value ENOSR)
+if [ "$rc" -ne "$expected_rc" ]; then
+  echo "xqry po wyjatku w handlerze: kod $rc, oczekiwano $expected_rc; tresc $QRY_LOG:"
+  cat "$QRY_LOG"
+  exit 1
+fi
+
+if ! grep -F "command handler failure: RDB_FAULT_THROW_IN_COMMAND" "$QRY_LOG"; then
+  echo "zapora zatrzymala wyjatek, ale klient nie dostal powodu; tresc $QRY_LOG:"
+  cat "$QRY_LOG"
+  exit 1
+fi
+
+# Jedno wadliwe zadanie nie jest powodem, zeby przestac obslugiwac pozostale.
+if ! run_timeout 30 xqry -l >/dev/null 2>&1; then
+  echo "serwer przezyl wyjatek, ale nie obsluguje juz kolejnych komend"
+  exit 1
+fi
+
+xqry -k >/dev/null
+# server_wait_status biegnie w podpowloce $(...), ktora zna kod tylko procesu juz zakonczonego.
+if ! wait_for_exit "$_server_pid"; then
+  echo "serwer zyje 30 s po 'kill' wyslanym po wyjatku w handlerze"
+  exit 1
+fi
+status=$(server_wait_status)
+if [ "$status" -ne 0 ]; then
+  echo "zatrzymanie po wyjatku w handlerze: kod wyjscia $status, oczekiwano 0"
+  cat command.err
+  exit 1
+fi
+
 # Blokada uslugi ma znikac SAMA. std::exit nie uruchamia destruktorow obiektow
 # automatycznych, wiec FlockServiceGuard::~FlockServiceGuard() przy bledzie krytycznym
 # sie nie wykonuje - plik kasuje executorsm::cleanup() zarejestrowany przez atexit.
