@@ -134,11 +134,14 @@ Result<> storage::attachStorage() {
 
   RDB_TRY(initializeAccessor());
   if (!accessor_->initializationError().empty()) {
-    // Niepusty status zrodla oznacza zly rodzaj pliku (BINFILE/TEXTFILE/DEVICE).
-    if (isDeclared()) return fail(Refusal{.cls = ErrorClass::Plan, .message = accessor_->initializationError()});
+    const int err = accessor_->initializationErrno();
+    // Zly rodzaj zrodla to K2; nieudane open() to K4, takze po udanym preflight (#488).
+    if (isDeclared())
+      return fail(Refusal{.cls     = err == 0 ? ErrorClass::Plan : ErrorClass::Environment,
+                          .message = accessor_->initializationError(),
+                          .err     = err});
     // Zapisywalne akcesory oddaja blad open(O_CREAT). Klasa jak w checkOutputFilesOpenable:
     // sciezka sprzeczna z systemem plikow to plan, reszta to srodowisko (#474).
-    const int err = accessor_->initializationErrno();
     return fail(Refusal{.cls     = err == ENOENT || err == ENOTDIR || err == EISDIR ? ErrorClass::Plan : ErrorClass::Environment,
                         .message = accessor_->initializationError(),
                         .err     = err});

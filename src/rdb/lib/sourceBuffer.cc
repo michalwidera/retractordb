@@ -24,7 +24,8 @@ Result<> SourceBuffer::readCurrent(FileInterface &source, payload &out) {
   chamber_->setNullBitset(nullBitset);
 
   // Źródła deklarowane przy błędzie same zwracają dane wyzerowane i wzorzec all-null.
-  if (result != EXIT_SUCCESS) {
+  if (result != EXIT_SUCCESS && !readFailureReported_) {
+    readFailureReported_ = true;
     SPDLOG_WARN("Read failure from declared source {}. Returning null row.", source.name());
   }
 

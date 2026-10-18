@@ -89,11 +89,13 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// - [plansource.check-declared-sources.1~1] badać tylko deklaracje, a przy niepustej liście nazw tylko deklaracje z listy.
 /// - [plansource.check-declared-sources.2~1] dla TYPE TEXTSOURCE odrzucać z klasą Plan pole o niezerowej długości typu innego niż BYTE, INTEGER, UINT, FLOAT, DOUBLE i STRING.
 ///   Nietestowalne: gramatyka DECLARE dopuszcza tylko BYTE, STRING, UINT, INTEGER, FLOAT i DOUBLE, wiec plan z parsera nie niesie odrzucanego pola; te sama kontrole pol dla zachowanego `.desc` sprawdza `PlanSource.text_source_refuses_a_kept_rational_even_when_its_schema_fits_double`.
-/// - [plansource.check-declared-sources.3~1] sprawdzać rodzaj pliku pod ścieżką przez stat(), bez otwierania; brak pliku (ENOENT, ENOTDIR) przepuszczać, a inny błąd stat zwracać z klasą Environment i errno.
+/// - [plansource.check-declared-sources.3~2] sprawdzac rodzaj pliku przez stat() i prawo odczytu przez access(R_OK), bez otwierania;
+///   kazdy blad tych kontroli, takze brak pliku (ENOENT, ENOTDIR), zwracac z klasa Environment,
+///   nazwa strumienia, sciezka, przyczyna systemowa i errno.
 /// - [plansource.check-declared-sources.4~1] odrzucać z klasą Plan, z nazwą strumienia i ścieżką, BINFILE albo TEXTFILE, które nie wskazują zwykłego pliku, oraz DEVICE, które nie wskazuje urządzenia znakowego ani FIFO.
 /// - [plansource.check-declared-sources.5~1] dla deklaracji w przestarzałej formie `FILE` dopisywać do odmowy słowo wybrane przez regułę, a gdy pod ścieżką leży urządzenie znakowe, FIFO albo zwykły plik - także pasujące słowo (DEVICE albo "BINFILE or TEXTFILE").
 ///
-/// @note stat() zamiast otwarcia, wiec FIFO bez pisarza niczego nie wiesza. Brak zrodla nadal daje NULL (#346).
+/// @note stat() zamiast otwarcia, wiec FIFO bez pisarza niczego nie wiesza. Brak zrodla odmawia startu z klasa K4 (#488).
 ///       Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
 [[nodiscard]] rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
 

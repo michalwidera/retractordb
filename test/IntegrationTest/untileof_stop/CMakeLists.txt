@@ -15,6 +15,13 @@ add_test(
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
 
+# covers: plansource.check-declared-sources.3~2, facctxtsrc.text-source-ro.16~1, faccbindev.binary-device-ro.14~1
+add_test(
+  NAME ${TestID}-missing-sources
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND python3 missing_sources.py $<TARGET_FILE:xretractor>)
+set_tests_properties(${TestID}-missing-sources PROPERTIES TIMEOUT 60)
+
 # Wpis logu o wyczerpanym zrodle ma poziom INFO, ktory Release wycina (jak w
 # service_idle).
 if(CMAKE_BUILD_TYPE STREQUAL "Release")

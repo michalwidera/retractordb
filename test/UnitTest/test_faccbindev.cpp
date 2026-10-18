@@ -729,4 +729,22 @@ TEST_F(BinaryDeviceROTest, device_fill_retries_eintr_and_short_reads) {
   ::close(writer);
 }
 
+TEST_F(BinaryDeviceROTest, missing_sources_report_initialization_error_and_errno) {
+  // covers: faccbindev.binary-device-ro.14~1
+  const auto regular = sandboxPath("parent.bin");
+  writeBinaryFile(regular, {1, 2, 3, 4});
+  const auto desc = fixedIntDescriptor();
+  for (const std::string type : {"BINFILE", "DEVICE"}) {
+    for (const auto &[path, expected] :
+         std::vector<std::pair<std::string, int>>{{sandboxPath("absent"), ENOENT}, {regular + "/input", ENOTDIR}}) {
+      rdb::binaryDeviceRO source(path, desc, true, type);
+      EXPECT_EQ(source.initializationErrno(), expected);
+      EXPECT_TRUE(source.initializationError().contains(type));
+      EXPECT_TRUE(source.initializationError().contains(path));
+      EXPECT_TRUE(source.initializationError().contains(std::strerror(expected)));
+      EXPECT_FALSE(source.exhausted());
+    }
+  }
+}
+
 // NOLINTEND(modernize-avoid-c-arrays)

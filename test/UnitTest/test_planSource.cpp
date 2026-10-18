@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <future>
@@ -648,9 +649,9 @@ auto withinFiveSeconds(F call) {
 }  // namespace
 
 // Rodzaj pliku pod sciezka deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE - urzadzenie
-// znakowe albo FIFO. Brak pliku nie jest odmowa - akcesor ostrzega i daje NULL jak dotad.
+// znakowe albo FIFO. Brak pliku jest odmowa K4 przed budowa modelu (#488).
 TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
-  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~1, plansource.check-declared-sources.4~1
+  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~2, plansource.check-declared-sources.4~1
   // covers: plansource.check-declared-sources.5~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_source_kind";
@@ -680,7 +681,7 @@ TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
   EXPECT_EQ(check("DEVICE '/dev/null'"), "");
   EXPECT_EQ(check("BINFILE '" + regular + "'"), "");
   EXPECT_EQ(check("TEXTFILE '" + regular + "'"), "");
-  EXPECT_EQ(check("BINFILE '" + (dir / "missing.bin").string() + "'"), "");
+  EXPECT_TRUE(check("BINFILE '" + (dir / "missing.bin").string() + "'").contains("source file does not exist"));
 
   // Forma przestarzala: odmowa mowi, co wybrala regula i jakie slowo pasuje do pliku.
   EXPECT_EQ(check("FILE '" + fifo + "'"), "stream 'src': BINFILE '" + fifo +
@@ -887,7 +888,7 @@ TEST(PlanSource, storage_directory_refusal_precedes_all_storage_operations) {
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "STORAGE 'preflight_directory/'\n"
-                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'preflight_directory_input.txt'\n"
                           "SELECT a STREAM out FROM src VOLATILE\n")
                 .status,
             "OK");
@@ -905,9 +906,11 @@ TEST(PlanSource, storage_directory_refusal_precedes_all_storage_operations) {
   EXPECT_TRUE(wrongKind.message.contains("not a directory"));
   fs::remove(dir);
   fs::create_directory(dir);
+  std::ofstream("preflight_directory_input.txt") << "1\n";
   EXPECT_TRUE(checkPlanStorage(plan, {}).message.empty());
   EXPECT_TRUE(fs::is_empty(dir)) << "preflight nie tworzy artefaktow";
   fs::remove(dir);
+  fs::remove("preflight_directory_input.txt");
   qTree idle;
   EXPECT_TRUE(checkStorageDirectory(idle, dir.string()).message.empty());
 }
@@ -956,10 +959,11 @@ TEST(PlanSource, adhoc_checks_retained_select_descriptors_and_only_the_new_strea
   const fs::path dir = "preflight_adhoc_descriptor";
   fs::remove_all(dir);
   fs::create_directory(dir);
+  std::ofstream(dir / "input.txt") << "1\n";
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "STORAGE 'preflight_adhoc_descriptor'\n"
-                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'preflight_adhoc_descriptor/input.txt'\n"
                           "SELECT a STREAM disk FROM src\n"
                           "SELECT a STREAM mem FROM src VOLATILE\n"
                           "SELECT a STREAM fresh FROM src VOLATILE\n")
@@ -1243,10 +1247,10 @@ TEST(PlanSource, descriptor_file_check_scope_and_error_classes) {
   fs::remove(dir);
 }
 
-// Kontrola zrodel deklarowanych: wyniki nie sa zrodlami, ENOTDIR jak brak pliku,
+// Kontrola zrodel deklarowanych: wyniki nie sa zrodlami, ENOTDIR to K4 jak brak pliku,
 // inny blad stat to K4 z errno, rozjazd rodzaju to K2, a forma przestarzala podpowiada slowo.
 TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
-  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~1, plansource.check-declared-sources.4~1
+  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~2, plansource.check-declared-sources.4~1
   // covers: plansource.check-declared-sources.5~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_scope";
@@ -1275,7 +1279,9 @@ TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
           .message,
       "")
       << "plik wyniku nie jest zrodlem";
-  EXPECT_EQ(declare("INTEGER", "BINFILE '" + regular + "/x'").message, "") << "ENOTDIR jak brak pliku";
+  const auto underFile = declare("INTEGER", "BINFILE '" + regular + "/x'");
+  EXPECT_EQ(underFile.cls, rdb::ErrorClass::Environment);
+  EXPECT_EQ(underFile.err, ENOTDIR);
   const auto looped = declare("INTEGER", "BINFILE '" + loop + "'");
   EXPECT_EQ(looped.cls, rdb::ErrorClass::Environment);
   EXPECT_EQ(looped.err, ELOOP);
@@ -1500,6 +1506,34 @@ TEST(PlanSource, output_preflight_scope_segments_shadows_and_permissions) {
     EXPECT_EQ(readOnly.cls, rdb::ErrorClass::Environment);
     EXPECT_EQ(readOnly.err, EACCES);
     EXPECT_FALSE(fs::exists(dir / "readonly/out"));
+  }
+  fs::remove_all(dir);
+}
+
+// Niedostepne wejscie nie oznacza EOF ani poprawnego strumienia NULL (#488).
+TEST(PlanSource, missing_declared_sources_preserve_environment_class_errno_and_context) {
+  // covers: plansource.check-declared-sources.3~2
+  namespace fs       = std::filesystem;
+  const fs::path dir = "declared_missing";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  std::ofstream(dir / "file") << "1\n";
+  fs::create_symlink("absent", dir / "dangling");
+  for (const std::string keyword : {"TEXTFILE", "BINFILE", "DEVICE"}) {
+    for (const auto &[path, expected] : std::vector<std::pair<fs::path, int>>{{dir / "absent", ENOENT},
+                                                                              {dir / "parent/input", ENOENT},
+                                                                              {dir / "file/input", ENOTDIR},
+                                                                              {dir / "dangling", ENOENT}}) {
+      qTree plan;
+      ASSERT_EQ(parsePlanText(plan, "DECLARE a INTEGER STREAM src, 1 " + keyword + " '" + path.string() + "'\n").status, "OK");
+      const auto refusal = checkDeclaredSources(plan);
+      EXPECT_EQ(refusal.cls, rdb::ErrorClass::Environment) << keyword << ": " << path;
+      EXPECT_EQ(refusal.err, expected);
+      EXPECT_TRUE(refusal.message.contains("stream 'src'")) << refusal.message;
+      EXPECT_TRUE(refusal.message.contains(path.string())) << refusal.message;
+      EXPECT_TRUE(refusal.message.contains(std::strerror(expected))) << refusal.message;
+      EXPECT_TRUE(checkDeclaredSources(plan, {"other"}).message.empty());
+    }
   }
   fs::remove_all(dir);
 }

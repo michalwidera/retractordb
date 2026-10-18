@@ -21,9 +21,9 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// - [sourcebuffer.source-buffer.2~1] pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
 ///   jedyne miejsce fizycznego odczytu źródeł plikowych; dla DEVICE (#347) bajty zbiera wcześniej faza
 ///   DEVICE poza blokadami (rdb::awaitRecords), a read() oddaje gotowy rekord albo all-null,
-/// - [sourcebuffer.source-buffer.3~1] po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
+/// - [sourcebuffer.source-buffer.3~2] po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
 ///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
-///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
+///   logujac ostrzezenie tylko przy pierwszym bledzie odczytu danego zrodla.
 /// - [sourcebuffer.source-buffer.4~1] kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero jest naruszeniem niezmiennika zgłaszanym przez RDB_ASSERT/rdb::fatal,
 /// - [sourcebuffer.source-buffer.5~1] utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
@@ -43,7 +43,7 @@ class SourceBuffer {
 
   /// @brief The only place where data is physically read from a declared source; fills @p out with the record.
   /// Errc::Config, gdy zrodlo zglosi blad tresci wejscia (EILSEQ, patrz FileInterface::inputError()).
-  /// Kazdy inny blad odczytu daje - jak dotad - wiersz all-null i ostrzezenie w logu.
+  /// Kazdy inny blad odczytu daje - jak dotad - wiersz all-null; ostrzezenie w logu tylko przy pierwszym bledzie zrodla.
   [[nodiscard]] Result<> readCurrent(FileInterface &source, payload &out);
 
   /// @brief Copy the chamber to @p out and push it into history; capacity zero is a broken invariant (RDB_ASSERT).
@@ -55,6 +55,7 @@ class SourceBuffer {
  private:
   std::unique_ptr<payload> chamber_;
   boost::circular_buffer<payload> circularBuffer_{0};
+  bool readFailureReported_ = false;
 };
 
 }  // namespace rdb

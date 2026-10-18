@@ -105,10 +105,12 @@ textSourceRO::textSourceRO(const std::string_view fileName,    //
   // zawsze buforowany; do #346 bufor wyłączano tu dla urządzeń i FIFO, bo czytałby w przód poza krotkę.
   initializationError_ = sourceKindMismatch("TEXTSOURCE", filename_);
   if (initializationError_.empty()) {
+    // Standard nie wymaga errno po nieudanym ifstream::open; bez niego odmowa bylaby klasy Plan.
+    errno = 0;
     myFile_.open(filename_, std::ios::in);
     if ((myFile_.rdstate() & std::ifstream::failbit) != 0) {
-      SPDLOG_WARN("Unable to open text source file: {}", filename_);
-      myFile_.clear();
+      initializationErrno_ = errno != 0 ? errno : EIO;
+      initializationError_ = fmt::format("cannot open TEXTFILE source '{}': {}", filename_, std::strerror(initializationErrno_));
     }
   }
 

@@ -41,10 +41,14 @@ namespace rdb {
 /// - [facctxtsrc.text-source-ro.15~1] traktować token liczbowy niepoprawny (nieodczytany w całości albo poza zakresem typu pola) jako null pola
 ///   i zgłaszać tylko pierwszy taki token źródła jednym ostrzeżeniem w logu (#471).
 ///
+/// - [facctxtsrc.text-source-ro.16~1] przy nieudanym otwarciu udostepniac opis z nazwa pliku i przyczyna przez initializationError()
+///   oraz zachowac errno przez initializationErrno(), aby magazyn odmowil z klasa Environment przed odczytem (#488).
+///
 /// @note Klasa nie obsługuje zapisu i nie zapewnia losowego dostępu do rekordów tekstowych.
 class textSourceRO : public FileInterface {
   std::string filename_;
   std::string initializationError_;
+  int initializationErrno_ = 0;
   const ssize_t recordSize_;
 
   Descriptor descriptor_;
@@ -81,6 +85,7 @@ class textSourceRO : public FileInterface {
   [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] int initializationErrno() const override { return initializationErrno_; }
   [[nodiscard]] const std::string &inputError() const override { return inputError_; }
 
   const std::vector<bool> &lastNullBitset() const;

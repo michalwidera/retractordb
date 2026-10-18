@@ -25,7 +25,7 @@ SYNTHETIC = ("doubling", "tripled", "double_source", "nullable", "arrays", "hist
              "binary_nonfinite", "mean", "wrapping", "disposable", "delayed", "multirate",
              "volatile_low", "volatile_high")
 # Poza wspolnym zakresem z powodem; odmowe Engine sprawdza test_engine.py.
-SYNTHETIC_EXCLUDED = {"missing": "Engine refuses a missing source with IOError; the service gives NULL records (#346, #451)"}
+SYNTHETIC_EXCLUDED = {"missing": "Missing-input refusals are checked separately in test_engine.py and it_untileof_stop-missing-sources (#488)"}
 
 
 def plan_for(name: str, directory: Path) -> str:
