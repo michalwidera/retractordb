@@ -52,8 +52,8 @@ struct dumpTask {
 ///   DUMP -5 TO -2 obejmuje wylacznie rekordy -5, -4 i -3.
 /// - [dumpmanager.dump-manager.5~1] dla zakresu o nieujemnym początku pomijać tyle kolejnych slotów, ile wynosi początek, a następnie zapisywać po jednym bieżącym rekordzie strumienia w slocie do wyczerpania zakresu.
 /// - [dumpmanager.dump-manager.6~1] w processStreamChunk nie wykonywać żadnej pracy dla strumienia bez zadań ani dla strumienia bez rekordów, a po wyczerpaniu zakresu zamykać plik zadania i usuwać zadanie z księgi.
-/// - [dumpmanager.dump-manager.7~1] dopisywac payload do konca pliku pojedynczym write z zadanym rozmiarem deskryptora strumienia; kazdy dodatni wynik
-///   uznawac za zapis rekordu, bez sprawdzania pelnej liczby zapisanych bajtow i bez ponawiania niepelnego zapisu.
+/// - [dumpmanager.dump-manager.7~2] dopisywac payload do konca pliku w rozmiarze deskryptora strumienia, ponawiajac write do pelnej dlugosci
+///   rekordu (takze po EINTR); zapis bez postepu zwracac jako Errc::IO z kodem EIO, liczba zapisanych bajtow wobec oczekiwanej i sciezka pliku.
 /// - [dumpmanager.dump-manager.8~1] zwracać Errc::IO z kodem systemowym przy błędzie usunięcia, utworzenia, pozycjonowania lub zapisu pliku zrzutu.
 class dumpManager {
  public:

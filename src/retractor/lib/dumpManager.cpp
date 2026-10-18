@@ -19,7 +19,41 @@
 
 namespace {
 constexpr mode_t kDefaultDumpFileMode = 0644;
+
+// Dopisuje caly rekord, ponawiajac write() do pelnej dlugosci - jak posixBinaryFile::write. Do #479
+// kazdy dodatni wynik uchodzil za rekord: przy krotkim zapisie (np. zapelniony nosnik) reszta rekordu
+// ginela, a kolejne rekordy lezaly przesuniete wzgledem granic rekordow bez zadnego sygnalu.
+rdb::Result<> writeRecord(int fd, const uint8_t *data, size_t size, std::string_view caller, const std::string &fileName) {
+  constexpr int maxRetries = 5;
+  int retries              = 0;
+  size_t written           = 0;
+  while (written < size) {
+    const ssize_t result = ::write(fd, data + written, size - written);
+    if (result > 0) {
+      retries = 0;
+      written += static_cast<size_t>(result);
+      continue;
+    }
+    // Zero bajtow nie ustawia errno, wiec komunikat podaje postep zamiast strerror.
+    if (result == 0)
+      return rdb::fail(rdb::Errc::IO,
+                       fmt::format("{}: write to '{}' made no progress after {} of {} bytes", caller, fileName, written, size),
+                       EIO);
+    const int error = errno;
+    if (error != EINTR)
+      return rdb::fail(
+          rdb::Errc::IO,
+          fmt::format("{}: write to '{}' failed after {} of {} bytes: {}", caller, fileName, written, size, strerror(error)),
+          error != 0 ? error : EIO);
+    if (++retries > maxRetries)
+      return rdb::fail(rdb::Errc::IO,
+                       fmt::format("{}: write to '{}' failed after {} EINTR retries at {} of {} bytes", caller, fileName,
+                                   maxRetries, written, size),
+                       EINTR);
+  }
+  return {};
 }
+}  // namespace
 
 dumpTask::dumpTask(dumpTask &&other) noexcept
     : taskName(std::move(other.taskName)),
@@ -108,12 +142,8 @@ rdb::Result<> dumpManager::registerTask(const std::string &streamName, dumpTask 
                          fmt::format("dumpManager::registerTask: lseek on '{}' failed during history dump: {}",
                                      task.dumpFilename, strerror(errno)),
                          errno != 0 ? errno : EIO);
-      ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
-      if (write_count_result <= 0)
-        return rdb::fail(rdb::Errc::IO,
-                         fmt::format("dumpManager::registerTask: write to '{}' failed during history dump: {}",
-                                     task.dumpFilename, strerror(errno)),
-                         errno != 0 ? errno : EIO);
+      RDB_TRY(writeRecord(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes(),
+                          "dumpManager::registerTask: history dump", task.dumpFilename));
     }
     // Niezmiennik, nie wejscie: zakres niepusty (first < second) gwarantuje parser, wiec zrzucona
     // historia nigdy nie przekracza dlugosci zakresu.
@@ -189,11 +219,8 @@ rdb::Result<bool> dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rd
         fmt::format("dumpManager::buildDumpChunk: lseek to end of '{}' failed: {}", task.dumpFilename, strerror(errno)),
         errno != 0 ? errno : EIO);
 
-  ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
-  if (write_count_result <= 0)
-    return rdb::fail(rdb::Errc::IO,
-                     fmt::format("dumpManager::buildDumpChunk: write to '{}' failed: {}", task.dumpFilename, strerror(errno)),
-                     errno != 0 ? errno : EIO);
+  RDB_TRY(writeRecord(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes(), "dumpManager::buildDumpChunk",
+                      task.dumpFilename));
 
   if (task.dumpedRecordsToGo > 0) {
     task.dumpedRecordsToGo--;

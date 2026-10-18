@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iterator>
 #include <list>
@@ -17,6 +18,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -50,6 +52,9 @@ int lseekErrno          = 0;
 ssize_t writeResult     = -1;
 int writeErrno          = 0;
 size_t lastWriteRequest = 0;
+// Kolejne wyniki write, zuzywane przed writeResult: n > 0 zapisuje naprawde min(n, count) bajtow,
+// 0 zwraca 0 bez zapisu, -e zwraca -1 z errno = e. Dodatnie wpisy wymagaja prawdziwego deskryptora.
+std::vector<ssize_t> writeChunks;
 // unlink: po prawdziwym usunieciu odtwarza plik pod ta sama nazwa tyle razy (-1 = zawsze), jak
 // konkurent tworzacy plik miedzy unlink() a open(). Dziala niezaleznie od wrapEnabled.
 int recreateAfterUnlink = 0;
@@ -71,10 +76,16 @@ extern "C" off_t __wrap_lseek(int fd, off_t offset, int whence) {
 
 extern "C" ssize_t __wrap_write(int fd, const void *buf, size_t count) {
   if (!wrapEnabled) return __real_write(fd, buf, count);
-  (void)buf;
   wrappedWriteCalls++;
   wrappedLastFd    = fd;
   lastWriteRequest = count;
+  if (!writeChunks.empty()) {
+    const ssize_t chunk = writeChunks.front();
+    writeChunks.erase(writeChunks.begin());
+    if (chunk > 0) return __real_write(fd, buf, std::min(static_cast<size_t>(chunk), count));
+    errno = chunk == 0 ? 0 : static_cast<int>(-chunk);
+    return chunk == 0 ? 0 : -1;
+  }
   if (writeResult >= 0 || writeErrno != 0) {
     errno = writeErrno;
     return writeResult;
@@ -108,11 +119,12 @@ struct wrapReset {
     writeResult         = -1;
     writeErrno          = 0;
     recreateAfterUnlink = 0;
+    writeChunks.clear();
   }
 };
 
 TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
-  // covers: dumpmanager.dump-manager.7~1
+  // covers: dumpmanager.dump-manager.7~2
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -218,7 +230,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
-  // covers: dumpmanager.dump-manager.7~1
+  // covers: dumpmanager.dump-manager.7~2
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -928,48 +940,92 @@ TEST_F(DumpManagerFileTest, createDumpFile_reports_remove_and_create_failures_wi
   EXPECT_EQ(createFailed.error().err(), ENOENT);
 }
 
-// Jeden write o rozmiarze deskryptora. Niepelny, ale dodatni wynik liczy sie jako rekord i nie
-// jest ponawiany; zero i -1 to Errc::IO z errno (EIO, gdy write nie ustawil errno).
-TEST(dumpManager, buildDumpChunk_counts_any_positive_write_and_reports_failures) {
-  // covers: dumpmanager.dump-manager.7~1, dumpmanager.dump-manager.8~1
-  const wrapReset reset;
+// Rekord zrzutu w pliku: payload v = 42 (INTEGER) i w = 2.5 (DOUBLE), 12 bajtow.
+class DumpManagerWriteTest : public DumpManagerFileTest {
+ protected:
+  rdb::Descriptor descriptor            = rdb::Descriptor("v", 4, 1, rdb::INTEGER) + rdb::Descriptor("w", 8, 1, rdb::DOUBLE);
+  std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(descriptor);
   dumpManager manager;
-  auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER) + rdb::Descriptor("w", 8, 1, rdb::DOUBLE);
-  auto payload    = std::make_unique<rdb::payload>(descriptor);
+  dumpTask task{"task", {0, 2}, 0};
 
-  dumpTask task("task", {0, 2}, 0);
-  task.dumpedRecordsToGo = 2;
-  task.fd                = 0;
-  wrapEnabled            = true;
-  wrappedWriteCalls      = 0;
-  wrappedLseekCalls      = 0;
-  writeResult            = 1;
+  void SetUp() override {
+    DumpManagerFileTest::SetUp();
+    payload->setItem(0, 42);
+    payload->setItem(1, 2.5);
+    manager.setDumpStorage(sandBoxFolder.string());
+    std::tie(task.dumpFilename, task.fd) = rdbtest::ok(manager.createDumpFile("stream", "t"));
+    task.dumpedRecordsToGo               = 2;
+  }
+
+  std::string record() const {
+    const auto bytes = payload->span();
+    return {reinterpret_cast<const char *>(bytes.data()), descriptor.getSizeInBytes()};
+  }
+
+  std::string fileBytes() const {
+    std::ifstream dump(task.dumpFilename, std::ios::binary);
+    return {std::istreambuf_iterator<char>{dump}, std::istreambuf_iterator<char>{}};
+  }
+};
+
+// Rekord zapisany w czesciach (z EINTR po drodze) daje plik identyczny bajt w bajt z zapisem
+// jednorazowym. Do #479 pierwszy dodatni wynik konczyl zapis i reszta rekordu ginela.
+TEST_F(DumpManagerWriteTest, buildDumpChunk_completes_a_record_written_in_parts) {
+  // covers: dumpmanager.dump-manager.7~2
+  const wrapReset reset;
+  wrapEnabled       = true;
+  wrappedWriteCalls = 0;
+  writeChunks       = {5, -EINTR, 4, 3, 12};
   EXPECT_FALSE(rdbtest::ok(manager.buildDumpChunk(task, payload.get())));
-  EXPECT_EQ(wrappedLseekCalls, 1);
-  EXPECT_EQ(wrappedWriteCalls, 1);
-  EXPECT_EQ(lastWriteRequest, descriptor.getSizeInBytes());
+  EXPECT_EQ(wrappedWriteCalls, 4);
+  EXPECT_EQ(lastWriteRequest, 3U);
   EXPECT_EQ(task.dumpedRecordsToGo, 1);
 
-  writeResult = 0;
-  writeErrno  = 0;
-  ASSERT_RDB_ERROR(manager.buildDumpChunk(task, payload.get()), rdb::Errc::IO, "write to");
-  EXPECT_EQ(manager.buildDumpChunk(task, payload.get()).error().err(), EIO);
-  EXPECT_EQ(task.dumpedRecordsToGo, 1);
+  EXPECT_TRUE(rdbtest::ok(manager.buildDumpChunk(task, payload.get())));
+  EXPECT_EQ(wrappedWriteCalls, 5);
+  EXPECT_EQ(task.dumpedRecordsToGo, 0);
+  EXPECT_EQ(fileBytes(), record() + record());
+}
 
-  writeResult        = -1;
-  writeErrno         = ENOSPC;
+// Zapis bez postepu po czesci rekordu to Errc::IO z EIO, liczba bajtow i sciezka, bez strerror
+// z nieustawionego errno; rekord nie jest liczony.
+TEST_F(DumpManagerWriteTest, buildDumpChunk_reports_a_short_write_without_progress_as_eio) {
+  // covers: dumpmanager.dump-manager.7~2, dumpmanager.dump-manager.8~1
+  const wrapReset reset;
+  wrapEnabled            = true;
+  writeChunks            = {4, 0};
+  const auto noProgress  = manager.buildDumpChunk(task, payload.get());
+  const auto expectedMsg = std::format("write to '{}' made no progress after 4 of 12 bytes", task.dumpFilename);
+  ASSERT_RDB_ERROR(noProgress, rdb::Errc::IO, expectedMsg);
+  EXPECT_EQ(noProgress.error().err(), EIO);
+  EXPECT_EQ(task.dumpedRecordsToGo, 2);
+}
+
+// -1 przerywa zapis z errno, a EINTR jest ponawiany najwyzej piec razy z rzedu; lseek bez
+// powodzenia nie dochodzi do write.
+TEST_F(DumpManagerWriteTest, buildDumpChunk_reports_write_errors_and_seek_failures) {
+  // covers: dumpmanager.dump-manager.7~2, dumpmanager.dump-manager.8~1
+  const wrapReset reset;
+  wrapEnabled        = true;
+  writeChunks        = {6, -ENOSPC};
   const auto noSpace = manager.buildDumpChunk(task, payload.get());
-  ASSERT_RDB_ERROR(noSpace, rdb::Errc::IO, "write to");
+  ASSERT_RDB_ERROR(noSpace, rdb::Errc::IO, "failed after 6 of 12 bytes");
   EXPECT_EQ(noSpace.error().err(), ENOSPC);
 
-  writeErrno            = 0;
+  writeChunks            = {-EINTR, -EINTR, -EINTR, -EINTR, -EINTR, -EINTR};
+  const auto interrupted = manager.buildDumpChunk(task, payload.get());
+  ASSERT_RDB_ERROR(interrupted, rdb::Errc::IO, "5 EINTR retries");
+  EXPECT_EQ(interrupted.error().err(), EINTR);
+  EXPECT_TRUE(writeChunks.empty());
+  EXPECT_EQ(task.dumpedRecordsToGo, 2);
+
   lseekErrno            = ESPIPE;
   wrappedWriteCalls     = 0;
   const auto seekFailed = manager.buildDumpChunk(task, payload.get());
   ASSERT_RDB_ERROR(seekFailed, rdb::Errc::IO, "lseek to end");
   EXPECT_EQ(seekFailed.error().err(), ESPIPE);
   EXPECT_EQ(wrappedWriteCalls, 0);
-  EXPECT_EQ(task.dumpedRecordsToGo, 1);
+  EXPECT_EQ(task.dumpedRecordsToGo, 2);
 }
 
 class DumpManagerModelTest : public DumpManagerFileTest {
@@ -1055,7 +1111,7 @@ TEST_F(DumpManagerModelTest, registerTask_history_dump_reports_seek_and_write_fa
   wrapEnabled            = true;
   writeErrno             = EFBIG;
   const auto writeFailed = manager.registerTask("result", dumpTask("w", {-2, 1}, 0));
-  ASSERT_RDB_ERROR(writeFailed, rdb::Errc::IO, "failed during history dump");
+  ASSERT_RDB_ERROR(writeFailed, rdb::Errc::IO, "history dump: write to");
   EXPECT_EQ(writeFailed.error().err(), EFBIG);
   EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
 
