@@ -17,28 +17,28 @@ public:
     FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, BINFILE = 17, TEXTFILE = 18, 
     DEVICE = 19, STORAGE = 20, ROTATION = 21, SUBSTRAT = 22, RULE = 23, 
     DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, TIMEOUT = 27, VOLATILE = 28, 
-    PERSISTENT = 29, DEFAULT = 30, LET = 31, ON = 32, WHEN = 33, DUMP = 34, 
-    SYSTEM = 35, DO = 36, TO = 37, AND_C = 38, OR_C = 39, NOT_C = 40, MIN = 41, 
-    MAX = 42, AVG = 43, SUMC = 44, TYPE_PROFILE = 45, STRING_PROFILE = 46, 
-    ID = 47, CONST_REF = 48, STRING = 49, FLOAT = 50, DECIMAL = 51, REAL = 52, 
-    IS_EQ = 53, IS_NQ = 54, IS_GR = 55, IS_LS = 56, IS_GE = 57, IS_LE = 58, 
-    EXCLAMATION = 59, DOUBLE_BAR = 60, DOT = 61, UNDERLINE = 62, AT = 63, 
-    SHARP = 64, AND = 65, MOD = 66, DOLLAR = 67, COMMA = 68, SEMI = 69, 
-    COLON = 70, DOUBLE_COLON = 71, STAR = 72, DIVIDE = 73, PLUS = 74, MINUS = 75, 
-    BIT_NOT = 76, BIT_OR = 77, BIT_XOR = 78, SPACE = 79, COMMENT = 80, LINE_COMMENT2 = 81
+    PERSISTENT = 29, DEFAULT = 30, LET = 31, VAR = 32, ON = 33, WHEN = 34, 
+    DUMP = 35, SYSTEM = 36, DO = 37, TO = 38, AND_C = 39, OR_C = 40, NOT_C = 41, 
+    MIN = 42, MAX = 43, AVG = 44, SUMC = 45, TYPE_PROFILE = 46, STRING_PROFILE = 47, 
+    ID = 48, CONST_REF = 49, STRING = 50, FLOAT = 51, DECIMAL = 52, REAL = 53, 
+    IS_EQ = 54, IS_NQ = 55, IS_GR = 56, IS_LS = 57, IS_GE = 58, IS_LE = 59, 
+    EXCLAMATION = 60, DOUBLE_BAR = 61, DOT = 62, UNDERLINE = 63, AT = 64, 
+    SHARP = 65, AND = 66, MOD = 67, DOLLAR = 68, COMMA = 69, SEMI = 70, 
+    COLON = 71, DOUBLE_COLON = 72, STAR = 73, DIVIDE = 74, PLUS = 75, MINUS = 76, 
+    BIT_NOT = 77, BIT_OR = 78, BIT_XOR = 79, SPACE = 80, COMMENT = 81, LINE_COMMENT2 = 82
   };
 
   enum {
     RuleProg = 0, RuleDefault_statement = 1, RuleLet_statement = 2, RuleLet_value = 3, 
-    RuleInt_const = 4, RuleCompiler_option = 5, RuleSelect_statement = 6, 
-    RuleDeclare_statement = 7, RuleRule_statement = 8, RuleDumppart = 9, 
-    RuleSystempart = 10, RuleRational_se = 11, RuleRetention_from = 12, 
-    RuleFraction_rule = 13, RuleField_declaration = 14, RuleField_type = 15, 
-    RuleSelect_list = 16, RuleField_id = 17, RuleUnary_op_expression = 18, 
-    RuleAsterisk = 19, RuleExpression = 20, RuleLogic = 21, RuleExpression_logic = 22, 
-    RuleTerm_logic = 23, RuleExpression_factor = 24, RuleTerm = 25, RuleStream_expression = 26, 
-    RuleStream_factor = 27, RuleGen_index = 28, RuleAgregator = 29, RuleStream_fn_call = 30, 
-    RuleWindow_agg = 31, RuleFunction_call = 32
+    RuleVar_statement = 4, RuleInt_const = 5, RuleCompiler_option = 6, RuleSelect_statement = 7, 
+    RuleDeclare_statement = 8, RuleRule_statement = 9, RuleDumppart = 10, 
+    RuleSystempart = 11, RuleRational_se = 12, RuleRetention_from = 13, 
+    RuleFraction_rule = 14, RuleField_declaration = 15, RuleField_type = 16, 
+    RuleSelect_list = 17, RuleField_id = 18, RuleUnary_op_expression = 19, 
+    RuleAsterisk = 20, RuleExpression = 21, RuleLogic = 22, RuleExpression_logic = 23, 
+    RuleTerm_logic = 24, RuleExpression_factor = 25, RuleTerm = 26, RuleStream_expression = 27, 
+    RuleStream_factor = 28, RuleGen_index = 29, RuleAgregator = 30, RuleStream_fn_call = 31, 
+    RuleWindow_agg = 32, RuleFunction_call = 33
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -62,6 +62,7 @@ public:
   class Default_statementContext;
   class Let_statementContext;
   class Let_valueContext;
+  class Var_statementContext;
   class Int_constContext;
   class Compiler_optionContext;
   class Select_statementContext;
@@ -109,6 +110,8 @@ public:
     Rule_statementContext* rule_statement(size_t i);
     std::vector<Let_statementContext *> let_statement();
     Let_statementContext* let_statement(size_t i);
+    std::vector<Var_statementContext *> var_statement();
+    Var_statementContext* var_statement(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -189,6 +192,34 @@ public:
   };
 
   Let_valueContext* let_value();
+
+  class  Var_statementContext : public antlr4::ParserRuleContext {
+  public:
+    Var_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Var_statementContext() = default;
+    void copyFrom(Var_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  VarContext : public Var_statementContext {
+  public:
+    VarContext(Var_statementContext *ctx);
+
+    antlr4::Token *name = nullptr;
+    antlr4::tree::TerminalNode *VAR();
+    antlr4::tree::TerminalNode *IS_EQ();
+    Let_valueContext *let_value();
+    antlr4::tree::TerminalNode *ID();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Var_statementContext* var_statement();
 
   class  Int_constContext : public antlr4::ParserRuleContext {
   public:

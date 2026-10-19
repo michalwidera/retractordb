@@ -52,8 +52,8 @@ void recordProgram(std::ostream &xout, const std::list<token> &program) {
     else
       xout << "|";
     const std::string sTokenName(t.getStrCommandID());
-    if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL" || sTokenName == "CALL" || sTokenName == "CALL2" ||
-        sTokenName.starts_with("WINDOW_")) {
+    if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL" || sTokenName == "PUSH_VAR" || sTokenName == "CALL" ||
+        sTokenName == "CALL2" || sTokenName.starts_with("WINDOW_")) {
       std::ostringstream arg;
       arg << t;
       xout << recordLabel(arg.str());
@@ -402,7 +402,8 @@ void presenter::onlyCompileShowProgram() {
       // ktore pola czytaja to samo okno.
       for (auto tf : f.lProgram)
         if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "CALL2") ||
-            (tf.getStrCommandID() == "PUSH_VAL") || tf.getStrCommandID().starts_with("WINDOW_"))
+            (tf.getStrCommandID() == "PUSH_VAL") || (tf.getStrCommandID() == "PUSH_VAR") ||
+            tf.getStrCommandID().starts_with("WINDOW_"))
           std::cout << "\t\t" << tf << '\n';
         else
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
@@ -431,7 +432,7 @@ void presenter::onlyCompileShowProgram() {
 
       for (auto tf1 : r.condition) {
         if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "CALL2") ||
-            (tf1.getStrCommandID() == "PUSH_VAL"))
+            (tf1.getStrCommandID() == "PUSH_VAL") || (tf1.getStrCommandID() == "PUSH_VAR"))
           std::cout << "\t\t" << tf1 << '\n';
         else
           std::cout << "\t\t" << tf1.getStrCommandID() << '\n';

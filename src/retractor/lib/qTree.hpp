@@ -12,6 +12,14 @@
 #include "query.hpp"
 #include "rdb/error.hpp"
 
+/// Zmienna planu `VAR NAZWA = wartosc` (#531). Plan niesie wylacznie deklaracje; wartosc biezaca
+/// zyje w dataModel, ktory buduje ja z `initial` przy kazdym wczytaniu planu (D6).
+/// @requirements-exempt planVariable: Rekord deklaracji zmiennej; logike maja parser i dataModel.
+struct planVariable {
+  std::string name;        ///< Nazwa bez `?`.
+  rdb::descFldVT initial;  ///< Wartosc z deklaracji; jej typ jest typem zmiennej (D4).
+};
+
 /// Plan zapytan - wektor wezlow w kolejnosci przetwarzania, plus wyszukanie po nazwie.
 ///
 /// Dziedziczenie jest PRYWATNE i to jest wlasnosc klasy, nie szczegol zapisu. Publiczne
@@ -109,6 +117,9 @@ class qTree : private std::vector<query> {
   [[nodiscard]] rdb::Result<std::set<boost::rational<int>>> getAvailableTimeIntervals();
 
   std::map<std::string, int> maxCapacity;
+
+  /// Zmienne VAR planu w kolejnosci deklaracji; indeks w tym wektorze niesie token PUSH_VAR.
+  std::vector<planVariable> variables;
 
   /// Numer KSZTALTU planu: jego dlugosci, kolejnosci wezlow i nazwy na kazdej pozycji. Sluzy
   /// temu, kto trzyma strukture rownolegla do planu (dataModel::handles_) i musi wiedziec,

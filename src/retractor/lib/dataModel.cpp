@@ -48,6 +48,11 @@ rdb::Result<std::unique_ptr<dataModel>> dataModel::create(qTree &coreInstance, r
       }
     }
 
+  // Zmienne VAR (#531) zaczynaja od wartosci z deklaracji przy kazdym wczytaniu planu (D6): nowy plan,
+  // `--reset` i przeladowanie buduja nowy dataModel, wiec stan poprzedniego planu tu nie dochodzi.
+  for (const auto &variable : coreInstance.variables)
+    self->variables_.push_back(variable.initial);
+
   auto removed = std::ranges::remove_if(coreInstance,  //
                                         [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance.erase(removed.begin(), removed.end());
@@ -410,13 +415,13 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
     }
     if (runtime.elapsedSlots++ < silentSlots) continue;
 
-    RDB_TRY(constructInputPayload(q, runtime));          // That will create 'from' clause data set
-    RDB_TRY(computeWindowAggregates(q, runtime));        // That will reduce record windows read from the source history
-    RDB_TRY(runtime.constructOutputPayload(q.lSchema));  // That will create all fields from 'select' clause/list
+    RDB_TRY(constructInputPayload(q, runtime));    // That will create 'from' clause data set
+    RDB_TRY(computeWindowAggregates(q, runtime));  // That will reduce record windows read from the source history
+    RDB_TRY(runtime.constructOutputPayload(q.lSchema, &variables_));  // That will create all fields from 'select' clause/list
     RDB_TRY_ASSIGN(const auto written, runtime.outputPayload->write());
     RDB_ASSERT(written == rdb::WriteStatus::Ok, "dataModel::processRows: stream '{}' refused the write of its output record",
-               q.id);                             // That will store data from 'select' clause/list
-    RDB_TRY(runtime.constructRulesAndUpdate(q));  // That will process all rules for this query
+               q.id);                                          // That will store data from 'select' clause/list
+    RDB_TRY(runtime.constructRulesAndUpdate(q, &variables_));  // That will process all rules for this query
   }
 
   // Then - process all declarations to unlock them for next step

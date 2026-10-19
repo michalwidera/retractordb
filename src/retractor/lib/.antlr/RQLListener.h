@@ -26,6 +26,9 @@ public:
   virtual void enterLet_value(RQLParser::Let_valueContext *ctx) = 0;
   virtual void exitLet_value(RQLParser::Let_valueContext *ctx) = 0;
 
+  virtual void enterVar(RQLParser::VarContext *ctx) = 0;
+  virtual void exitVar(RQLParser::VarContext *ctx) = 0;
+
   virtual void enterInt_const(RQLParser::Int_constContext *ctx) = 0;
   virtual void exitInt_const(RQLParser::Int_constContext *ctx) = 0;
 

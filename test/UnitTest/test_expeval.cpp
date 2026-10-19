@@ -2552,3 +2552,23 @@ TEST(xExpressionEval, scalar_math_functions_preserve_numeric_types_and_reject_pa
       EXPECT_RDB_ERROR(evalUnaryResult(input, token(CALL, std::string(name))), rdb::Errc::Eval) << name;
   }
 }
+
+TEST(xExpressionEval, push_var_reads_the_variable_table_by_index) {
+  // covers: expressionevaluator.expression-evaluator.20~1
+  // Zmienna VAR (#531): wartosc taktu z tablicy wolajacego, takze NULL, ktory propaguje sie dalej.
+  const auto var = [](int index) { return token(PUSH_VAR, std::pair<std::string, int>{"V", index}); };
+  const std::vector<rdb::descFldVT> variables{7, 2.5F, std::monostate{}};
+  expressionEvaluator evaluator;
+
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({var(0), token(PUSH_VAL, 3), token(MULTIPLY)}, nullptr, nullptr, &variables)),
+            rdb::descFldVT{21});
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({var(1)}, nullptr, nullptr, &variables)), rdb::descFldVT{2.5F});
+  // `?X * 0` przy NULL to NULL, nie zero.
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(
+      rdbtest::ok(evaluator.eval({var(2), token(PUSH_VAL, 0), token(MULTIPLY)}, nullptr, nullptr, &variables))));
+
+  // Brak tablicy (zwijanie stalych liczy bez niej) i indeks spoza niej to blad programu.
+  EXPECT_RDB_ERROR(evaluator.eval({var(0)}), rdb::Errc::Eval, "variable values not supplied");
+  EXPECT_RDB_ERROR(evaluator.eval({var(3)}, nullptr, nullptr, &variables), rdb::Errc::Eval, "out of range");
+  EXPECT_RDB_ERROR(evaluator.eval({var(-1)}, nullptr, nullptr, &variables), rdb::Errc::Eval, "out of range");
+}

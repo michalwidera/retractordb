@@ -627,3 +627,36 @@ TEST(exprSimplify, keeps_repeated_factor_when_aggressive_rewrites_are_off) {
 }
 
 #endif
+
+TEST(exprSimplify, variable_read_is_a_typed_leaf_never_a_constant) {
+  // covers: exprsimplify.simplify-expression.13~1, exprsimplify.infer-string-width.7~1
+  // Odczyt VAR (#531) ma typ, ale nie wartosc: regula A go nie zwija - takze `?X * 0`, ktore przy
+  // NULL daje NULL - a reguly B i C dzialaja jak nad polem tego typu.
+  const token var(PUSH_VAR, std::pair<std::string, int>{"X", 0});
+  const auto intVariable = [](int index) -> std::optional<rdb::descFld> {
+    EXPECT_EQ(index, 0);
+    return rdb::INTEGER;
+  };
+  for (auto program : {std::list<token>{var}, std::list<token>{var, token(PUSH_VAL, 0), token(MULTIPLY)},
+                       std::list<token>{token(PUSH_VAL, 2), token(PUSH_VAL, 3), var, token(ADD), token(MULTIPLY)},
+                       std::list<token>{var, token(NEGATE)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, testFieldType, intVariable), 0U) << before;
+    EXPECT_EQ(dump(program), before);
+  }
+  // Stale obok zmiennej nadal sie zwijaja, a element neutralny znika przy znanym typie dokladnym.
+  std::list<token> folded{var, token(PUSH_VAL, 1), token(PUSH_VAL, 2), token(ADD), token(ADD)};
+  EXPECT_EQ(simplifyExpression(folded, testFieldType, intVariable), 1U);
+  EXPECT_EQ(dump(folded), dump({var, token(PUSH_VAL, 3), token(ADD)}));
+  std::list<token> neutral{var, token(PUSH_VAL, 0), token(ADD)};
+  EXPECT_EQ(simplifyExpression(neutral, testFieldType, intVariable), 1U);
+  EXPECT_EQ(dump(neutral), dump({var}));
+  // Bez typu zmiennej regula C odmawia - jak dla pola o nieznanym typie.
+  std::list<token> untyped{var, token(PUSH_VAL, 0), token(ADD)};
+  EXPECT_EQ(simplifyExpression(untyped, testFieldType), 0U);
+
+  // Szerokosc napisu: zmienna jest liczba, a konkatenacja z nia - napisem o szerokosci literalu.
+  const auto noShape = [](const std::string &, int) -> std::optional<fieldShape> { return std::nullopt; };
+  EXPECT_EQ(inferStringWidth({var}, noShape), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushString("ab"), var, token(ADD)}, noShape), std::optional<int>{2});
+}

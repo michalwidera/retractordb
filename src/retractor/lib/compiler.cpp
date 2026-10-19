@@ -3059,6 +3059,19 @@ std::optional<int> inputSlotOfReference(const query &q, const std::map<std::stri
   if (base == fromOffsets.end()) return std::nullopt;
   return base->second + flatIndex;
 }
+
+/// Typ zmiennej VAR planu po indeksie z tokenu PUSH_VAR (#531) - typ wartosci z deklaracji (D4).
+/// Jedno zrodlo dla inferFieldShapes(), checkRuleConditionShapes() i R3.
+std::optional<rdb::descFld> variableType(const qTree &plan, const int index) {
+  if (index < 0 || std::cmp_greater_equal(index, plan.variables.size())) return std::nullopt;
+  return static_cast<rdb::descFld>(plan.variables[static_cast<size_t>(index)].initial.index());
+}
+
+std::optional<exprShape> variableShape(const qTree &plan, const int index) {
+  const auto type = variableType(plan, index);
+  if (!type.has_value()) return std::nullopt;
+  return numericShape(*type);
+}
 }  // namespace
 
 /// Ksztalt wyniku KAZDEGO pola SELECT - jeden przebieg wnioskowania dla calego planu.
@@ -3126,6 +3139,7 @@ std::string compiler::inferFieldShapes() {
     if (!position.has_value()) return std::nullopt;
     return shapeOfSlot(inputRecord[static_cast<size_t>(position->first)]);
   };
+  auto shapeOfVariable = [this](const int index) { return variableShape(coreInstance, index); };
 
   for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
     bool changed = false;
@@ -3167,7 +3181,7 @@ std::string compiler::inferFieldShapes() {
       };
 
       for (auto &f : q.lSchema) {
-        const auto inferred = inferExpressionShape(f.lProgram, shapeOfField, shapeOfWindow);
+        const auto inferred = inferExpressionShape(f.lProgram, shapeOfField, shapeOfWindow, shapeOfVariable);
         // `rejected` jest JEDYNYM statusem, ktory konczy kompilacje: program jest poprawny
         // skladniowo i typ da sie policzyc, ale silnik wydalby zla WARTOSC. Patrz
         // rejectedIrrationalOverExact() w expressionShape.cpp.
@@ -3212,6 +3226,7 @@ std::string compiler::checkRuleConditionShapes() {
     const int arity = (rdb::flatElementCount(*sourceField) == 1) ? sourceField->rarray : 1;
     return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
   };
+  auto shapeOfVariable = [this](const int index) { return variableShape(coreInstance, index); };
 
   for (const auto &q : coreInstance) {
     if (q.isCompilerDirective() || q.isDeclaration()) continue;
@@ -3222,7 +3237,7 @@ std::string compiler::checkRuleConditionShapes() {
     };
 
     for (const auto &r : q.lRules) {
-      const auto inferred = inferExpressionShape(r.condition, shapeOfField, shapeOfWindow);
+      const auto inferred = inferExpressionShape(r.condition, shapeOfField, shapeOfWindow, shapeOfVariable);
       if (inferred.rejected()) return "Stream '" + q.id + "' rule condition: " + inferred.reason;
     }
   }
@@ -3252,6 +3267,7 @@ std::string compiler::simplifyFieldExpressions() {
     if (sourceField->rtype > rdb::STRING) return std::nullopt;
     return sourceField->rtype;
   };
+  auto typeOfVariable = [this](const int index) { return variableType(coreInstance, index); };
 
   for (auto &q : coreInstance) {
     if (q.isCompilerDirective()) continue;
@@ -3280,9 +3296,9 @@ std::string compiler::simplifyFieldExpressions() {
     };
 
     for (auto &f : q.lSchema)
-      rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfSelectField));
+      rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfSelectField, typeOfVariable));
     for (auto &r : q.lRules)
-      rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
+      rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField, typeOfVariable));
 
     // Podwyrazenia okien stoja w tabeli grup, a nie w programie pola - resolveWindowAggregates()
     // wyjmuje je stamtad wczesniej, bo okno adresuje sloty ZRODLA. Bez tej petli `MIN(x*1 : 3)`

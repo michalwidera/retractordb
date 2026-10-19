@@ -32,6 +32,7 @@
 /// - [datamodel.data-model.13~1] przez syncDeclaredCapacities zwiększać pojemność historii źródeł deklarowanych do wymaganej przez plan, nigdy jej nie zmniejszając.
 /// - [datamodel.data-model.14~1] przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
 /// - [datamodel.data-model.15~1] traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
+/// - [datamodel.data-model.16~1] przy create budować wartości bieżące zmiennych VAR z wartości deklaracji qTree::variables (D6, #531) i przekazywać je w processRows wyrażeniom pól i warunkom reguł każdego liczonego strumienia.
 class dataModel {
  private:
   qTree &coreInstance_;
@@ -101,6 +102,10 @@ class dataModel {
 
  private:
   dataModel(qTree &coreInstance, rdb::MemoryStore *memory);
+
+  /// Wartosci biezace zmiennych VAR planu, indeksowane jak qTree::variables (#531). Etap A ich nie
+  /// zmienia - zostaja wartosciami z deklaracji (D6).
+  std::vector<rdb::descFldVT> variables_;
 
  public:
   /// Model planu: instancja kazdego strumienia z otwartym magazynem. Blad otwarcia magazynu wraca

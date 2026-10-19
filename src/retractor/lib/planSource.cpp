@@ -12,6 +12,7 @@
 #include <format>
 #include <sstream>
 #include <system_error>
+#include <tuple>
 
 #include <spdlog/spdlog.h>
 
@@ -145,12 +146,14 @@ PlanSource parsePlanText(qTree &plan, const std::string &text, std::string_view 
     retVal.lines.emplace_back(stream_name, stmt);
   }
   // Ostrzezenie, nie blad (#440, O2): nieuzyta stala nie zmienia planu, ale zwykle znaczy literowke.
-  std::vector<std::pair<size_t, std::string>> unused;
+  // Zmienna VAR (#531) dostaje to samo ostrzezenie.
+  std::vector<std::tuple<size_t, std::string, bool>> unused;
   for (const auto &[name, constant] : constants)
-    if (!constant.used) unused.emplace_back(constant.line, name);
+    if (!constant.used) unused.emplace_back(constant.line, name, constant.variable.has_value());
   std::ranges::sort(unused);
-  for (const auto &[line, name] : unused)
-    retVal.warnings.push_back(std::format("line {}: constant ?{} is declared but never used", line, name));
+  for (const auto &[line, name, variable] : unused)
+    retVal.warnings.push_back(
+        std::format("line {}: {} ?{} is declared but never used", line, variable ? "variable" : "constant", name));
   return retVal;
 }
 

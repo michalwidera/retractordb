@@ -570,11 +570,12 @@ rdb::Result<> streamInstance::reduceFieldsInto(command_id cmd, rdb::payload &tar
   return {};
 }
 
-rdb::Result<> streamInstance::constructOutputPayload(const std::list<field> &fields) const {
+rdb::Result<> streamInstance::constructOutputPayload(const std::list<field> &fields,
+                                                     const std::vector<rdb::descFldVT> *variables) const {
   auto i{0};
   for (const auto &program : fields) {
     expressionEvaluator expression;
-    RDB_TRY_ASSIGN(const rdb::descFldVT retVal, expression.eval(program.lProgram, inputPayload.get(), &windowValues));
+    RDB_TRY_ASSIGN(const rdb::descFldVT retVal, expression.eval(program.lProgram, inputPayload.get(), &windowValues, variables));
 
     if (std::holds_alternative<std::monostate>(retVal)) {
       outputPayload->getPayload()->setItemVT(i, std::nullopt);
@@ -635,7 +636,7 @@ static rdb::Result<bool> boolCast(const rdb::descFldVT &inVar) {
   return retVal;
 }
 
-rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry) {
+rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables) {
   // Kopia payloadu jest potrzebna tylko do ewaluacji warunkow regul - bez regul nie placimy za nia co interwal.
   if (qry.lRules.empty()) return dumpMgr.processStreamChunk(qry.id);
 
@@ -650,7 +651,7 @@ rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry) {
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
     if (outputPayload->getRecordsCount() < r.armAtCount) continue;
     expressionEvaluator expression;
-    RDB_TRY_ASSIGN(const auto result, expression.eval(r.condition, &payload));
+    RDB_TRY_ASSIGN(const auto result, expression.eval(r.condition, &payload, nullptr, variables));
     RDB_TRY_ASSIGN(const bool fired, boolCast(result));
     if (fired) {
       if (r.action == rule::DUMP) {

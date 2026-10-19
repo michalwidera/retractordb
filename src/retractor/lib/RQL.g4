@@ -6,6 +6,7 @@ prog                : ( select_statement
                       | default_statement
                       | rule_statement
                       | let_statement
+                      | var_statement
                       )+ EOF
                     ;
 
@@ -22,6 +23,14 @@ let_statement       : LET name=ID IS_EQ let_value
                     ;
 
 let_value           : sign=MINUS? ( DECIMAL | FLOAT | nom=DECIMAL DIVIDE den=DECIMAL )
+                    ;
+
+// Zmienna planu (#531, etap A): `VAR NAZWA = wartosc`, odwolanie `?NAZWA` - ten sam token co stala
+// LET i ta sama tablica nazw (D5). W przeciwienstwie do LET zmienna zyje w wykonaniu: odwolanie
+// w wyrazeniu skalarnym SELECT i RULE WHEN staje sie tokenem PUSH_VAR, a w kazdym kontekscie
+// strukturalnym jest odmowa (D2). Prawa strona jak w LET; typ zmiennej to typ literalu (D4).
+var_statement       : VAR name=ID IS_EQ let_value
+                    # Var
                     ;
 
 // Liczba calkowita w kontekstach etapu A #440: literal albo odwolanie do stalej. Ograniczenia
@@ -388,6 +397,7 @@ VOLATILE:           'VOLATILE'|'volatile';
 PERSISTENT:         'PERSISTENT'|'persistent';
 DEFAULT:            'DEFAULT'|'default';
 LET:                'LET'|'let';
+VAR:                'VAR'|'var';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';

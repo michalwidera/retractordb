@@ -34,6 +34,7 @@ struct PlanSource {
 /// - [plansource.parse-plan-text.3~1] przy pierwszej nieudanej instrukcji przerywać i zwracać jej komunikat jako status, z lines obejmującym tylko instrukcje sprzed niej.
 /// - [plansource.parse-plan-text.4~1] dla tekstu pustego albo złożonego wyłącznie z komentarzy i pustych wierszy zwracać status "OK" i pustą listę instrukcji.
 /// - [plansource.parse-plan-text.5~1] parsować wszystkie instrukcje tekstu z jedną tablicą stałych LET, która ginie razem z wywołaniem, i dla planu przyjętego dopisywać do warnings po jednym ostrzeżeniu `line N: constant ?X is declared but never used` na stałą bez odwołania, w kolejności wierszy deklaracji.
+/// - [plansource.parse-plan-text.6~1] dla zmiennej VAR bez odwołania dopisywać do warnings ostrzeżenie `line N: variable ?X is declared but never used`, w tej samej kolejności wierszy co stałe.
 ///
 /// @note Pusty plan nie jest tu bledem: dla uslugi to tryb bezczynny, dla `--onlycompile` blad - rozstrzyga
 ///       wolajacy. Funkcja jest wspolna dla startu z pliku (launcher) i przeladowania `reset` (executorsm),

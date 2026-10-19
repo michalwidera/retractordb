@@ -259,6 +259,17 @@ if xqry -d | grep -Eq 'letref|letpair'; then
   exit 1
 fi
 
+# Zmienne VAR (#531, D7): w etapie A deklaracja w kanale ad-hoc to odmowa filtra kanalu, a odczyt
+# `?X` - nieznana nazwa, bo kanal parsuje z pusta tablica nazw. Plan serwera zostaje bez zmian.
+expect_parse_rejected "VAR X = 1" "'VAR' is not supported"
+expect_parse_rejected "SELECT core0[0] * ?X STREAM varref FROM core0" "line 1:18: constant ?X in expression is not declared"
+expect_parse_rejected $'VAR X = 0\nSELECT core0[0] * ?X STREAM varpair FROM core0' "exactly one SELECT or DECLARE"
+if xqry -d | grep -Eq 'varref|varpair'; then
+  echo "odrzucone zapytanie z VAR zmienilo plan serwera"
+  xqry -d
+  exit 1
+fi
+
 # A2 C2 (#328): `-pole` ad hoc konczylo serwer (kod 1), a `pole * -pole` bylo przyjmowane i konczylo
 # go dopiero w pierwszym slocie (kod 4). `~` nad INTEGER i `-` nad napisem to odmowy kompilatora.
 expect_parse_rejected "SELECT ~core0[0] STREAM bitnot FROM core0" \

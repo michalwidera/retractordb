@@ -862,7 +862,8 @@ rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<doub
 }
 
 rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
-                                                      const std::vector<windowStats> *windowValues) {
+                                                      const std::vector<windowStats> *windowValues,
+                                                      const std::vector<rdb::descFldVT> *variables) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
   // std::deque alokuje mapę + blok już przy konstrukcji pustego stosu (~2 alok.),
   // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 -
@@ -1083,6 +1084,14 @@ rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &pr
             rStack.push(stats.sumValue);
             break;
         }
+      } break;
+      case PUSH_VAR: {
+        // Zmienna VAR (#531): wartosc taktu, a nie stala programu. Indeks nadal parser.
+        if (variables == nullptr) return evalError("PUSH_VAR: variable values not supplied");
+        const auto index = get<std::pair<std::string, int>>(tk.getVT()).second;
+        if (index < 0 || std::cmp_greater_equal(index, variables->size()))
+          return evalError("PUSH_VAR: variable index out of range");
+        rStack.push((*variables)[static_cast<size_t>(index)]);
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");

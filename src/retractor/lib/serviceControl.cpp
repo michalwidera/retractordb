@@ -3,6 +3,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -13,21 +14,31 @@
 #include <spdlog/spdlog.h>
 
 #include "platformConfig.h"
+#include "rdb/error.hpp"
 
 namespace {
 
 // Kod wyjścia dziecka, gdy execvp() się nie powiedzie - konwencja powłoki "command not found".
 constexpr int kExecFailedExitCode{127};
 
+// Najdłuższe argv z restartCommand(): {"systemctl", "--user", "restart", unit} albo
+// {"launchctl", "kickstart", "-k", cel}.
+constexpr std::size_t kMaxServiceArgv{4};
+
 // Domyślny wykonawca: fork + execvp(menedżer usług, argv). Bez shella (brak ryzyka
 // interpretacji argv). Zwraca kod wyjścia programu albo -1 przy błędzie fork/wait.
 int execServiceManager(const std::vector<std::string> &argv) {
   // Po fork() potomek nie alokuje: alokator mogl zostac zablokowany przez inny watek.
-  std::vector<char *> cargv;
-  cargv.reserve(argv.size() + 1);
-  for (const auto &a : argv)
-    cargv.push_back(const_cast<char *>(a.c_str()));
-  cargv.push_back(nullptr);
+  //
+  // Tablica argv stoi na STOSIE, nie na stercie. Potomek, ktoremu execvp() sie nie powiodl, konczy sie
+  // przez _exit() z kopia sterty rodzica, a pod valgrindem _exit() potomka robi kontrole wyciekow.
+  // Bufor std::vector byl wtedy w Release "definitely lost" (wskaznik juz tylko w rejestrze), a
+  // --error-exitcode=1 zamienial kod 127 na 1: ut_lockManager-valgrind padal na floorze ablacji.
+  RDB_ASSERT(argv.size() <= kMaxServiceArgv, "execServiceManager: argv has {} entries, the limit is {}", argv.size(),
+             kMaxServiceArgv);
+  std::array<char *, kMaxServiceArgv + 1> cargv{};
+  for (std::size_t i = 0; i < argv.size(); ++i)
+    cargv[i] = const_cast<char *>(argv[i].c_str());
   const pid_t pid = fork();
   if (pid < 0) {
     SPDLOG_ERROR("restartService: fork() failed before systemctl exec");

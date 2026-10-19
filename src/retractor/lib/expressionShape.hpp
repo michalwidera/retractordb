@@ -103,6 +103,10 @@ using exprFieldShapeFn = std::function<std::optional<exprShape>(const std::strin
 /// Pusty `std::function` znaczy „plan bez okien" i kazdy token `WINDOW_*` daje `unknown`.
 using exprWindowShapeFn = std::function<std::optional<exprShape>(int groupIndex)>;
 
+/// Ksztalt zmiennej VAR planu (#531), po jej indeksie w `qTree::variables`. Pusty `std::function`
+/// znaczy „plan bez zmiennych" i kazdy token `PUSH_VAR` daje `unknown`.
+using exprVariableShapeFn = std::function<std::optional<exprShape>(int variableIndex)>;
+
 /// Funkcja fieldLengthOfType powinna:
 /// - [expressionshape.field-length-of-type.1~1] zwracać długość jednego elementu pola w bajtach: 1 dla BYTE i STRING, sizeof(int) dla INTEGER, sizeof(unsigned) dla UINT, sizeof(boost::rational<int>) dla RATIONAL, sizeof(float) dla FLOAT i sizeof(double) dla DOUBLE.
 /// - [expressionshape.field-length-of-type.2~1] dla każdego innego typu zwracać sizeof(int).
@@ -158,6 +162,7 @@ bool isExactType(rdb::descFld type);
 /// - [expressionshape.infer-expression-shape.4~1] dla `PUSH_ID` kłaść kształt z shapeOfField(strumień, płaski indeks slotu), a zwracać unknown, gdy token nie niesie pary albo shapeOfField jest pusty lub zwraca nullopt.
 /// - [expressionshape.infer-expression-shape.5~1] dla nierozwiązanych odwołań `PUSH_ID1`..`PUSH_ID5` i `PUSH_IDX` oraz dla każdego tokenu spoza zestawu ewaluatora zwracać unknown.
 /// - [expressionshape.infer-expression-shape.6~1] dla `WINDOW_MIN`, `WINDOW_MAX`, `WINDOW_AVG` i `WINDOW_SUM` kłaść kształt z shapeOfWindow(indeks grupy), a zwracać unknown, gdy token nie niesie liczby int albo shapeOfWindow jest pusty lub zwraca nullopt.
+/// - [expressionshape.infer-expression-shape.18~1] dla `PUSH_VAR` kłaść kształt z shapeOfVariable(indeks zmiennej), a zwracać unknown, gdy token nie niesie pary albo shapeOfVariable jest pusty lub zwraca nullopt.
 /// - [expressionshape.infer-expression-shape.7~1] dla `+` z operandem STRING kłaść STRING o sumie szerokości operandów tekstowych, przy czym operand liczbowy wnosi zero.
 /// - [expressionshape.infer-expression-shape.8~1] dla `+`, `-`, `*`, `/` i `^` nad typami liczbowymi kłaść numericShape(arithmeticValueType), a dla operandu o typie powyżej DOUBLE (także napisu pod `-`, `*`, `/`, `^`) zwracać illTyped.
 /// - [expressionshape.infer-expression-shape.9~1] dla porównań kłaść INTEGER, gdy typ znormalizowany operandów to STRING, w przeciwnym razie numericShape typu znormalizowanego bez promocji BYTE, a dla typu znormalizowanego INTPAIR albo IDXPAIR zwracać illTyped.
@@ -173,10 +178,11 @@ bool isExactType(rdb::descFld type);
 /// @param program program pola albo warunku, w ONP
 /// @param shapeOfField ksztalt pola zrodlowego dla `PUSH_ID`
 /// @param shapeOfWindow ksztalt wyniku grupy okna dla `WINDOW_*`; moze byc pusty
+/// @param shapeOfVariable ksztalt zmiennej VAR dla `PUSH_VAR` (#531); moze byc pusty
 ///
 /// @note Jednoargumentowy `-` nad napisem to odmowa planu, a nie illTyped, bo wyjatek w slocie konczy serwer
 ///       (#328); `~` tylko dla BYTE i UINT to decyzja wlasciciela (#328). Typ `AND`/`OR` zalezy w wykonaniu od
 ///       WARTOSCI (lewy operand, chyba ze NULL), ale operatory logiczne zyja tylko w warunku RULE i nie
 ///       opisuja deskryptora. Napis zerowej szerokosci dostaje szerokosc domyslna, zeby nie powstalo `STRING[0]`.
 exprShapeResult inferExpressionShape(const std::list<token> &program, const exprFieldShapeFn &shapeOfField,
-                                     const exprWindowShapeFn &shapeOfWindow);
+                                     const exprWindowShapeFn &shapeOfWindow, const exprVariableShapeFn &shapeOfVariable = {});

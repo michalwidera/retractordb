@@ -327,7 +327,8 @@ std::optional<node> rewriteWithConstantOnRight(const node &left, const rdb::desc
 
 }  // namespace
 
-std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup &typeOfField) {
+std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup &typeOfField,
+                               const variableTypeLookup &typeOfVariable) {
   if (program.empty()) return 0;
 
   std::vector<node> stack;
@@ -355,6 +356,16 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         leaf.program.push_back(tk);
         if (const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT()))
           leaf.type = typeOfField(reference->first, reference->second);
+        stack.push_back(std::move(leaf));
+      } break;
+
+      case PUSH_VAR: {
+        // Zmienna VAR (#531) ma typ, ale nie wartosc: liczy ja dopiero takt. Wezel bez `constant`,
+        // wiec regula A nigdy jej nie zwinie - nawet `?X * 0`, ktore przy NULL daje NULL.
+        node leaf;
+        leaf.program.push_back(tk);
+        if (const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT()); reference && typeOfVariable)
+          leaf.type = typeOfVariable(reference->second);
         stack.push_back(std::move(leaf));
       } break;
 
@@ -538,6 +549,11 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
           stack.push_back({true, static_cast<int>(text->length())});
         else
           stack.push_back({false, 0});
+        break;
+
+      // Zmienna VAR (#531) jest zawsze liczbą - napisy są poza zakresem (D4).
+      case PUSH_VAR:
+        stack.push_back({false, 0});
         break;
 
       // Odwołanie do pola. Kształt zna wyłącznie PUSH_ID, bo tylko on niesie parę
