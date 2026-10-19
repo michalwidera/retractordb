@@ -81,9 +81,13 @@ dumppart            : DUMP '-'? step_back=int_const TO '-'? step_forward=int_con
 systempart          : SYSTEM syscmd=STRING
                     ;
 
+// Stala LET (#440, etap B) przyjmuje tu kazda postac literalu: calkowita, dziesietna i ulamek
+// przechodza przez te same konwersje co literal tej postaci. Stala jest jednym literalem (D3),
+// wiec `?N/40` nie jest ulamkiem, tylko bledem skladni.
 rational_se         : fraction_rule # RationalAsFraction_proforma
                     | FLOAT         # RationalAsFloat
                     | DECIMAL       # RationalAsDecimal
+                    | CONST_REF     # RationalAsConst
                     ;
 
 retention_from      : RETENTION capacity=int_const (segments=int_const)?
@@ -178,6 +182,7 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
                     | '(' expression_factor ')'    # ExpIn
                     | '-'? FLOAT                   # ExpFloat
                     | '-'? DECIMAL                 # ExpDec
+                    | '-'? CONST_REF               # ExpConst
                     | STRING                       # ExpString
                     | unary_op_expression          # ExpUnary
                     | field_id                     # ExpField

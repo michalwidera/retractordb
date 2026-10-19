@@ -7,7 +7,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
-# covers: rqlparser.parser-rql-string.10~1, plansource.parse-plan-text.5~1
+# covers: rqlparser.parser-rql-string.10~1, rqlparser.parser-rql-string.12~1, rqlparser.parser-rql-string.13~1, plansource.parse-plan-text.5~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

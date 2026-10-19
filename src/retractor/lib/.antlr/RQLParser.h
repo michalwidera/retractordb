@@ -420,6 +420,15 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  RationalAsConstContext : public Rational_seContext {
+  public:
+    RationalAsConstContext(Rational_seContext *ctx);
+
+    antlr4::tree::TerminalNode *CONST_REF();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  RationalAsFloatContext : public Rational_seContext {
   public:
     RationalAsFloatContext(Rational_seContext *ctx);
@@ -1044,6 +1053,16 @@ public:
     ExpFloatContext(TermContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT();
+    antlr4::tree::TerminalNode *MINUS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpConstContext : public TermContext {
+  public:
+    ExpConstContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *CONST_REF();
     antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

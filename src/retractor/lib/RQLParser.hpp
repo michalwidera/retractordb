@@ -18,15 +18,19 @@
 
 class qTree;
 
-/// Stala `LET NAZWA = wartosc` (#440). Wartosc liczbowa trzyma tylko stala calkowita, bo tylko taka
-/// ma dzis odbiorcow (konteksty calkowite, etap A); dziesietna i ulamek sa przyjmowane w deklaracji,
-/// a ich uzycie w kontekscie calkowitym jest odmowa - bez niejawnego obcinania.
+/// Stala `LET NAZWA = wartosc` (#440). Stala ma typ swojego literalu: kazdy kontekst zamienia ja ta
+/// sama konwersja, ktora stosuje do literalu tej postaci. Dziesietna nie ma tu wartosci liczbowej, bo
+/// literal dziesietny ma w roznych kontekstach rozne typy (FLOAT w wyrazeniu, Rationalize w
+/// rational_se) - kontekst parsuje jej tekst. Uzycie, ktorego literal tej postaci nie ma (dziesietna
+/// w kontekscie calkowitym, ulamek w wyrazeniu), jest odmowa - bez niejawnej konwersji.
 /// @requirements-exempt RqlConstant: Rekord tablicy stalych; logike ma parser.
 struct RqlConstant {
   enum class Kind { integer, decimal, fraction };
   Kind kind{Kind::integer};
-  std::string text;  ///< Prawa strona deklaracji, ze znakiem - do komunikatow.
+  std::string text;  ///< Prawa strona deklaracji, ze znakiem - do komunikatow i parsowania dziesietnej.
   int integer{0};    ///< Wartosc, gdy kind == integer.
+  int nom{0};        ///< Licznik ze znakiem, gdy kind == fraction.
+  int den{1};        ///< Mianownik, dodatni, gdy kind == fraction.
   size_t line{0};    ///< Wiersz deklaracji w pliku planu.
   bool used{false};  ///< Czy plan odwolal sie do stalej - podstawa ostrzezenia o nieuzytej.
 };
@@ -50,6 +54,8 @@ using RqlConstants = std::map<std::string, RqlConstant>;
 /// - [rqlparser.parser-rql-string.9~1] po błędzie nie cofać zmian już naniesionych w coreInstance.
 /// - [rqlparser.parser-rql-string.10~1] dopisywać deklaracje LET porcji do tablicy constants i rozwiązywać z niej odwołania `?NAZWA`, oznaczając stałą jako użytą; przeciążenia bez tej tablicy parsują z pustą tablicą lokalną, więc stała nie wychodzi poza porcję.
 /// - [rqlparser.parser-rql-string.11~1] odwołanie do stałej nieznanej, niecałkowitej albo o wartości łamiącej ograniczenia kontekstu oraz ponowną deklarację LET i nazwę z `$` zwracać jako błąd semantyczny z nazwą stałej i pozycją `line L:C`.
+/// - [rqlparser.parser-rql-string.12~1] rozwiązywać `?NAZWA` w `rational_se` (interwał DECLARE, `&`, `%`, `-`, TIMEOUT) tą samą konwersją co literał całkowity, dziesiętny albo ułamek tej postaci; stałą ujemną odrzucać, a w TIMEOUT `-?NAZWA` negować wartość i odrzucać wynik ujemny.
+/// - [rqlparser.parser-rql-string.13~1] rozwiązywać `'-'? ?NAZWA` w wyrażeniu SELECT i RULE WHEN jak literał `'-'? DECIMAL` (INTEGER) albo `'-'? FLOAT` (FLOAT z tekstu stałej); ułamek oraz negację wychodzącą poza zakres INTEGER odrzucać.
 ///
 /// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
 ///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca

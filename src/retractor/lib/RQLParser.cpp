@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <format>
 #include <iostream>
 #include <limits>
@@ -326,20 +327,47 @@ class ParserListener : public RQLBaseListener {
   /// planu, wiec pozniejszego LET jeszcze w niej nie ma. Stala dziesietna albo ulamek w kontekscie
   /// calkowitym jest odmowa, bo literal tej postaci bylby tu bledem skladni.
   std::optional<int> constantValue(const antlr4::Token *ref, const std::string &what) {
-    const std::string name = ref->getText().substr(1);
-    const auto found       = constants_.find(name);
-    if (found == constants_.end()) {
-      reportSemanticError(position(ref) + ": constant ?" + name + " in " + what +
-                          " is not declared; LET must precede its first use");
-      return std::nullopt;
-    }
-    found->second.used = true;
-    if (found->second.kind != RqlConstant::Kind::integer) {
-      reportSemanticError(position(ref) + ": constant ?" + name + " = " + found->second.text + " in " + what +
+    const RqlConstant *constant = findConstant(ref, what);
+    if (constant == nullptr) return std::nullopt;
+    if (constant->kind != RqlConstant::Kind::integer) {
+      reportSemanticError(position(ref) + ": constant " + ref->getText() + " = " + constant->text + " in " + what +
                           " is not an integer");
       return std::nullopt;
     }
-    return found->second.integer;
+    return constant->integer;
+  }
+
+  /// Stala z tablicy, oznaczona jako uzyta, albo nullptr po zgloszonej odmowie.
+  const RqlConstant *findConstant(const antlr4::Token *ref, const std::string &what) {
+    const auto found = constants_.find(ref->getText().substr(1));
+    if (found == constants_.end()) {
+      reportSemanticError(position(ref) + ": constant " + ref->getText() + " in " + what +
+                          " is not declared; LET must precede its first use");
+      return nullptr;
+    }
+    found->second.used = true;
+    return &found->second;
+  }
+
+  /// Odwolanie do stalej w komunikacie: `?NAZWA = wartosc (line L:C)`.
+  [[nodiscard]] std::string constantText(const antlr4::Token *ref, const RqlConstant &constant) const {
+    return ref->getText() + " = " + constant.text + " (" + position(ref) + ")";
+  }
+
+  /// Literal dziesietny bez znaku jako liczba wymierna - jedyna konwersja `x.y` w rational_se,
+  /// wspolna dla literalu i stalej. nullopt znaczy wartosc spoza zakresu.
+  ///
+  /// Zakres liczy sie tu wzgledem `rational<int>`, nie `double`. Rationalize() nie odmawia:
+  /// wartosc od 2^31 w gore i niezerowa ponizej jej rozdzielczosci (1e-6) oddaje jako 0/1,
+  /// wiec `3000000000.0` i `0.00000001` dawaly interwal zerowy, a plan padal dopiero
+  /// w kompilatorze na mylacym "Circular dependency in stream definitions". Jawne `0.0` zostaje
+  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu; odrzuca je acceptInterval().
+  static std::optional<boost::rational<int>> rationalFromFloat(const std::string &text) {
+    const auto value = parseLiteral<double>(text);
+    if (!value) return std::nullopt;
+    const auto rational = Rationalize(*value);
+    if (rational == 0 && *value != 0) return std::nullopt;
+    return rational;
   }
 
   /// Liczba `int_const` - literal albo stala - z tekstem do komunikatow. Brak wartosci znaczy, ze
@@ -646,6 +674,41 @@ class ParserListener : public RQLBaseListener {
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, literal<float>(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, literal<int>(ctx->getText())); }
+
+  /// `?NAZWA` i `-?NAZWA` w wyrazeniu (#440, etap B) - ten sam token co literal `'-'? DECIMAL` albo
+  /// `'-'? FLOAT`. Dziesietna parsuje sie z tekstu stalej ta sama funkcja co literal (FLOAT, nie double
+  /// rzutowany na float), a minus neguje wartosc (O5); oba zabiegi sa dokladne. Ulamka literalem tu
+  /// zapisac sie nie da - `1/40` w wyrazeniu to dzielenie calkowite, czyli 0 - wiec jest odmowa.
+  /// Wartosc zastepcza 0 trzyma ksztalt programu po odmowie, jak w literal().
+  void exitExpConst(RQLParser::ExpConstContext *ctx) override {
+    const antlr4::Token *ref    = ctx->CONST_REF()->getSymbol();
+    const bool negated          = ctx->MINUS() != nullptr;
+    const RqlConstant *constant = findConstant(ref, "expression");
+    if (constant == nullptr) {
+      recpToken(PUSH_VAL, 0);
+      return;
+    }
+    switch (constant->kind) {
+      case RqlConstant::Kind::integer: {
+        const long long value = negated ? -static_cast<long long>(constant->integer) : constant->integer;
+        if (!std::in_range<int>(value)) reportSemanticError("expression -" + constantText(ref, *constant) + " is out of range");
+        recpToken(PUSH_VAL, std::in_range<int>(value) ? static_cast<int>(value) : 0);
+        break;
+      }
+      case RqlConstant::Kind::decimal: {
+        // LET sprawdzil zakres double; FLOAT ma wezszy, jak dla literalu w tym miejscu.
+        const auto value = parseLiteral<float>(constant->text);
+        if (!value) reportSemanticError("expression " + constantText(ref, *constant) + " is out of range");
+        recpToken(PUSH_VAL, negated ? -value.value_or(0) : value.value_or(0));
+        break;
+      }
+      case RqlConstant::Kind::fraction:
+        reportSemanticError("constant " + constantText(ref, *constant) +
+                            " is a fraction, which an expression has no literal for; write it as a decimal");
+        recpToken(PUSH_VAL, 0);
+        break;
+    }
+  }
   void exitExpString(RQLParser::ExpStringContext *ctx) override {
     auto text = ctx->getText();
     // Strip surrounding single quotes
@@ -797,10 +860,17 @@ class ParserListener : public RQLBaseListener {
     // wcale - takze wtedy, gdy regula ze sciezki wybrala DEVICE - wiec komunikat podpowiada jawne
     // slowo. Wartosc ujemna nie ma znaczenia "czekaj bez konca": takiego terminu nie ma.
     if (ctx->TIMEOUT() != nullptr) {
-      const std::string text = ctx->timeout_value->getText();
+      std::string text = ctx->timeout_value->getText();
+      // Znak przy stalej rozliczyl juz exitRationalAsConst (O5), a jej tekst niesie wartosc i pozycje.
+      auto *constRef = dynamic_cast<RQLParser::RationalAsConstContext *>(ctx->timeout_value);
+      if (constRef != nullptr) {
+        const antlr4::Token *ref = constRef->CONST_REF()->getSymbol();
+        if (const auto found = constants_.find(ref->getText().substr(1)); found != constants_.end())
+          text = constantText(ref, found->second);
+      }
       // Brak wartosci znaczy, ze przebieg rational_se juz zglosil literal (zakres, zerowy mianownik).
       if (timeoutResult) {
-        if (ctx->timeout_sign != nullptr)
+        if (ctx->timeout_sign != nullptr && constRef == nullptr)
           reportSemanticError("DECLARE " + qry.id + ": TIMEOUT -" + text + " must not be negative");
         else if (boost::rational_cast<double>(*timeoutResult) > rdb::limits::kMaxDeviceTimeoutSeconds)
           reportSemanticError("DECLARE " + qry.id + ": TIMEOUT " + text + " exceeds the limit " +
@@ -827,20 +897,63 @@ class ParserListener : public RQLBaseListener {
   // https://www.programiz.com/cpp-programming/string-float-conversion
   // https://www.geeksforgeeks.org/converting-strings-numbers-cc/
 
-  /// Zakres liczy sie tu wzgledem `rational<int>`, nie `double`. Rationalize() nie odmawia:
-  /// wartosc od 2^31 w gore i niezerowa ponizej jej rozdzielczosci (1e-6) oddaje jako 0/1,
-  /// wiec `3000000000.0` i `0.00000001` dawaly interwal zerowy, a plan padal dopiero
-  /// w kompilatorze na mylacym "Circular dependency in stream definitions". Jawne `0.0` zostaje
-  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu; odrzuca je acceptInterval().
   void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) override {
     const std::string text = ctx->FLOAT()->getText();
-    const auto value       = parseLiteral<double>(text);
-    const auto rational    = value ? Rationalize(*value) : boost::rational<int>{};
-    if (!value || (rational == 0 && *value != 0)) {
+    const auto rational    = rationalFromFloat(text);
+    if (!rational) {
       reportOutOfRange(text);
       return;
     }
-    acceptRational(ctx, rational, text);
+    acceptRational(ctx, *rational, text);
+  }
+
+  /// `?NAZWA` w rational_se (#440, etap B): wartosc bezwzgledna stalej przechodzi te sama konwersje
+  /// co literal jej postaci - `n`, `x.y`, `a/b` - wiec plan jest nie do odroznienia od literalowego.
+  /// Literal stoi tu zawsze bez znaku, dlatego stala ujemna jest odmowa. Wyjatkiem jest TIMEOUT, gdzie
+  /// gramatyka dopuszcza minus: `-?T` neguje wartosc stalej (O5), a odmowa dotyczy dopiero wyniku
+  /// ujemnego. Zero przechodzi dalej - interwal odrzuca je acceptInterval(), TIMEOUT je przyjmuje.
+  void exitRationalAsConst(RQLParser::RationalAsConstContext *ctx) override {
+    const antlr4::Token *ref    = ctx->CONST_REF()->getSymbol();
+    const bool timeout          = isTimeoutValue(ctx);
+    const std::string what      = timeout ? "TIMEOUT" : "interval";
+    const RqlConstant *constant = findConstant(ref, what);
+    if (constant == nullptr) return;
+    const std::string text = constantText(ref, *constant);
+
+    bool negative = false;
+    std::optional<boost::rational<int>> magnitude;
+    switch (constant->kind) {
+      case RqlConstant::Kind::integer:
+        negative = constant->integer < 0;
+        // Modul najmniejszej wartosci int sie w int nie miesci - jak literal 2147483648.
+        if (const long long value = std::abs(static_cast<long long>(constant->integer)); std::in_range<int>(value))
+          magnitude = boost::rational<int>(static_cast<int>(value));
+        break;
+      case RqlConstant::Kind::decimal:
+        negative  = constant->text.starts_with('-');
+        magnitude = rationalFromFloat(negative ? constant->text.substr(1) : constant->text);
+        break;
+      case RqlConstant::Kind::fraction:
+        negative  = constant->nom < 0;
+        magnitude = boost::rational<int>(std::abs(constant->nom), constant->den);
+        break;
+    }
+    // Przy TIMEOUT nazwa strumienia jest juz znana, a komunikaty literalu ja podaja (exitDeclare).
+    std::string owner;
+    if (timeout) {
+      const auto *declare = dynamic_cast<RQLParser::DeclareContext *>(ctx->parent);
+      owner               = "DECLARE " + declare->stream_name->getText() + ": ";
+      if (declare->timeout_sign != nullptr) negative = !negative;
+    }
+    if (negative && magnitude != boost::rational<int>(0)) {
+      reportSemanticError(owner + what + " " + text + (timeout ? " must not be negative" : " must be greater than zero"));
+      return;
+    }
+    if (!magnitude) {
+      reportSemanticError(owner + what + " " + text + " is out of range");
+      return;
+    }
+    acceptRational(ctx, *magnitude, text);
   }
 
   void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) override {
@@ -1094,6 +1207,8 @@ class ParserListener : public RQLBaseListener {
         reportSemanticError(where + ": fraction " + constant.text + " of constant ?" + name + " has a zero denominator");
         return;
       }
+      constant.nom = value->sign != nullptr ? -*nom : *nom;
+      constant.den = *den;
     } else {
       // Tekst niesie znak, wiec std::stoi przyjmuje takze najmniejsza wartosc int.
       const auto integer = parseLiteral<int>(constant.text);

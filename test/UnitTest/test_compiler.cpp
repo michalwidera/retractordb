@@ -5,7 +5,10 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iomanip>
 #include <iterator>
+#include <limits>
+#include <list>
 #include <map>
 #include <optional>
 #include <set>
@@ -5225,7 +5228,21 @@ std::string letPlanFingerprint(const std::string &rql) {
   if (loaded.status != "OK") return "parse: " + loaded.status;
   if (const auto status = compiler(plan).compile(); status != "OK") return "compile: " + status;
   std::ostringstream os;
+  // Wydruk tokenu nie niesie typu wartosci (INTEGER 2 i FLOAT 2.0 to oba `2`) i obcina liczby
+  // zmiennoprzecinkowe do 6 cyfr - stala dziesietna musi dac ten sam typ i te same bity co literal.
+  os << std::setprecision(std::numeric_limits<double>::max_digits10);
+  const auto types = [&os](const std::list<token> &program) {
+    os << "|types:";
+    for (const auto &t : program)
+      os << t.getVT().index() << ",";
+  };
   for (auto &q : plan) {
+    types(q.lProgram);
+    for (const auto &f : q.lSchema)
+      types(f.lProgram);
+    for (const auto &r : q.lRules)
+      types(r.condition);
+    os << "|timeout:" << q.timeoutSeconds.value_or(boost::rational<int>(-1));
     os << q << "|gen:" << q.generatorSize << "|lat:" << q.startupLatency << "|origin:" << q.logicalOrigin
        << "|policy:" << q.policy.first << "," << q.policy.second << "|retention:" << q.retention.segments << ","
        << q.retention.capacity << "|storage:" << q.storage_policy;
@@ -5357,6 +5374,96 @@ TEST(xparser, let_refusals_name_the_constant_and_its_position) {
   EXPECT_EQ(letPlanStatus("LET X = " + reach + "\n" + header + "\nSELECT * STREAM o FROM s > ?X"), "OK");
   EXPECT_EQ(letPlanStatus("LET X = " + reach + "\n" + header + "\nSELECT * STREAM o FROM s@(1, -?X)"), "OK");
   EXPECT_EQ(letPlanStatus("LET X = -" + reach + "\n" + header + "\nSELECT * STREAM o FROM s@(1, ?X)"), "OK");
+}
+
+// --- LET i ?NAZWA (#440, etap B): rational_se i wyrazenia skalarne ------------------------------
+
+TEST(xparser, let_constants_in_rational_and_scalar_contexts_compile_to_the_literal_plan) {
+  // covers: rqlparser.parser-rql-string.12~1, rqlparser.parser-rql-string.13~1
+  const std::string header(kLetHeader);
+  const std::string device = "DECLARE a INTEGER STREAM d, 1 DEVICE 'dev.fifo' TIMEOUT ";
+  // {plan z literalami, plan z LET}. Stala ma typ swojego literalu: calkowita, dziesietna i ulamek
+  // w rational_se, INTEGER i FLOAT w wyrazeniu; odcisk porownuje takze typ kazdej wartosci programu.
+  const std::vector<std::pair<std::string, std::string>> pairs = {
+      {"DECLARE a INTEGER STREAM s, 2 TEXTFILE 's.txt'\nDECLARE a INTEGER STREAM t, 0.25 TEXTFILE 't.txt'\n"
+       "DECLARE a INTEGER STREAM u, 1/40 TEXTFILE 'u.txt'",
+       "LET I = 2\nLET D = 0.25\nLET F = 1/40\nDECLARE a INTEGER STREAM s, ?I TEXTFILE 's.txt'\n"
+       "DECLARE a INTEGER STREAM t, ?D TEXTFILE 't.txt'\nDECLARE a INTEGER STREAM u, ?F TEXTFILE 'u.txt'"},
+      {header + "\nSELECT * STREAM o FROM s & 2\nSELECT * STREAM p FROM s % 1/2\nSELECT * STREAM q FROM s - 3/2\n"
+                "SELECT * STREAM r FROM s - 2.5",
+       "LET DIV = 2\nLET MOD = 1/2\nLET RATE = 3/2\nLET SLOW = 2.5\n" + header +
+           "\nSELECT * STREAM o FROM s & ?DIV\nSELECT * STREAM p FROM s % ?MOD\nSELECT * STREAM q FROM s - ?RATE\n"
+           "SELECT * STREAM r FROM s - ?SLOW"},
+      {device + "0.5", "LET T = 0.5\n" + device + "?T"},
+      {device + "1/2", "LET T = -1/2\n" + device + "-?T"},
+      {device + "0", "LET Z = 0\n" + device + "-?Z"},
+      {device + "7", "LET T = 7\n" + device + "?T"},
+      {header + "\nSELECT s[0]*3, s[1]*0.1 + -2, -2^2, s[0]^2, -9.81, 9.81, -0.5 STREAM o FROM s",
+       "LET K = 3\nLET H = 0.1\nLET M = 2\nLET G = -9.81\nLET N = 0.5\n" + header +
+           "\nSELECT s[0]*?K, s[1]*?H + -?M, -?M^2, s[0]^?M, ?G, -?G, -?N STREAM o FROM s"},
+      {header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] >= 250 AND o[1] < 0.5 DO DUMP -1 TO 1",
+       "LET LIMIT = 250\nLET LOW = 0.5\n" + header +
+           "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] >= ?LIMIT AND o[1] < ?LOW DO DUMP -1 TO 1"},
+      {header + "\nSELECT s[0]*2 STREAM o FROM s@(2, 4)\nSELECT o[0] STREAM p FROM o - 2",
+       "LET N = 2\n" + header + "\nSELECT s[0]*?N STREAM o FROM s@(?N, 4)\nSELECT o[0] STREAM p FROM o - ?N"},
+  };
+  for (const auto &[literal, named] : pairs) {
+    SCOPED_TRACE(named);
+    const std::string expected = letPlanFingerprint(literal);
+    ASSERT_EQ(expected.find("parse:"), std::string::npos) << expected;
+    ASSERT_EQ(expected.find("compile:"), std::string::npos) << expected;
+    const std::string actual = letPlanFingerprint(named);
+    EXPECT_EQ(actual, expected);
+    EXPECT_EQ(actual.find('?'), std::string::npos) << actual;
+  }
+}
+
+TEST(xparser, let_refusals_in_rational_and_scalar_contexts) {
+  // covers: rqlparser.parser-rql-string.12~1, rqlparser.parser-rql-string.13~1
+  const std::string header(kLetHeader);
+  const std::string declare                                    = "DECLARE a INTEGER STREAM s, ?X TEXTFILE 's.txt'";
+  const std::string device                                     = "DECLARE a INTEGER STREAM d, 1 DEVICE 'dev.fifo' TIMEOUT ";
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"LET F = 1/40\n" + header + "\nSELECT s[0] * ?F STREAM o FROM s",
+       "constant ?F = 1/40 (line 3:14) is a fraction, which an expression has no literal for"},
+      {"LET X = -2\n" + declare, "interval ?X = -2 (line 2:28) must be greater than zero"},
+      {"LET X = -0.5\n" + header + "\nSELECT * STREAM o FROM s - ?X",
+       "interval ?X = -0.5 (line 3:27) must be greater than zero"},
+      {"LET X = -1/2\n" + header + "\nSELECT * STREAM o FROM s & ?X",
+       "interval ?X = -1/2 (line 3:27) must be greater than zero"},
+      {"LET X = 0\n" + declare, "interval ?X = 0 (line 2:28) must be greater than zero"},
+      {"LET X = 0/5\n" + header + "\nSELECT * STREAM o FROM s % ?X", "interval ?X = 0/5 (line 3:27) must be greater than zero"},
+      {"LET X = 0.0\n" + declare, "interval ?X = 0.0 (line 2:28) must be greater than zero"},
+      {"LET X = 0.00000001\n" + declare, "interval ?X = 0.00000001 (line 2:28) is out of range"},
+      {"LET X = 3000000000.0\n" + declare, "interval ?X = 3000000000.0 (line 2:28) is out of range"},
+      {"LET X = -2147483648\n" + declare, "interval ?X = -2147483648 (line 2:28) must be greater than zero"},
+      {"LET T = -1\n" + device + "?T", "DECLARE d: TIMEOUT ?T = -1 (line 2:56) must not be negative"},
+      {"LET T = 1\n" + device + "-?T", "DECLARE d: TIMEOUT ?T = 1 (line 2:57) must not be negative"},
+      {"LET T = 86401\n" + device + "?T", "DECLARE d: TIMEOUT ?T = 86401 (line 2:56) exceeds the limit 86400 s"},
+      {"LET T = -0.01\n" + device + "?T", "DECLARE d: TIMEOUT ?T = -0.01 (line 2:56) must not be negative"},
+      {"LET X = -2147483648\n" + header + "\nSELECT -?X STREAM o FROM s",
+       "expression -?X = -2147483648 (line 3:8) is out of range"},
+      {"LET X = 1" + std::string(40, '0') + ".0\n" + header + "\nSELECT s[0] * ?X STREAM o FROM s",
+       "expression ?X = 1" + std::string(40, '0') + ".0 (line 3:14) is out of range"},
+      {header + "\nSELECT s[0] * ?Q STREAM o FROM s", "line 2:14: constant ?Q in expression is not declared"},
+      {header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] > ?Q DO DUMP 0 TO 1",
+       "line 3:24: constant ?Q in expression is not declared"},
+      {header + "\nSELECT * STREAM o FROM s - ?Q", "line 2:27: constant ?Q in interval is not declared"},
+      {device + "?Q", "line 1:56: constant ?Q in TIMEOUT is not declared"},
+      {"LET X = 2.5\n" + header + "\nSELECT s[?X] STREAM o FROM s", "constant ?X = 2.5 in field index is not an integer"},
+      {"LET N = 1\n" + header + "\nSELECT * STREAM o FROM s - ?N/40", "line 3:29 extraneous input '/'"},
+  };
+  for (const auto &[rql, expected] : cases) {
+    SCOPED_TRACE(rql);
+    const std::string status = letPlanStatus(rql);
+    EXPECT_NE(status.find(expected), std::string::npos) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
+  // Wartosci graniczne TIMEOUT przechodza: 0 i 86400, takze przez negacje stalej ujemnej.
+  EXPECT_EQ(letPlanStatus("LET T = 0\n" + device + "?T"), "OK");
+  EXPECT_EQ(letPlanStatus("LET T = 86400\n" + device + "?T"), "OK");
+  EXPECT_EQ(letPlanStatus("LET T = -86400\n" + device + "-?T"), "OK");
+  EXPECT_EQ(letPlanStatus("LET X = 2147483647\n" + header + "\nSELECT -?X STREAM o FROM s"), "OK");
 }
 
 TEST(xparser, let_question_mark_inside_text_stays_text) {

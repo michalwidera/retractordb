@@ -56,6 +56,9 @@ public:
   virtual void enterRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
   virtual void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
 
+  virtual void enterRationalAsConst(RQLParser::RationalAsConstContext *ctx) = 0;
+  virtual void exitRationalAsConst(RQLParser::RationalAsConstContext *ctx) = 0;
+
   virtual void enterRetention(RQLParser::RetentionContext *ctx) = 0;
   virtual void exitRetention(RQLParser::RetentionContext *ctx) = 0;
 
@@ -181,6 +184,9 @@ public:
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
   virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
+
+  virtual void enterExpConst(RQLParser::ExpConstContext *ctx) = 0;
+  virtual void exitExpConst(RQLParser::ExpConstContext *ctx) = 0;
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;

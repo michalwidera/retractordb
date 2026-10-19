@@ -1,6 +1,7 @@
 # Plan z literalami dla it_let_constants (#440). Para z let.rql: ten sam plan, liczby zapisane
 # stalymi LET. Obie wersje maja dac identyczny zrzut `xretractor -c` i identyczne wyjscie.
 DECLARE v INTEGER[2] STREAM s, 1 TEXTFILE 'data.txt'
+DECLARE w INTEGER[2] STREAM fast, 1/2 TEXTFILE 'data.txt'
 SELECT s[0], s[1] STREAM channels FROM s
 SELECT * STREAM block FROM channels@(3, -4)
 SELECT * STREAM block2 FROM channels@(2, 4)
@@ -8,4 +9,8 @@ SELECT * STREAM shifted FROM channels > 2
 SELECT AVG(channels[0] : 3), to_string(channels[1] : 6) STREAM means FROM channels
 SELECT channels[1-$] STREAM fam[2] FROM channels
 SELECT * STREAM kept FROM fam[1] RETENTION 10 2
-RULE high ON channels WHEN channels[0] >= 7 DO DUMP -1 TO 2 RETENTION 3
+SELECT * STREAM thin FROM channels - 3/2
+SELECT * STREAM slow FROM channels - 2.5
+SELECT * STREAM part FROM fast & 2
+SELECT channels[0]*0.1 + -2, -2^2, channels[1]^2 STREAM scaled FROM channels
+RULE high ON channels WHEN channels[0] >= 7 AND channels[1] > 0.5 DO DUMP -1 TO 2 RETENTION 3
