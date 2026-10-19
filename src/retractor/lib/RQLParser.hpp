@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -33,10 +34,13 @@ struct RqlConstant {
   int den{1};        ///< Mianownik, dodatni, gdy kind == fraction.
   size_t line{0};    ///< Wiersz deklaracji w pliku planu.
   bool used{false};  ///< Czy plan odwolal sie do stalej - podstawa ostrzezenia o nieuzytej.
+  /// Indeks w qTree::variables, gdy nazwe zadeklarowal VAR (#531), a nie LET. Jedna tablica dla
+  /// obu form, bo dziela znacznik `?` i przestrzen nazw (D5).
+  std::optional<size_t> variable;
 };
 
-/// Tablica stalych JEDNEGO planu: nazwa (bez `?`) -> stala. Zyje dluzej niz jedno wywolanie
-/// parserRQLString, bo plan jest parsowany po jednej instrukcji (readLogicalLines).
+/// Tablica stalych i zmiennych JEDNEGO planu: nazwa (bez `?`) -> wpis. Zyje dluzej niz jedno
+/// wywolanie parserRQLString, bo plan jest parsowany po jednej instrukcji (readLogicalLines).
 using RqlConstants = std::map<std::string, RqlConstant>;
 
 /// Funkcja parserRQLString powinna:
@@ -56,6 +60,9 @@ using RqlConstants = std::map<std::string, RqlConstant>;
 /// - [rqlparser.parser-rql-string.11~1] odwołanie do stałej nieznanej, niecałkowitej albo o wartości łamiącej ograniczenia kontekstu oraz ponowną deklarację LET i nazwę z `$` zwracać jako błąd semantyczny z nazwą stałej i pozycją `line L:C`.
 /// - [rqlparser.parser-rql-string.12~1] rozwiązywać `?NAZWA` w `rational_se` (interwał DECLARE, `&`, `%`, `-`, TIMEOUT) tą samą konwersją co literał całkowity, dziesiętny albo ułamek tej postaci; stałą ujemną odrzucać, a w TIMEOUT `-?NAZWA` negować wartość i odrzucać wynik ujemny.
 /// - [rqlparser.parser-rql-string.13~1] rozwiązywać `'-'? ?NAZWA` w wyrażeniu SELECT i RULE WHEN jak literał `'-'? DECIMAL` (INTEGER) albo `'-'? FLOAT` (FLOAT z tekstu stałej); ułamek oraz negację wychodzącą poza zakres INTEGER odrzucać.
+/// - [rqlparser.parser-rql-string.14~1] dopisywać deklarację `VAR NAZWA = literał` do qTree::variables z wartością w typie literału (całkowity INTEGER, dziesiętny FLOAT, ułamek RATIONAL) i do tej samej tablicy constants co LET; ponowną deklarację nazwy w dowolnej z obu form, nazwę z `$` i wartość spoza zakresu typu zwracać jako błąd semantyczny z nazwą i pozycją.
+/// - [rqlparser.parser-rql-string.15~1] odwołanie `'-'? ?NAZWA` do zmiennej VAR w wyrażeniu SELECT i RULE WHEN zamieniać na token PUSH_VAR z parą (nazwa, indeks w qTree::variables), a minus na następujący po nim NEGATE.
+/// - [rqlparser.parser-rql-string.16~1] odwołanie do zmiennej VAR w każdym kontekście strukturalnym (int_const, rational_se, indeks z `$`) oraz w argumencie okna rekordowego zwracać jako błąd semantyczny z nazwą, kontekstem i pozycją `line L:C`.
 ///
 /// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
 ///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca

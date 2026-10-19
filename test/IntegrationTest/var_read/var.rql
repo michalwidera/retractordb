@@ -1,0 +1,16 @@
+# Plan ze zmiennymi VAR dla it_var_read (#531, etap A). Para z let.rql: te same wartosci, odczyt
+# ?NAZWA w wyrazeniach skalarnych SELECT i RULE WHEN, obok stalej LET w kontekscie strukturalnym.
+VAR GAIN = 0.1
+VAR OFFSET = 2
+VAR POWER = 2
+VAR LIMIT = 7
+VAR FLOOR = 0.5
+VAR NEG = -3
+LET LAST = 1
+DECLARE v INTEGER[2] STREAM s, 1 TEXTFILE 'data.txt'
+SELECT s[0], s[1] STREAM channels FROM s
+SELECT channels[0]*?GAIN + -?OFFSET, -?OFFSET^?POWER, channels[1]^?POWER, ?NEG, ?GAIN, ?NEG*0 STREAM scaled FROM channels
+SELECT channels[?LAST-$] * ?OFFSET + $ STREAM fam[2] FROM channels
+SELECT AVG(channels[0] : 3) * ?OFFSET, to_string(channels[1] * ?NEG : 6) STREAM means FROM channels
+RULE high ON channels WHEN channels[0] >= ?LIMIT AND channels[1] > ?FLOOR DO DUMP -1 TO 2
+RULE low ON scaled WHEN scaled[3] < ?NEG + 1 DO DUMP 0 TO 1

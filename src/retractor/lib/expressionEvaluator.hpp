@@ -53,6 +53,7 @@
 /// - [expressionevaluator.expression-evaluator.15~1] odkładać na stos wartość PUSH_VAL oraz odczyt pola payload dla PUSH_ID i PUSH_ID2; tokeny WINDOW_MIN,
 ///   WINDOW_MAX, WINDOW_AVG i WINDOW_SUM pobierają odpowiednio minValue, maxValue, avgValue i sumValue
 ///   z przekazanej tablicy windowValues, według indeksu grupy zapisanego w tokenie.
+/// - [expressionevaluator.expression-evaluator.20~1] dla PUSH_VAR odkładać na stos wartość z przekazanej tablicy variables według indeksu z pary (nazwa, indeks) w tokenie, także NULL; brak tablicy albo indeks spoza niej zgłaszać błędem Errc::Eval.
 /// - [expressionevaluator.expression-evaluator.16~1] zwalniać własną pamięć roboczą po zakończeniu eval(), również gdy wynikiem jest błąd.
 /// - [expressionevaluator.expression-evaluator.17~1] zwracać wynik wyrażenia jako rdb::Result<rdb::descFldVT>, którego wartość może reprezentować różne typy danych.
 /// - [expressionevaluator.expression-evaluator.18~1] zgłaszać błędem Result o kodzie Errc::Eval brak operandów, nieznane funkcje lub tokeny oraz operatory
@@ -77,6 +78,10 @@ class expressionEvaluator {
   /// Wartosc wyrazenia RPN albo Errc::Eval, gdy programu nie da sie policzyc dla tych operandow
   /// (operator nieokreslony dla typu, brak operandu, nieznana funkcja). NULL - brak wyniku w zbiorze
   /// wartosci (dzielenie przez zero, przepelnienie) - jest wynikiem, nie bledem.
+  /// @param variables wartosci zmiennych VAR planu w tym takcie, indeksowane jak qTree::variables
+  ///        (#531). Trzyma je dataModel. nullptr znaczy: brak zmiennych - PUSH_VAR jest wtedy
+  ///        bledem programu, wiec zwijanie stalych (exprSimplify, bez tablicy) nie moze go policzyc.
   [[nodiscard]] rdb::Result<rdb::descFldVT> eval(const std::list<token> &program, rdb::payload *payload = nullptr,
-                                                 const std::vector<windowStats> *windowValues = nullptr);
+                                                 const std::vector<windowStats> *windowValues = nullptr,
+                                                 const std::vector<rdb::descFldVT> *variables = nullptr);
 };

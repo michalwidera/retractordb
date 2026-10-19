@@ -214,7 +214,7 @@ bool isExactType(const rdb::descFld type) {
 }
 
 exprShapeResult inferExpressionShape(const std::list<token> &program, const exprFieldShapeFn &shapeOfField,
-                                     const exprWindowShapeFn &shapeOfWindow) {
+                                     const exprWindowShapeFn &shapeOfWindow, const exprVariableShapeFn &shapeOfVariable) {
   if (program.empty()) return {.status = exprShapeStatus::unknown, .shape = {}};
 
   std::vector<exprShape> stack;
@@ -262,6 +262,15 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT());
         if (reference == nullptr) return unknown;
         const auto shape = shapeOfField ? shapeOfField(reference->first, reference->second) : std::nullopt;
+        if (!shape.has_value()) return unknown;
+        stack.push_back(*shape);
+      } break;
+
+      // Zmienna VAR (#531): typ ustala deklaracja (D4), wiec ksztalt jest znany od parsowania.
+      case PUSH_VAR: {
+        const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT());
+        if (reference == nullptr) return unknown;
+        const auto shape = shapeOfVariable ? shapeOfVariable(reference->second) : std::nullopt;
         if (!shape.has_value()) return unknown;
         stack.push_back(*shape);
       } break;

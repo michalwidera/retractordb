@@ -338,6 +338,10 @@ class ParserListener : public RQLBaseListener {
   }
 
   /// Stala z tablicy, oznaczona jako uzyta, albo nullptr po zgloszonej odmowie.
+  ///
+  /// Tedy przechodzi KAZDY kontekst strukturalny (int_const, rational_se, indeks z `$`), wiec tu
+  /// stoi odmowa D2 dla zmiennej VAR (#531): jej wartosc zmienia sie w wykonaniu, a te miejsca
+  /// wyznaczaja ksztalt planu. Wyrazenie skalarne rozpoznaje zmienna wczesniej (exitExpConst).
   const RqlConstant *findConstant(const antlr4::Token *ref, const std::string &what) {
     const auto found = constants_.find(ref->getText().substr(1));
     if (found == constants_.end()) {
@@ -346,7 +350,17 @@ class ParserListener : public RQLBaseListener {
       return nullptr;
     }
     found->second.used = true;
+    if (found->second.variable) {
+      reportVariableMisuse(ref, what);
+      return nullptr;
+    }
     return &found->second;
+  }
+
+  /// Odmowa D2 (#531): zmienna VAR poza wyrazeniem skalarnym SELECT i RULE WHEN.
+  void reportVariableMisuse(const antlr4::Token *ref, const std::string &what) {
+    reportSemanticError(position(ref) + ": variable " + ref->getText() + " cannot be used in " + what +
+                        "; VAR is allowed only in scalar expressions of SELECT and RULE WHEN");
   }
 
   /// Odwolanie do stalej w komunikacie: `?NAZWA = wartosc (line L:C)`.
@@ -681,8 +695,18 @@ class ParserListener : public RQLBaseListener {
   /// zapisac sie nie da - `1/40` w wyrazeniu to dzielenie calkowite, czyli 0 - wiec jest odmowa.
   /// Wartosc zastepcza 0 trzyma ksztalt programu po odmowie, jak w literal().
   void exitExpConst(RQLParser::ExpConstContext *ctx) override {
-    const antlr4::Token *ref    = ctx->CONST_REF()->getSymbol();
-    const bool negated          = ctx->MINUS() != nullptr;
+    const antlr4::Token *ref = ctx->CONST_REF()->getSymbol();
+    const bool negated       = ctx->MINUS() != nullptr;
+    // Zmienna VAR (#531) nie znika jak stala: czyta ja ewaluator w kazdym takcie. Argument okna
+    // rekordowego liczy sie na rekordach historii, wiec biezaca wartosc zmiennej dzialalaby wstecz
+    // na rekordy sprzed jej zmiany - etap A tego miejsca nie otwiera (decyzja 2026-10-19).
+    if (const auto found = constants_.find(ref->getText().substr(1)); found != constants_.end() && found->second.variable) {
+      found->second.used = true;
+      if (!windowArgMarks.empty()) reportVariableMisuse(ref, "record window argument");
+      recpToken(PUSH_VAR, std::make_pair(found->first, static_cast<int>(*found->second.variable)));
+      if (negated) recpToken(NEGATE);
+      return;
+    }
     const RqlConstant *constant = findConstant(ref, "expression");
     if (constant == nullptr) {
       recpToken(PUSH_VAL, 0);
@@ -1170,30 +1194,33 @@ class ParserListener : public RQLBaseListener {
     systemCommand.erase(0, 1);
   }
 
-  /// `LET NAZWA = wartosc` (#440): wpis do tablicy stalych planu, bez zadnego sladu w coreInstance.
-  /// Nazwa rozroznia wielkosc liter jak kazdy ID; `$` jest w ID legalny, ale nie w nazwie stalej,
-  /// bo token odwolania `?NAZWA` go nie obejmuje.
-  void exitLet(RQLParser::LetContext *ctx) override {
-    const std::string name  = ctx->name->getText();
-    const std::string where = position(ctx->name);
-    auto *value             = ctx->let_value();
+  /// Wpis deklaracji `LET` albo `VAR` po kontroli nazwy i literalu, albo nullopt po zgloszonej odmowie.
+  /// Nazwa rozroznia wielkosc liter jak kazdy ID; `$` jest w ID legalny, ale nie w nazwie, bo token
+  /// odwolania `?NAZWA` go nie obejmuje. LET i VAR dziela przestrzen nazw (#531, D5), wiec kolizja
+  /// miedzy formami jest taka sama odmowa jak powtorzenie jednej z nich.
+  std::optional<RqlConstant> declaration(const antlr4::Token *nameToken, RQLParser::Let_valueContext *value,
+                                         const std::string &kind) {
+    const std::string name  = nameToken->getText();
+    const std::string where = position(nameToken);
     if (name.find('$') != std::string::npos) {
-      reportSemanticError(where + ": constant name " + name + " must not contain '$'");
-      return;
+      reportSemanticError(where + ": " + kind + " name " + name + " must not contain '$'");
+      return std::nullopt;
     }
     if (const auto found = constants_.find(name); found != constants_.end()) {
-      reportSemanticError(where + ": constant ?" + name + " is already declared on line " + std::to_string(found->second.line));
-      return;
+      const std::string existing = found->second.variable ? "variable" : "constant";
+      reportSemanticError(where + ": " + kind + " ?" + name + " is already declared" +
+                          (existing != kind ? " as " + existing : "") + " on line " + std::to_string(found->second.line));
+      return std::nullopt;
     }
-    RqlConstant constant{.text = value->getText(), .line = firstLine_ + ctx->name->getLine() - 1};
+    RqlConstant constant{.text = value->getText(), .line = firstLine_ + nameToken->getLine() - 1};
     const auto outOfRange = [&](const std::string &text) {
-      reportSemanticError(where + ": value " + text + " of constant ?" + name + " is out of range");
+      reportSemanticError(where + ": value " + text + " of " + kind + " ?" + name + " is out of range");
     };
     if (value->FLOAT() != nullptr) {
       constant.kind = RqlConstant::Kind::decimal;
       if (!parseLiteral<double>(value->FLOAT()->getText())) {
         outOfRange(constant.text);
-        return;
+        return std::nullopt;
       }
     } else if (value->DIVIDE() != nullptr) {
       constant.kind  = RqlConstant::Kind::fraction;
@@ -1201,11 +1228,11 @@ class ParserListener : public RQLBaseListener {
       const auto den = parseLiteral<int>(value->den->getText());
       if (!nom || !den) {
         outOfRange(nom ? value->den->getText() : value->nom->getText());
-        return;
+        return std::nullopt;
       }
       if (*den == 0) {
-        reportSemanticError(where + ": fraction " + constant.text + " of constant ?" + name + " has a zero denominator");
-        return;
+        reportSemanticError(where + ": fraction " + constant.text + " of " + kind + " ?" + name + " has a zero denominator");
+        return std::nullopt;
       }
       constant.nom = value->sign != nullptr ? -*nom : *nom;
       constant.den = *den;
@@ -1214,11 +1241,48 @@ class ParserListener : public RQLBaseListener {
       const auto integer = parseLiteral<int>(constant.text);
       if (!integer) {
         outOfRange(constant.text);
-        return;
+        return std::nullopt;
       }
       constant.integer = *integer;
     }
-    constants_.emplace(name, std::move(constant));
+    return constant;
+  }
+
+  /// `LET NAZWA = wartosc` (#440): wpis do tablicy stalych planu, bez zadnego sladu w coreInstance.
+  void exitLet(RQLParser::LetContext *ctx) override {
+    if (auto constant = declaration(ctx->name, ctx->let_value(), "constant"))
+      constants_.emplace(ctx->name->getText(), std::move(*constant));
+  }
+
+  /// `VAR NAZWA = wartosc` (#531): wpis w tej samej tablicy co LET oraz deklaracja w planie, z ktorej
+  /// dataModel buduje wartosc biezaca (D6). Typ zmiennej to typ literalu w wyrazeniu (D4): calkowity
+  /// INTEGER, dziesietny FLOAT - jak exitExpFloat, wiec plan z VAR bez SET liczy to samo co plan z LET -
+  /// a ulamek, ktorego wyrazenie literalem nie zapisze, RATIONAL.
+  void exitVar(RQLParser::VarContext *ctx) override {
+    auto variable = declaration(ctx->name, ctx->let_value(), "variable");
+    if (!variable) return;
+    rdb::descFldVT initial;
+    switch (variable->kind) {
+      case RqlConstant::Kind::integer:
+        initial = variable->integer;
+        break;
+      case RqlConstant::Kind::decimal: {
+        // declaration() sprawdzil zakres double; FLOAT ma wezszy, jak literal w wyrazeniu.
+        const auto value = parseLiteral<float>(variable->text);
+        if (!value) {
+          reportSemanticError(position(ctx->name) + ": value " + variable->text + " of variable ?" + ctx->name->getText() +
+                              " is out of range");
+          return;
+        }
+        initial = *value;
+      } break;
+      case RqlConstant::Kind::fraction:
+        initial = boost::rational<int>(variable->nom, variable->den);
+        break;
+    }
+    variable->variable = coreInstance.variables.size();
+    coreInstance.variables.push_back({.name = ctx->name->getText(), .initial = std::move(initial)});
+    constants_.emplace(ctx->name->getText(), std::move(*variable));
   }
 
   void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) override {

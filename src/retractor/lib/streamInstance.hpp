@@ -34,6 +34,7 @@
 ///   porównania =, !=, <, >, <=, >=, AND, OR i NOT, wywołania CALL/CALL2 i odczyty pól; wyniki okien
 ///   udostępniać wyrażeniom pól przez windowValues; zakres typów operandów, nazw funkcji i konwersji
 ///   określa kontrakt expressionEvaluator,
+/// - [streaminstance.stream-instance.10~1] przekazywać wyrażeniom pól (constructOutputPayload) i warunkom reguł (constructRulesAndUpdate) tablicę variables wartości zmiennych VAR planu, którą podaje wołający.
 /// - [streaminstance.stream-instance.7~1] przez constructRulesAndUpdate() oceniać reguły qry.lRules na kopii bieżącego payloadu wyjściowego,
 ///   gdy getRecordsCount() >= armAtCount; warunek null, zero liczbowe lub pusty STRING nie uruchamia akcji,
 ///   niezerowa liczba albo niepusty STRING uruchamia akcję, a wynik INTPAIR/IDXPAIR zwraca Errc::Eval,
@@ -148,14 +149,17 @@ struct streamInstance {
    * constructOutputPayload uses only data from inputPayload
    * inputPayload need to be filled first before this constructOutputPayload will be called.
    */
-  [[nodiscard]] rdb::Result<> constructOutputPayload(const std::list<field> &fields) const;
+  /// `variables` - wartosci zmiennych VAR planu w tym takcie (#531), z dataModel; nullptr: plan bez zmiennych.
+  [[nodiscard]] rdb::Result<> constructOutputPayload(const std::list<field> &fields,
+                                                     const std::vector<rdb::descFldVT> *variables = nullptr) const;
 
   /*
    * This function will process all rules from query
    * constructRules uses data from outputPayload
    * outputPayload need to be filled first before this constructRules will be called
    */
-  [[nodiscard]] rdb::Result<> constructRulesAndUpdate(const query &qry);
+  /// `variables` - jak przy constructOutputPayload(); warunek reguly czyta te same wartosci taktu.
+  [[nodiscard]] rdb::Result<> constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables = nullptr);
 
  private:
   streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory);

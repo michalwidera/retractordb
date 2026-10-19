@@ -5532,3 +5532,133 @@ TEST(xparser, let_constants_live_within_one_plan) {
     std::filesystem::remove(file);
   }
 }
+
+// --- VAR i ?NAZWA (#531, etap A): odczyt zmiennej w wyrazeniach skalarnych ------------------------
+
+TEST(xparser, var_reads_compile_to_variable_tokens_with_the_declared_type) {
+  // covers: rqlparser.parser-rql-string.14~1, rqlparser.parser-rql-string.15~1, plansource.parse-plan-text.6~1
+  // covers: exprsimplify.simplify-expression.13~1, expressionshape.infer-expression-shape.18~1
+  qTree plan;
+  const PlanSource loaded =
+      parsePlanText(plan, "VAR K = 3\nVAR H = 0.1\nVAR R = 1/4\nVAR N = -2\nLET L = 0\n" + std::string(kLetHeader) +
+                              "\nSELECT s[?L]*?K, ?H, ?R, -?N, ?K*0, ?K*2+3 STREAM o FROM s\n"
+                              "RULE r ON o WHEN o[0] > ?K DO DUMP 0 TO 1");
+  ASSERT_EQ(loaded.status, "OK");
+  EXPECT_TRUE(loaded.warnings.empty());
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+
+  // Deklaracje zostaja w planie, w kolejnosci tekstu i z typem literalu (D4).
+  ASSERT_EQ(plan.variables.size(), 4U);
+  EXPECT_EQ(plan.variables[0].name, "K");
+  EXPECT_EQ(plan.variables[0].initial, rdb::descFldVT{3});
+  EXPECT_EQ(plan.variables[1].initial, rdb::descFldVT{0.1F});
+  EXPECT_EQ(plan.variables[2].initial, rdb::descFldVT{boost::rational<int>(1, 4)});
+  EXPECT_EQ(plan.variables[3].initial, rdb::descFldVT{-2});
+
+  const auto program = [](const std::list<token> &tokens) {
+    std::ostringstream os;
+    for (const auto &t : tokens)
+      os << t << ";";
+    return os.str();
+  };
+  const auto &fields = plan.getQuery("o").lSchema;
+  ASSERT_EQ(fields.size(), 6U);
+  std::vector<std::string> programs;
+  std::vector<rdb::descFld> types;
+  for (const auto &f : fields) {
+    programs.push_back(program(f.lProgram));
+    types.push_back(f.field_.rtype);
+  }
+  EXPECT_EQ(types,
+            (std::vector<rdb::descFld>{rdb::INTEGER, rdb::FLOAT, rdb::RATIONAL, rdb::INTEGER, rdb::INTEGER, rdb::INTEGER}));
+  EXPECT_NE(programs[0].find("PUSH_VAR(K[0]);MULTIPLY(0);"), std::string::npos) << programs[0];
+  EXPECT_EQ(programs[1], "PUSH_VAR(H[1]);");
+  EXPECT_EQ(programs[2], "PUSH_VAR(R[2]);");
+  EXPECT_EQ(programs[3], "PUSH_VAR(N[3]);NEGATE(0);");
+  // Zmienna nie jest stala: `?K*0` zostaje (NULL*0 to NULL), `?K*2+3` nie zwija sie do liczby.
+  EXPECT_EQ(programs[4], "PUSH_VAR(K[0]);PUSH_VAL(0);MULTIPLY(0);");
+  EXPECT_EQ(programs[5], "PUSH_VAR(K[0]);PUSH_VAL(2);MULTIPLY(0);PUSH_VAL(3);ADD(0);");
+  EXPECT_NE(program(plan.getQuery("o").lRules.front().condition).find("PUSH_VAR(K[0]);CMP_GT(0);"), std::string::npos);
+
+  // Nieuzyta zmienna dostaje to samo ostrzezenie co stala, w kolejnosci wierszy.
+  qTree unused;
+  EXPECT_EQ(parsePlanText(unused, "VAR U = 1\nLET C = 2\nVAR W = 2\n" + std::string(kLetHeader) + "\nSELECT ?W STREAM o FROM s")
+                .warnings,
+            (std::vector<std::string>{"line 1: variable ?U is declared but never used",
+                                      "line 2: constant ?C is declared but never used"}));
+}
+
+TEST(xparser, var_refusals_name_the_variable_the_context_and_its_position) {
+  // covers: rqlparser.parser-rql-string.14~1, rqlparser.parser-rql-string.16~1
+  const std::string header(kLetHeader);
+  const std::string var = "VAR V = 1\n";
+  const auto misuse     = [](const std::string &where, const std::string &context) {
+    return "line " + where + ": variable ?V cannot be used in " + context +
+           "; VAR is allowed only in scalar expressions of SELECT and RULE WHEN";
+  };
+  const std::string rule = var + header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] = 1 DO DUMP ";
+  // D2: kazdy kontekst strukturalny, takze argument okna rekordowego (decyzja 2026-10-19).
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {var + header + "\nSELECT s[?V] STREAM o FROM s", misuse("3:9", "field index")},
+      {var + header + "\nSELECT s[?V-$] STREAM o[2] FROM s", misuse("3:9", "generator index")},
+      {var + header + "\nSELECT s[0] STREAM o[?V] FROM s", misuse("3:21", "stream generator size")},
+      {var + header + "\nSELECT s[0] STREAM o[2] FROM s\nSELECT * STREAM p FROM o[?V]", misuse("4:25", "stream index")},
+      {var + header + "\nSELECT * STREAM o FROM s@(?V, 2)", misuse("3:26", "AGSE step")},
+      {var + header + "\nSELECT * STREAM o FROM s@(1, -?V)", misuse("3:30", "AGSE window")},
+      {var + header + "\nSELECT * STREAM o FROM s > ?V", misuse("3:27", "time shift")},
+      {var + header + "\nSELECT AVG(s[0] : ?V) STREAM o FROM s", misuse("3:18", "record window width")},
+      {var + header + "\nSELECT AVG(s[0] * ?V : 3) STREAM o FROM s", misuse("3:18", "record window argument")},
+      {var + header + "\nSELECT to_string(s[0] : ?V) STREAM o FROM s", misuse("3:24", "to_string width")},
+      {var + header + "\nSELECT * STREAM o FROM s RETENTION ?V", misuse("3:35", "RETENTION capacity")},
+      {var + header + "\nSELECT * STREAM o FROM s RETENTION 4 ?V", misuse("3:37", "RETENTION segments")},
+      {var + header + "\nSELECT * STREAM o FROM s - ?V", misuse("3:27", "interval")},
+      {var + header + "\nSELECT * STREAM o FROM s & ?V", misuse("3:27", "interval")},
+      {var + header + "\nSELECT * STREAM o FROM s % ?V", misuse("3:27", "interval")},
+      {rule + "-?V TO 1", misuse("4:35", "DUMP range bound")},
+      {rule + "0 TO 1 RETENTION ?V", misuse("4:51", "DUMP RETENTION")},
+      {var + "DECLARE a INTEGER STREAM d, ?V TEXTFILE 'd.txt'", misuse("2:28", "interval")},
+      {var + "DECLARE a INTEGER STREAM d, 1 DEVICE 'dev.fifo' TIMEOUT ?V", misuse("2:56", "TIMEOUT")},
+      {var + "DECLARE a STRING[?V] STREAM s, 1 TEXTFILE 'in.txt'", misuse("2:17", "field size")},
+      // D5: jedna przestrzen nazw dla LET i VAR.
+      {"VAR X = 1\nVAR X = 2\n" + header, "line 2:4: variable ?X is already declared on line 1"},
+      {"LET X = 1\nVAR X = 2\n" + header, "line 2:4: variable ?X is already declared as constant on line 1"},
+      {"VAR X = 1\nLET X = 2\n" + header, "line 2:4: constant ?X is already declared as variable on line 1"},
+      {"VAR A$B = 1\n" + header, "line 1:4: variable name A$B must not contain '$'"},
+      {header + "\nSELECT ?X STREAM o FROM s\nVAR X = 1", "line 2:7: constant ?X in expression is not declared"},
+      // Prawa strona to jeden literal liczbowy; napis jest poza zakresem (D4).
+      {"VAR X = 'txt'\n" + header, "line 1:8 mismatched input ''txt''"},
+      {"VAR X = s[0]\n" + header, "line 1:8 mismatched input 's'"},
+      {"VAR X = 99999999999\n" + header, "line 1:4: value 99999999999 of variable ?X is out of range"},
+      {"VAR X = 1" + std::string(40, '0') + ".0\n" + header,
+       "line 1:4: value 1" + std::string(40, '0') + ".0 of variable ?X is out of range"},
+      {"VAR X = 1/0\n" + header, "line 1:4: fraction 1/0 of variable ?X has a zero denominator"},
+      {"DECLARE var INTEGER STREAM s, 1 TEXTFILE 'in.txt'", "mismatched input 'var'"},
+  };
+  for (const auto &[rql, expected] : cases) {
+    SCOPED_TRACE(rql);
+    const std::string status = letPlanStatus(rql);
+    EXPECT_NE(status.find(expected), std::string::npos) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
+  // Ten sam odczyt w wyrazeniu skalarnym SELECT i RULE WHEN przechodzi; zmienna obok okna tez.
+  EXPECT_EQ(
+      letPlanStatus(var + header + "\nSELECT AVG(s[0] : 3) * ?V STREAM o FROM s\nRULE r ON o WHEN o[0] > ?V DO DUMP 0 TO 1"),
+      "OK");
+}
+
+TEST(xparser, var_lives_within_one_plan) {
+  // covers: rqlparser.parser-rql-string.14~1
+  const std::string use = "SELECT ?X STREAM o FROM s";
+  // Kanal ad-hoc parsuje z pusta tablica: zmienna planu nie jest w nim widoczna (D7, etap A),
+  // mimo ze jej deklaracja stoi w qTree::variables kopii planu.
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, "VAR X = 1")), "OK");
+  EXPECT_EQ(plan.variables.size(), 1U);
+  EXPECT_TRUE(plan.empty());
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, kLetHeader)), "OK");
+  EXPECT_NE(std::get<0>(parserRQLString(plan, use)).find("constant ?X in expression is not declared"), std::string::npos);
+  // Nastepny plan zaczyna bez zmiennych.
+  qTree next;
+  EXPECT_NE(parsePlanText(next, std::string(kLetHeader) + "\n" + use).status.find("is not declared"), std::string::npos);
+  EXPECT_TRUE(next.variables.empty());
+}

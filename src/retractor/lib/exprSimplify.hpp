@@ -13,6 +13,10 @@
 /// std::nullopt oznacza „typ nieznany" i blokuje wszystkie reguły, które typu wymagają.
 using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::string &, int)>;
 
+/// Typ zmiennej VAR planu po jej indeksie w qTree::variables (#531). Pusty `std::function` albo
+/// std::nullopt znaczy „typ nieznany" - jak dla pola, blokuje tylko reguły wymagające typu.
+using variableTypeLookup = std::function<std::optional<rdb::descFld>(int)>;
+
 /// Funkcja simplifyExpression powinna:
 /// - [exprsimplify.simplify-expression.1~1] dla pustego programu, programu z tokenem spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_IDX) i programu, który nie zostawia na stosie dokładnie jednej wartości, zwracać 0 i nie zmieniać programu.
 /// - [exprsimplify.simplify-expression.2~1] podmieniać program wyłącznie wtedy, gdy zadziałało co najmniej jedno przepisanie, i zwracać liczbę przepisań.
@@ -26,6 +30,7 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 /// - [exprsimplify.simplify-expression.10~1] (D) wyłącznie przy `aggressive_expr_optimization=ON` zwijać iloczyn powtórzonego niestałego podwyrażenia o typie dokładnym do potęgi: `a*a` → `a^2`, `a^k*a` → `a^(k+1)`.
 /// - [exprsimplify.simplify-expression.11~1] nie stosować reguł B, C i D do `^`, porównań ani operatorów logicznych, a dla FLOAT i DOUBLE nie stosować żadnej z nich.
 /// - [exprsimplify.simplify-expression.12~1] nie przepisywać `E*0` na `0`.
+/// - [exprsimplify.simplify-expression.13~1] traktować PUSH_VAR jako liść, który nigdy nie jest stałą - reguła A go nie zwija, także pod operatorem z innym operandem stałym - z typem z typeOfVariable po indeksie zmiennej.
 ///
 /// Zwija stałe i kanonizuje wyrażenia, żeby plan wykonania był krótszy już po kompilacji -
 /// program pola liczony jest raz na interwał, więc każdy usunięty token jest oszczędnością
@@ -81,7 +86,8 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 /// @note `to_string` nie zwija sie, bo token niesie DEKLARACJE szerokosci pola: zastapienie programu
 ///       literalem kasowalo ja i `SELECT to_string(42:16)` zwezalo sie z 16 na 2 przy drugiej kompilacji
 ///       zywego planu (executorsm::getAdHoc).
-std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup &typeOfField);
+std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup &typeOfField,
+                               const variableTypeLookup &typeOfVariable = {});
 
 /// Szerokość pola `STRING` bez zadeklarowanego `N` - `to_string(expr)` bez dwukropka.
 constexpr int kToStringDefaultWidth = 32;
@@ -101,6 +107,7 @@ using fieldShapeLookup = std::function<std::optional<fieldShape>(const std::stri
 /// Funkcja inferStringWidth powinna:
 /// - [exprsimplify.infer-string-width.1~1] dla pustego programu, tokenu spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_TSCAN) i operatora bez operandów na stosie zwracać nullopt.
 /// - [exprsimplify.infer-string-width.2~1] traktować literał tekstowy jako napis swojej długości, a każdy inny literał jako liczbę.
+/// - [exprsimplify.infer-string-width.7~1] traktować PUSH_VAR jako liczbę.
 /// - [exprsimplify.infer-string-width.3~1] traktować PUSH_ID jako napis o szerokości z shapeOfField, gdy pole źródłowe jest STRING, a każde inne odwołanie, także nierozwiązane PUSH_ID1..PUSH_ID5 i PUSH_IDX oraz pole o nieznanym kształcie, jako liczbę.
 /// - [exprsimplify.infer-string-width.4~1] traktować `to_string` jako napis o szerokości zadeklarowanej w CALL2, a bez niej kToStringDefaultWidth; każdą inną funkcję i każdy operator jednoargumentowy jako liczbę.
 /// - [exprsimplify.infer-string-width.5~1] traktować `+` z co najmniej jednym operandem tekstowym jako napis o sumie szerokości operandów, w której liczba wnosi 0, nasyconej na INT_MAX; pozostałe operatory dwuargumentowe jako liczbę.

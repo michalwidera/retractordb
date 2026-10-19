@@ -28,6 +28,9 @@ public:
   virtual void enterLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
   virtual void exitLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
 
+  virtual void enterVar(RQLParser::VarContext * /*ctx*/) override { }
+  virtual void exitVar(RQLParser::VarContext * /*ctx*/) override { }
+
   virtual void enterInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
   virtual void exitInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
 

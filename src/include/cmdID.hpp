@@ -68,7 +68,11 @@ enum command_id : std::uint8_t {
   // `~a` (#328). Osobny od NEGATE, bo parser nie zna typu operandu, a o tym, czy plan wolno
   // przyjac, decyduje wlasnie typ: bitowa negacja ma sens tylko dla BYTE i UINT, gdzie jej
   // wartosc jest rowna `-a` (neg()). Pozostale typy odrzuca inferExpressionShape().
-  BIT_NOT  // 48
+  BIT_NOT,  // 48
+  // Odczyt zmiennej planu `?NAZWA` zadeklarowanej przez VAR (#531). Token niesie pare (nazwa,
+  // indeks w qTree::variables); ewaluator czyta wartosc z tablicy zmiennych taktu po indeksie,
+  // bez wyszukiwania nazwy. To NIE jest stala: zaden przebieg nie moze go zwinac jak PUSH_VAL.
+  PUSH_VAR  // 49
 };
 
 /// Funkcja GetStringcommand_id powinna:

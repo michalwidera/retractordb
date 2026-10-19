@@ -754,3 +754,19 @@ TEST(xExpressionShape, constant_to_string_without_width_keeps_the_default_width)
   EXPECT_EQ(after.shape.rtype, rdb::STRING);
   EXPECT_EQ(after.shape.rlen * after.shape.rarray, kToStringDefaultWidth);
 }
+
+TEST(xExpressionShape, variable_read_takes_the_shape_of_its_declaration) {
+  // covers: expressionshape.infer-expression-shape.18~1
+  const token var(PUSH_VAR, std::pair<std::string, int>{"X", 1});
+  const auto shapeOfVariable = [](int index) -> std::optional<exprShape> {
+    if (index == 1) return numericShape(rdb::FLOAT);
+    return std::nullopt;
+  };
+  const auto resolved = inferExpressionShape({var, token(PUSH_VAL, 2), token(MULTIPLY)}, {}, {}, shapeOfVariable);
+  ASSERT_TRUE(resolved.resolved());
+  EXPECT_EQ(resolved.shape.rtype, rdb::FLOAT);
+  EXPECT_EQ(inferExpressionShape({var}, {}, {}).status, exprShapeStatus::unknown);
+  EXPECT_EQ(inferExpressionShape({token(PUSH_VAR, std::pair<std::string, int>{"Y", 0})}, {}, {}, shapeOfVariable).status,
+            exprShapeStatus::unknown);
+  EXPECT_EQ(inferExpressionShape({token(PUSH_VAR, 1)}, {}, {}, shapeOfVariable).status, exprShapeStatus::unknown);
+}
