@@ -29,6 +29,26 @@
 // executorsmState.hpp; kanaly `adhoc` i `reset-*` maja wlasne jednostki.
 using namespace esm;
 
+/// Wartosc pola albo zmiennej w postaci tekstowej odpowiedzi; NULL jako "null". Wspolna dla wierszy
+/// strumieni (printRowValue) i zmiennych VAR (collectVariables), wiec obie drogi pisza wartosc tak samo.
+static std::string formatValue(const rdb::descFldVT &value) {
+  std::stringstream coutstring;
+  std::visit(
+      Overload{                                                                                                           //
+               [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+               [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+               [&coutstring](int a) { coutstring << a; },                                                                 //
+               [&coutstring](unsigned a) { coutstring << a; },                                                            //
+               [&coutstring](float a) { coutstring << a; },                                                               //
+               [&coutstring](double a) { coutstring << a; },                                                              //
+               [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                        //
+               [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+               [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+               [&coutstring](boost::rational<int> a) { coutstring << a; }},
+      value);
+  return coutstring.str();
+}
+
 ptree executorsm::engineErrorResponse(const std::string_view command, const std::string &message) {
   SPDLOG_CRITICAL("Engine invariant violated while handling command '{}': {}", command, message);
   ptree ptRetval;
@@ -81,6 +101,28 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
+ptree executorsm::collectVariables() {
+  if (coreInstancePtr == nullptr) return engineErrorResponse("vars", "executorsm::collectVariables: coreInstancePtr is null");
+  if (pProc == nullptr) return engineErrorResponse("vars", "executorsm::collectVariables: pProc is null");
+  const auto &declared = coreInstancePtr->variables;
+  const auto &values   = pProc->variables();
+  if (declared.size() != values.size())
+    return engineErrorResponse(
+        "vars", std::format("executorsm::collectVariables: plan declares {} variables, data model holds {}", declared.size(),
+                            values.size()));
+  ptree ptRetval;
+  // Wezel istnieje takze dla planu bez zmiennych: pusta lista jest odpowiedzia, a nie cisza.
+  ptRetval.put("db.vars", "");
+  for (std::size_t i = 0; i < declared.size(); ++i) {
+    const std::string key = std::string("db.vars.") + declared[i].name;
+    ptRetval.put(key, declared[i].name);
+    // Typ zmiennej to typ wartosci z deklaracji (D4); wartosc biezaca bywa NULL.
+    ptRetval.put(key + ".type", std::string(GetStringdescFld(static_cast<rdb::descFld>(declared[i].initial.index()))));
+    ptRetval.put(key + ".value", formatValue(values[i]));
+  }
+  return ptRetval;
+}
+
 ptree executorsm::commandProcessor(const ptree &ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
@@ -114,7 +156,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     if (const char *delayMs = std::getenv("RDB_FAULT_SHOW_DELAY"); delayMs != nullptr && command == "show")
       std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
 
-    const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show";
+    const bool requiresDataModel =
+        command == "get" || command == "adhoc" || command == "detail" || command == "show" || command == "vars";
     // Blokada epoki zyje az do wyjscia z handlera -- patrz plan_epoch_mutex. Brana dopiero PO
     // przebudzeniu na core_mutex, nigdy przed: czekanie na model pod blokada epoki zamykaloby
     // droge watkowi, ktory ten model ma dopiero opublikowac.
@@ -142,6 +185,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     // This command return stream identifiers
     //
     if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
+
+    if (command == "vars" && pProc != nullptr) ptRetval = collectVariables();
 
     if (command == "adhoc" && pProc != nullptr) ptRetval = getAdHoc(ptInval.get("db.argument", ""));
     //
@@ -346,23 +391,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
       auto value    = valueOpt.has_value() ? any_to_variant_cast(valueOpt.value()) : nullFallbackValue(field.rtype);
       nullmap.push_back(valueOpt.has_value() ? '0' : '1');
 
-      std::stringstream coutstring;
-
-      std::visit(
-          Overload{                                                                                                           //
-                   [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
-                   [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
-                   [&coutstring](int a) { coutstring << a; },                                                                 //
-                   [&coutstring](unsigned a) { coutstring << a; },                                                            //
-                   [&coutstring](float a) { coutstring << a; },                                                               //
-                   [&coutstring](double a) { coutstring << a; },                                                              //
-                   [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                        //
-                   [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                   [&coutstring](const std::string &a) { coutstring << a; },                                                  //
-                   [&coutstring](boost::rational<int> a) { coutstring << a; }},
-          value);
-
-      pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
+      pt.put(boost::lexical_cast<std::string>(i++), formatValue(value));
     }
   }
   pt.put("nullmap", nullmap);

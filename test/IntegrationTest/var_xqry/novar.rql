@@ -1,0 +1,4 @@
+# Plan bez zmiennych dla it_var_xqry (#531, etap D): `xqry --vars` daje pusta liste.
+STORAGE 'temp'
+DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
+SELECT src[0] STREAM st FROM src

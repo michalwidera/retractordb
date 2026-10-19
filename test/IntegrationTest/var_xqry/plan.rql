@@ -1,0 +1,12 @@
+# Plan testu it_var_xqry (#531, etap D): odczyt zmiennych VAR przez `xqry --vars`. Trzy typy z D4
+# (INTEGER, FLOAT, RATIONAL), licznik zmieniany regula SET i zmienna, ktora przepelnienie INTEGER
+# zamienia w NULL (D4) juz w pierwszym slocie.
+STORAGE 'temp'
+VAR COUNT = 0
+VAR GAIN = 0.5
+VAR RATIO = 1/3
+VAR BIG = 2147483647
+DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
+SELECT src[0] * ?GAIN, ?COUNT, ?RATIO STREAM st FROM src
+RULE tick ON st WHEN 1 = 1 DO SET ?COUNT = ?COUNT + 1
+RULE big ON st WHEN 1 = 1 DO SET ?BIG = ?BIG + 1

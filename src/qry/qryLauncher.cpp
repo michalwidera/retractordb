@@ -125,7 +125,7 @@ static routing::Resolution resolveTarget(const boost::program_options::variables
                                          const std::vector<bus::InstanceInfo> &instances, int elemLimit,
                                          const std::string &stream, const std::string &detail, const std::string &adHoc) {
   if (instances.size() <= 1) return routing::forSingleTarget(instances);
-  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir"))
+  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir") || vm.contains("vars"))
     return routing::forSingleTarget(instances);
   // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia - a instancja bezczynna
   // nie serwuje zadnego strumienia, wiec po strumieniu nie da sie jej wskazac. Przy wiecej
@@ -195,7 +195,8 @@ int main(int argc, char *argv[]) {
         ("hello,l", "diagnostic - hello db world")                                                                    //
         ("kill,k", "kill xretractor server")                                                                          //
         ("dir,d", "list of queries")                                                                                  //
-        ("yaml,y", "yaml output format for --dir, --detail and --bus")                                                //
+        ("vars,v", "list plan variables (VAR) with their current values")                                             //
+        ("yaml,y", "yaml output format for --dir, --detail, --vars and --bus")                                        //
         ("jsonl,j", "versioned JSON Lines API output")                                                                //
         ("idle-timeout,i", po::value<int>(&idleTimeoutMs)->default_value(0), "JSONL idle timeout in ms; 0 disables")  //
         ("raw,r", "raw output mode (default)")                                                                        //
@@ -263,7 +264,7 @@ int main(int argc, char *argv[]) {
     }
     if (vm.contains("jsonl") &&
         (vm.contains("yaml") || vm.contains("kill") || vm.contains("null") || vm.contains("wait-server") || vm.contains("bus") ||
-         vm.contains("reset") || vm.contains("adhoc") || elemLimit < 0 || idleTimeoutMs < 0)) {
+         vm.contains("reset") || vm.contains("adhoc") || vm.contains("vars") || elemLimit < 0 || idleTimeoutMs < 0)) {
       std::println(std::cerr, "xqry: --jsonl supports --hello, --dir, --detail or --select with nonnegative limits");
       return system::errc::invalid_argument;
     }
@@ -326,16 +327,17 @@ int main(int argc, char *argv[]) {
     // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
     // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
     const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") +
-                              vm.count("hello") + vm.count("reset");
+                              vm.count("hello") + vm.count("reset") + vm.count("vars");
     if (commandCount > 1) {
-      std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --bus, --hello)");
+      std::println(std::cerr,
+                   "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --vars, --bus, --hello)");
       return system::errc::invalid_argument;
     }
     // `-y` jest modyfikatorem formatu, nie komenda: sam z siebie nie wybiera niczego do
     // wypisania. Przy komendzie bez formy YAML (-s, -a, -l, -k) odmawiamy zamiast milczec,
     // bo flaga bez skutku wyglada dla operatora dokladnie tak jak flaga dzialajaca.
-    if (vm.contains("yaml") && !vm.contains("dir") && !vm.contains("detail") && !vm.contains("bus")) {
-      std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t or --bus/-b");
+    if (vm.contains("yaml") && !vm.contains("dir") && !vm.contains("detail") && !vm.contains("vars") && !vm.contains("bus")) {
+      std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t, --vars/-v or --bus/-b");
       return system::errc::invalid_argument;
     }
     // `--bus` nie jest komenda do serwera: czyta wylacznie magistrale (bez kontaktu z jakakolwiek
@@ -424,6 +426,13 @@ int main(int argc, char *argv[]) {
       // instancja bezczynna i konczyla sie zerem. Teraz stan serwera przychodzi tu werdyktem,
       // a instancja bezczynna ma wartosc (wlasny wydruk), nie porazke.
       const auto listing = vm.contains("yaml") ? obj.dirYaml() : obj.dir();
+      if (!listing) {
+        std::println(std::cerr, "xqry: {}", toString(listing.error()));
+        return exitCodeFor(listing.error());
+      }
+      std::print("{}", *listing);
+    } else if (vm.contains("vars")) {
+      const auto listing = vm.contains("yaml") ? obj.varsYaml() : obj.vars();
       if (!listing) {
         std::println(std::cerr, "xqry: {}", toString(listing.error()));
         return exitCodeFor(listing.error());

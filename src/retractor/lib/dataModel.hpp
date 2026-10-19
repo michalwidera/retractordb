@@ -182,6 +182,10 @@ class dataModel {
 
   size_t streamStoredSize(const std::string &instance);
 
+  /// Wartosci biezace zmiennych VAR planu, indeksowane jak qTree::variables (#531) - stan
+  /// zatwierdzony na koncu ostatniego slotu (D1), bez zapisow SET slotu w toku.
+  [[nodiscard]] const std::vector<rdb::descFldVT> &variables() const { return variables_; }
+
   /** This function return length of data stream */
   size_t getStreamCount(const std::string &instance);
 
