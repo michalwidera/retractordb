@@ -12,6 +12,7 @@
 #include <optional>
 #include <thread>
 #include <utility>
+#include <variant>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -52,6 +53,7 @@ rdb::Result<std::unique_ptr<dataModel>> dataModel::create(qTree &coreInstance, r
   // `--reset` i przeladowanie buduja nowy dataModel, wiec stan poprzedniego planu tu nie dochodzi.
   for (const auto &variable : coreInstance.variables)
     self->variables_.push_back(variable.initial);
+  self->pendingWrites_.resize(self->variables_.size());
 
   auto removed = std::ranges::remove_if(coreInstance,  //
                                         [](const query &qry) { return qry.isCompilerDirective(); });
@@ -313,6 +315,10 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
   // stoi w miejscu; przebudowa kosztuje tyle, ile kosztowal JEDEN takt przed ta zmiana.
   refreshStreamHandles();
 
+  // Zapisy SET slotu przerwanego bledem nie przechodza do tego slotu (#531, D1). Plan bez VAR ma
+  // pusty bufor.
+  std::ranges::fill(pendingWrites_, std::nullopt);
+
   // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. rdb::fatal()
   // w srodku slotu pada pod core_mutex i pod plan_epoch_mutex (bierze go executorsm::run),
   // a po W3 z 2026-09-14 zadne znane RQL nie prowadzi juz do niego w wykonaniu. Uspienie
@@ -420,8 +426,8 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
     RDB_TRY(runtime.constructOutputPayload(q.lSchema, &variables_));  // That will create all fields from 'select' clause/list
     RDB_TRY_ASSIGN(const auto written, runtime.outputPayload->write());
     RDB_ASSERT(written == rdb::WriteStatus::Ok, "dataModel::processRows: stream '{}' refused the write of its output record",
-               q.id);                                          // That will store data from 'select' clause/list
-    RDB_TRY(runtime.constructRulesAndUpdate(q, &variables_));  // That will process all rules for this query
+               q.id);                                                           // That will store data from 'select' clause/list
+    RDB_TRY(runtime.constructRulesAndUpdate(q, &variables_, &pendingWrites_));  // That will process all rules for this query
   }
 
   // Then - process all declarations to unlock them for next step
@@ -437,6 +443,23 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
     auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     RDB_TRY(advanceDeclaration(q, *runtime.outputPayload));
+  }
+
+  // Koniec slotu (#531, D1): zapisy SET staja sie widoczne od nastepnego slotu, dla kazdego
+  // czytelnika jednakowo - przed regula i za nia w planie, na tym samym strumieniu i na strumieniu
+  // o innym interwale. Opoznienie o slot przecina cykl regula -> zmienna -> przodek reguly jak z^-1.
+  // Wolajacy trzyma plan_epoch_mutex, wiec zatwierdzenie jest atomowe wobec komend IPC.
+  // Przy --until-eof petla konczy sie po tym slocie, a zatwierdzonych wartosci nikt juz nie czyta.
+  for (size_t i = 0; i < pendingWrites_.size(); ++i) {
+    auto &write = pendingWrites_[i];
+    if (!write.has_value()) continue;
+    // Typ prawej strony SET rowna kompilator z typem deklaracji (D4); NULL jest zapisem.
+    RDB_ASSERT(std::holds_alternative<std::monostate>(write->value) ||
+                   write->value.index() == coreInstance_.variables[i].initial.index(),
+               "dataModel::processRows: DO SET wrote type {} to variable ?{} of type {}", write->value.index(),
+               coreInstance_.variables[i].name, coreInstance_.variables[i].initial.index());
+    variables_[i] = std::move(write->value);
+    write.reset();
   }
   return {};
 }

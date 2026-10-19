@@ -63,6 +63,7 @@ using RqlConstants = std::map<std::string, RqlConstant>;
 /// - [rqlparser.parser-rql-string.14~1] dopisywać deklarację `VAR NAZWA = literał` do qTree::variables z wartością w typie literału (całkowity INTEGER, dziesiętny FLOAT, ułamek RATIONAL) i do tej samej tablicy constants co LET; ponowną deklarację nazwy w dowolnej z obu form, nazwę z `$` i wartość spoza zakresu typu zwracać jako błąd semantyczny z nazwą i pozycją.
 /// - [rqlparser.parser-rql-string.15~1] odwołanie `'-'? ?NAZWA` do zmiennej VAR w wyrażeniu SELECT i RULE WHEN zamieniać na token PUSH_VAR z parą (nazwa, indeks w qTree::variables), a minus na następujący po nim NEGATE.
 /// - [rqlparser.parser-rql-string.16~1] odwołanie do zmiennej VAR w każdym kontekście strukturalnym (int_const, rational_se, indeks z `$`) oraz w argumencie okna rekordowego zwracać jako błąd semantyczny z nazwą, kontekstem i pozycją `line L:C`.
+/// - [rqlparser.parser-rql-string.17~1] akcję `DO SET ?NAZWA = wyrażenie` zapisywać w regule jako SET z indeksem zmiennej VAR celu, programem prawej strony (odczyty VAR jako PUSH_VAR), pozycją celu `line L:C` i numerem reguły w tekście planu; cel będący stałą LET albo nazwą niezadeklarowaną zwracać jako błąd semantyczny z nazwą i pozycją.
 ///
 /// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
 ///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca

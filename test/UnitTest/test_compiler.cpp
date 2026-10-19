@@ -5662,3 +5662,105 @@ TEST(xparser, var_lives_within_one_plan) {
   EXPECT_NE(parsePlanText(next, std::string(kLetHeader) + "\n" + use).status.find("is not declared"), std::string::npos);
   EXPECT_TRUE(next.variables.empty());
 }
+
+// --- DO SET ?NAZWA = wyrazenie (#531, etap B) ------------------------------------------------------
+
+namespace {
+
+/// Status parsowania, a po nim kompilacji - odmowy D4 wydaje dopiero kompilator.
+std::string setPlanStatus(const std::string &rql) {
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan, rql);
+  if (loaded.status != "OK") return loaded.status;
+  return compiler(plan).compile();
+}
+
+}  // namespace
+
+TEST(xparser, set_rules_carry_target_value_program_and_text_order) {
+  // covers: rqlparser.parser-rql-string.17~1, compiler.compiler.15~1
+  qTree plan;
+  // Wolny strumien `slow` stoi w tekscie miedzy regulami, ale w planie po strumieniu `o` - numer
+  // reguly bierze sie z tekstu, nie z kolejnosci wykonania (D3).
+  const PlanSource loaded =
+      parsePlanText(plan, "VAR K = 3\nVAR H = 0.5\nLET C = 2\n" + std::string(kLetHeader) +
+                              "\nDECLARE z INTEGER STREAM w, 2 TEXTFILE 'w.txt'\nSELECT s[0], s[1] STREAM o FROM s\n"
+                              "SELECT w[0] STREAM slow FROM w\n"
+                              "RULE first ON o WHEN o[0] > ?K DO SET ?K = ?K * 0 + o[1] * ?C\n"
+                              "RULE second ON slow WHEN 1 = 1 do set ?H = to_float(slow[0]) * ?H\n"
+                              "RULE third ON o WHEN o[0] < 0 DO DUMP 0 TO 1");
+  ASSERT_EQ(loaded.status, "OK");
+  // Zmienna, ktora tylko pisze SET, jest uzyta - bez ostrzezenia.
+  EXPECT_TRUE(loaded.warnings.empty());
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+
+  const auto program = [](const std::list<token> &tokens) {
+    std::ostringstream os;
+    for (const auto &t : tokens)
+      os << t << ";";
+    return os.str();
+  };
+  const auto &onO    = plan.getQuery("o").lRules;
+  const auto &onSlow = plan.getQuery("slow").lRules;
+  ASSERT_EQ(onO.size(), 2U);
+  ASSERT_EQ(onSlow.size(), 1U);
+  const rule &first  = onO.front();
+  const rule &second = onSlow.front();
+  EXPECT_EQ(first.action, rule::SET);
+  EXPECT_EQ(first.setTarget, 0U);
+  EXPECT_EQ(first.setPosition, "line 8:38");
+  // `?K * 0` nie znika: zmienna nie jest stala (NULL * 0 to NULL); stala LET jest juz liczba.
+  EXPECT_EQ(program(first.setValue), "PUSH_VAR(K[0]);PUSH_VAL(0);MULTIPLY(0);PUSH_ID(o[1]);PUSH_VAL(2);MULTIPLY(0);ADD(0);");
+  EXPECT_EQ(second.action, rule::SET);
+  EXPECT_EQ(second.setTarget, 1U);
+  EXPECT_EQ(onO.back().action, rule::DUMP);
+  EXPECT_EQ(first.textOrder, 0U);
+  EXPECT_EQ(second.textOrder, 1U);
+  EXPECT_EQ(onO.back().textOrder, 2U);
+}
+
+TEST(xparser, set_refusals_name_the_target_the_rule_and_the_position) {
+  // covers: rqlparser.parser-rql-string.17~1, compiler.compiler.15~1
+  const std::string head = "VAR V = 1\nVAR H = 0.5\nVAR R = 1/2\nLET C = 2\n" + std::string(kLetHeader) +
+                           "\nSELECT s[0], s[1] STREAM o FROM s\nRULE r ON o WHEN o[0] > 0 DO ";
+  const auto mismatch = [](const std::string &where, const std::string &name, const std::string &got,
+                           const std::string &declared) {
+    return "line 7:" + where + ": rule 'r' on stream 'o': DO SET ?" + name + " - expression is " + got + ", but variable ?" +
+           name + " is " + declared + " (declared by VAR)";
+  };
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      // Cel: tylko zmienna VAR.
+      {head + "SET ?C = 1", "line 7:33: constant ?C cannot be the target of DO SET; declare it with VAR"},
+      {head + "SET ?Z = 1", "line 7:33: variable ?Z in DO SET is not declared; VAR must precede its first use"},
+      {head + "SET V = 1", "line 7:33 mismatched input 'V'"},
+      // D9: jedna akcja na regule.
+      {head + "SET ?V = 1 DUMP 0 TO 1", "line 7:40 extraneous input 'DUMP'"},
+      // D4: typ z deklaracji, bez niejawnej konwersji.
+      {head + "SET ?V = o[0] * 0.5", mismatch("33", "V", "FLOAT", "INTEGER")},
+      {head + "SET ?H = o[0]", mismatch("33", "H", "INTEGER", "FLOAT")},
+      {head + "SET ?H = to_double(o[0])", mismatch("33", "H", "DOUBLE", "FLOAT")},
+      {head + "SET ?R = o[0]", mismatch("33", "R", "INTEGER", "RATIONAL")},
+      {head + "SET ?V = s[2]", "Stream 'o': rule 'r' refers to stream 's'"},
+      {head + "SET ?V = AVG(o[0] : 3)", "Stream 'o' uses a window aggregate in DO SET of rule 'r', which is not supported"},
+      {head + "SET ?V = Unknown(o[0])", "Unknown"},
+  };
+  for (const auto &[rql, expected] : cases) {
+    SCOPED_TRACE(rql);
+    const std::string status = setPlanStatus(rql);
+    EXPECT_NE(status.find(expected), std::string::npos) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
+  // Jawna konwersja do typu zmiennej przechodzi; tak samo RATIONAL z wyrazenia RATIONAL.
+  EXPECT_EQ(setPlanStatus(head + "SET ?H = to_float(o[0]) * ?H"), "OK");
+  EXPECT_EQ(setPlanStatus(head + "SET ?V = to_integer(?H * 2)"), "OK");
+  EXPECT_EQ(setPlanStatus(head + "SET ?R = ?R * ?R"), "OK");
+  // Regula SET na rodzinie generatora: N kopii z tym samym numerem w tekscie pisaloby jedna zmienna.
+  EXPECT_NE(setPlanStatus("VAR V = 1\n" + std::string(kLetHeader) +
+                          "\nSELECT s[$] STREAM cell[2] FROM s\nRULE r ON cell WHEN 1 = 1 DO SET ?V = 5")
+                .find("Rule 'r' on stream generator 'cell' uses DO SET: its 2 instances would write one variable"),
+            std::string::npos);
+  // Regula na deklaracji to odmowa jak dla DUMP.
+  EXPECT_NE(setPlanStatus("VAR V = 1\n" + std::string(kLetHeader) + "\nRULE r ON s WHEN 1 = 1 DO SET ?V = 2")
+                .find("cannot be attached to declaration stream 's'"),
+            std::string::npos);
+}

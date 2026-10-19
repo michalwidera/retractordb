@@ -34,6 +34,9 @@
 ///   porównania =, !=, <, >, <=, >=, AND, OR i NOT, wywołania CALL/CALL2 i odczyty pól; wyniki okien
 ///   udostępniać wyrażeniom pól przez windowValues; zakres typów operandów, nazw funkcji i konwersji
 ///   określa kontrakt expressionEvaluator,
+/// - [streaminstance.stream-instance.11~1] dla prawdziwego warunku SET (#531) liczyć setValue na tej samej kopii payloadu i tych samych
+///   wartościach variables co warunek i nie zmieniać variables, tylko oddać wynik, także null, do bufora writes pod indeksem setTarget;
+///   wpis z większym textOrder zastępuje wpis z mniejszym, a wpis z mniejszym nie zastępuje istniejącego (D3); zatwierdza go wołający.
 /// - [streaminstance.stream-instance.10~1] przekazywać wyrażeniom pól (constructOutputPayload) i warunkom reguł (constructRulesAndUpdate) tablicę variables wartości zmiennych VAR planu, którą podaje wołający.
 /// - [streaminstance.stream-instance.7~1] przez constructRulesAndUpdate() oceniać reguły qry.lRules na kopii bieżącego payloadu wyjściowego,
 ///   gdy getRecordsCount() >= armAtCount; warunek null, zero liczbowe lub pusty STRING nie uruchamia akcji,
@@ -49,6 +52,17 @@
 ///   i zapisywać do slotu i przez setItemVT(); wynik null lub nieudana konwersja oznaczają null pola;
 ///   po udanym obliczeniu wszystkich pól zwracać sukces bez dopisywania rekordu do magazynu, co należy
 ///   do wywołującego; błąd przerywa obliczenia i wraca w Result, bez cofania wcześniej ustawionych pól.
+
+/// Zapis SET czekajacy na koniec slotu (#531, D1): numer reguly w tekscie planu (D3) i wartosc,
+/// z NULL wlacznie (D4).
+/// @requirements-exempt pendingVariableWrite: Rekord bufora; logike maja streamInstance i dataModel.
+struct pendingVariableWrite {
+  size_t textOrder{0};
+  rdb::descFldVT value;
+};
+
+/// Zapisy SET jednego slotu, indeksowane jak qTree::variables. Trzyma je dataModel.
+using variableWrites = std::vector<std::optional<pendingVariableWrite>>;
 
 struct streamInstance {
  private:
@@ -159,7 +173,9 @@ struct streamInstance {
    * outputPayload need to be filled first before this constructRules will be called
    */
   /// `variables` - jak przy constructOutputPayload(); warunek reguly czyta te same wartosci taktu.
-  [[nodiscard]] rdb::Result<> constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables = nullptr);
+  /// `writes` - bufor zapisow SET slotu (#531); regula SET pisze tylko tam, a nie do `variables`.
+  [[nodiscard]] rdb::Result<> constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables = nullptr,
+                                                      variableWrites *writes = nullptr);
 
  private:
   streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory);

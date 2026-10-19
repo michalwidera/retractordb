@@ -245,7 +245,12 @@ class ParserListener : public RQLBaseListener {
   long int dump_right;
   size_t dump_retention;
   std::string systemCommand;
-  rule::actionType actionType;
+  size_t setTarget{0};
+  std::list<token> setValue;
+  std::string setPosition;
+  /// Ustawia ja akcja reguly. Odmowa w exitSetpart() wraca bez akcji, a buildRule() i tak czyta
+  /// to pole - stad wartosc poczatkowa.
+  rule::actionType actionType{rule::UNKNOWN_ACTION};
 
   void recpToken(command_id id) { program.emplace_back(id); };
 
@@ -545,10 +550,20 @@ class ParserListener : public RQLBaseListener {
         ruleConstruct.action        = rule::SYSTEM;
         ruleConstruct.systemCommand = systemCommand;
         break;
+      case rule::SET:
+        ruleConstruct.action      = rule::SET;
+        ruleConstruct.setTarget   = setTarget;
+        ruleConstruct.setValue    = setValue;
+        ruleConstruct.setPosition = setPosition;
+        break;
       default:
         return "Rule '" + rule_name + "' on stream '" + stream_name + "' has an unknown action";
     }
 
+    // Plan jest parsowany po jednej instrukcji, w kolejnosci tekstu, a reguly nie znikaja z planu
+    // w trakcie parsowania - liczba regul juz dopietych jest wiec numerem tej reguly w tekscie (D3).
+    for (const auto &q : coreInstance)
+      ruleConstruct.textOrder += q.lRules.size();
     target->lRules.push_back(std::move(ruleConstruct));
     return {};
   }
@@ -1147,6 +1162,9 @@ class ParserListener : public RQLBaseListener {
     dump_right     = 0;
     dump_retention = 0;
     systemCommand.clear();
+    setTarget = 0;
+    setValue.clear();
+    setPosition.clear();
     ruleCondition.clear();
     actionType = rule::UNKNOWN_ACTION;
     qry.reset();
@@ -1192,6 +1210,31 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     systemCommand.erase(systemCommand.size() - 1);
     systemCommand.erase(0, 1);
+  }
+
+  /// `DO SET ?NAZWA = wyrazenie` (#531, etap B). Cel musi byc zmienna VAR: stala LET jest podstawiana
+  /// w parserze i nie ma czego ustawiac, a nazwa niezadeklarowana to ta sama odmowa co przy odczycie.
+  /// Prawa strona to program zebrany przez `expression_factor` - odczyty `?VAR` sa w nim juz tokenami
+  /// PUSH_VAR (exitExpConst). Typ prawej strony wobec typu zmiennej sprawdza kompilator (D4).
+  void exitSetpart(RQLParser::SetpartContext *ctx) override {
+    setValue = program;
+    program.clear();
+    const antlr4::Token *ref = ctx->target;
+    const auto found         = constants_.find(ref->getText().substr(1));
+    if (found == constants_.end()) {
+      reportSemanticError(position(ref) + ": variable " + ref->getText() +
+                          " in DO SET is not declared; VAR must precede its first use");
+      return;
+    }
+    if (!found->second.variable) {
+      reportSemanticError(position(ref) + ": constant " + ref->getText() +
+                          " cannot be the target of DO SET; declare it with VAR");
+      return;
+    }
+    found->second.used = true;
+    setTarget          = *found->second.variable;
+    setPosition        = position(ref);
+    actionType         = rule::SET;
   }
 
   /// Wpis deklaracji `LET` albo `VAR` po kontroli nazwy i literalu, albo nullopt po zgloszonej odmowie.

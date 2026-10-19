@@ -1,0 +1,17 @@
+# Szkic uc10 (#531): chlodnia - histereza sprezarki, licznik cykli, zerowanie wolnym taktem.
+# Takt godzinny 3600 przeskalowany do 10, alarm krotkich cykli od 3 w godzinie (zrzut -5..0).
+STORAGE 'temp'
+LET T_ON = 50
+LET T_OFF = 20
+LET MAX_CYCLES = 2
+VAR COMP = 0
+VAR CYCLES = 0
+DECLARE t INTEGER STREAM temp, 1 TEXTFILE 'uc10_temp.txt'
+DECLARE k INTEGER STREAM hour, 10 TEXTFILE 'uc10_hour.txt'
+SELECT temp[0], ?COMP, ?CYCLES STREAM status FROM temp
+SELECT hour[0] STREAM hour_tick FROM hour
+RULE cycle ON status WHEN status[0] >= ?T_ON AND ?COMP = 0 DO SET ?CYCLES = ?CYCLES + 1
+RULE comp_on ON status WHEN status[0] >= ?T_ON DO SET ?COMP = 1
+RULE comp_off ON status WHEN status[0] <= ?T_OFF DO SET ?COMP = 0
+RULE hour_reset ON hour_tick WHEN 1 = 1 DO SET ?CYCLES = 0
+RULE short_cycling ON status WHEN ?CYCLES > ?MAX_CYCLES DO DUMP -5 TO 0
