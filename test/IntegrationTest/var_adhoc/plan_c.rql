@@ -1,0 +1,4 @@
+# Plan bez VAR po `xqry --reset`: nazwy zmiennych poprzednich planow nie sa w nim widoczne.
+STORAGE 'temp_c'
+DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
+SELECT src[0] STREAM st_c FROM src

@@ -1,0 +1,9 @@
+# Plan po `xqry --reset` (D6): te same nazwy COUNT i LATCH pod innymi indeksami i z innymi
+# wartosciami z deklaracji, bez regul SET. Zadna wartosc ani regula ad hoc poprzedniego planu
+# nie moze tu przejsc.
+STORAGE 'temp_b'
+VAR COUNT = 100
+VAR OTHER = 5
+VAR LATCH = 3
+DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
+SELECT src[0], ?LATCH, ?COUNT, ?OTHER STREAM st_b FROM src

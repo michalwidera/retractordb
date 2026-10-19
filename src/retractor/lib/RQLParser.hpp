@@ -82,6 +82,14 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet);
 
+/// Funkcja planVariableNames powinna:
+/// - [rqlparser.plan-variable-names.1~1] zwracać tablicę nazw z wpisem dla każdej zmiennej VAR z plan.variables: nazwa -> indeks w plan.variables i wiersz deklaracji.
+/// - [rqlparser.plan-variable-names.2~1] nie zawierać stałych LET, bo plan ich nie niesie - kanał ad hoc nie widzi stałych planu (#440 O1).
+///
+/// @note Tablica dla kanalu ad hoc (#531, D7): zapytanie dolaczane do dzialajacego planu czyta jego
+///       zmienne i pisze je regula SET, a deklaracja o tej samej nazwie jest kolizja z wierszem planu.
+RqlConstants planVariableNames(const qTree &plan);
+
 /// Funkcja readLogicalLines powinna:
 /// - [rqlparser.read-logical-lines.1~1] pomijać wiersze puste lub złożone ze spacji, tabulacji i CR oraz wiersze, których pierwszy niebiały znak to `#`.
 /// - [rqlparser.read-logical-lines.2~1] zamykać instrukcję na każdym pozostałym wierszu, który nie kończy się znakiem `\`.

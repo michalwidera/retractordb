@@ -87,7 +87,7 @@ expect_refusal() { # <fragment komunikatu> <zapytanie ad-hoc>
 expect_refusal "no such stream is defined" 'RULE r ON nosuchstream WHEN nosuchstream[0] > 0 DO DUMP -1 TO 1'
 expect_refusal "declaration stream" 'RULE r ON core0 WHEN core0[0] > 0 DO DUMP -1 TO 1'
 expect_refusal "is empty" 'RULE r ON dst WHEN dst[0] > 0 DO DUMP 5 TO 5'
-expect_refusal "DO DUMP only" "RULE r ON dst WHEN dst[0] > 0 DO SYSTEM 'touch pwned.txt'"
+expect_refusal "DO DUMP and DO SET only" "RULE r ON dst WHEN dst[0] > 0 DO SYSTEM 'touch pwned.txt'"
 expect_refusal "only the record of the stream" 'RULE r ON dst WHEN core0[0] > 0 DO DUMP -1 TO 1'
 if [ -e pwned.txt ]; then
   echo "odrzucona regula SYSTEM mimo wszystko wykonala polecenie"
