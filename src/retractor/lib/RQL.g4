@@ -80,7 +80,7 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
 rule_statement      : RULE name=ID
                       ON stream_name=ID
                       WHEN logic
-                      DO ( dumppart | systempart )
+                      DO ( dumppart | systempart | setpart )
                     # Rulez
                     ;
 
@@ -88,6 +88,14 @@ dumppart            : DUMP '-'? step_back=int_const TO '-'? step_forward=int_con
                     ;
 
 systempart          : SYSTEM syscmd=STRING
+                    ;
+
+// Akcja SET (#531, etap B): `DO SET ?NAZWA = wyrazenie`. Cel to zmienna VAR (stala LET i nazwa
+// niezadeklarowana to odmowa w RQLParser.cpp). Prawa strona jest wyrazeniem skalarnym liczonym na
+// rekordzie strumienia z ON, w tym samym zakresie nazw co WHEN. Operand to `expression_factor`, a nie
+// `expression`: wyjscie z `expression` zamyka w RQLParser.cpp pole SELECT. Zapis jest buforowany
+// i zatwierdzany po slocie (D1), wiec w slocie zmienna zachowuje sie jak stala.
+setpart             : SET target=CONST_REF IS_EQ value=expression_factor
                     ;
 
 // Stala LET (#440, etap B) przyjmuje tu kazda postac literalu: calkowita, dziesietna i ulamek
@@ -402,6 +410,7 @@ ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';
 SYSTEM:             'SYSTEM'|'system';
+SET:                'SET'|'set';
 DO:                 'DO'|'do';
 TO:                 'TO'|'to';
 AND_C:              'AND'|'and';

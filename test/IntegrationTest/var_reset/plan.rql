@@ -1,0 +1,10 @@
+# Zatrzask ustawiany regula DO SET (#531, etap B) - plan testu it_var_reset. Histereza 250/200:
+# wartosc w pasmie 200..249 nie zmienia zatrzasku, wiec trzyma go od ostatniego przekroczenia.
+STORAGE 'temp'
+LET T_ON = 250
+LET T_OFF = 200
+VAR LATCH = 0
+DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
+SELECT src[0], ?LATCH STREAM st FROM src
+RULE latch_on ON st WHEN st[0] >= ?T_ON DO SET ?LATCH = 1
+RULE latch_off ON st WHEN st[0] < ?T_OFF DO SET ?LATCH = 0

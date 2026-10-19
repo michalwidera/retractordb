@@ -50,6 +50,9 @@ public:
   virtual void enterSystempart(RQLParser::SystempartContext *ctx) = 0;
   virtual void exitSystempart(RQLParser::SystempartContext *ctx) = 0;
 
+  virtual void enterSetpart(RQLParser::SetpartContext *ctx) = 0;
+  virtual void exitSetpart(RQLParser::SetpartContext *ctx) = 0;
+
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
 

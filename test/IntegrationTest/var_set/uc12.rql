@@ -1,0 +1,15 @@
+# Szkic uc12 (#531): pulsoksymetr - linia bazowa EMA zamrazana na czas zdarzenia, histereza
+# desaturacji, indeks na godzine. Typy D4: BASE to FLOAT z literalu dziesietnego, a prawa strona
+# jego SET (INTEGER * FLOAT) tez jest FLOAT. Pierwszy rekord ma ?N = 0, wiec indeks to NULL.
+STORAGE 'temp'
+VAR BASE = 960.0
+VAR DESAT = 0
+VAR EVENTS = 0
+VAR N = 0
+DECLARE s INTEGER STREAM spo2, 1 TEXTFILE 'uc12_spo2.txt'
+SELECT spo2[0], ?BASE, ?DESAT, ?EVENTS, (?EVENTS * 3600) / ?N STREAM odi FROM spo2
+RULE tick ON odi WHEN 1 = 1 DO SET ?N = ?N + 1
+RULE base ON odi WHEN ?DESAT = 0 DO SET ?BASE = (?BASE * 0.99) + (odi[0] * 0.01)
+RULE ev_count ON odi WHEN ?DESAT = 0 AND odi[0] <= (?BASE - 30) DO SET ?EVENTS = ?EVENTS + 1
+RULE ev_start ON odi WHEN odi[0] <= (?BASE - 30) DO SET ?DESAT = 1
+RULE ev_end ON odi WHEN odi[0] >= (?BASE - 10) DO SET ?DESAT = 0

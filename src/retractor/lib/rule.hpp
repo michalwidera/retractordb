@@ -12,12 +12,25 @@ struct rule {
   std::string name;
   std::list<token> condition;
 
-  enum actionType : std::uint8_t { UNKNOWN_ACTION, DUMP, SYSTEM } action{UNKNOWN_ACTION};
+  enum actionType : std::uint8_t { UNKNOWN_ACTION, DUMP, SYSTEM, SET } action{UNKNOWN_ACTION};
 
   std::pair<long int, long int> dumpRange{std::make_pair(0, 0)};
   size_t dump_retention{0};
 
   std::string systemCommand;
+
+  /// Akcja SET (#531, etap B): indeks zmiennej celu w qTree::variables i program prawej strony,
+  /// liczony na tym samym rekordzie co warunek.
+  size_t setTarget{0};
+  std::list<token> setValue;
+
+  /// Pozycja reguly w tekscie planu - numer porzadkowy wsrod wszystkich regul planu. Kompilator
+  /// sortuje wezly po interwale, wiec kolejnosc wykonania regul nie jest kolejnoscia ich zapisu;
+  /// przy kilku zapisach tej samej zmiennej w slocie wygrywa regula o najwiekszym numerze (D3).
+  size_t textOrder{0};
+
+  /// `line L:C` celu SET - do komunikatow kompilatora (D4), ktory pozycji w tekscie nie zna.
+  std::string setPosition;
 
   /// Liczba rekordow strumienia, od ktorej regula zaczyna byc oceniana. 0 - czyli regula
   /// z pliku planu - znaczy "od pierwszego rekordu".

@@ -1251,6 +1251,46 @@ TEST_F(DataModelSlotContract, processRows_mask_of_another_length_is_an_invariant
   EXPECT_DEATH(static_cast<void>(model->processRows(std::vector<char>(plan.size() + 1, 1))), "due mask has");
 }
 
+// Zapisy DO SET (#531, D1): widoczne od nastepnego slotu dla wezla przed regula i za nia, a slot
+// przerwany bledem nie zatwierdza niczego i nie zostawia zapisu w buforze nastepnemu slotowi.
+TEST_F(DataModelSlotContract, set_writes_commit_at_the_end_of_a_successful_slot_only) {
+  // covers: datamodel.data-model.17~1, streaminstance.stream-instance.11~1
+  qTree vars;
+  ASSERT_EQ(parsePlanText(vars, "VAR X = 0\nSTORAGE '" + dir.string() + "'\nDECLARE v INTEGER STREAM src, 1 TEXTFILE '" +
+                                    (dir / "input.txt").string() +
+                                    "'\nSELECT src[0], ?X STREAM pre FROM src STORAGE MEMORY\n"
+                                    "SELECT pre[0], ?X STREAM post FROM pre STORAGE MEMORY\n"
+                                    "RULE w ON pre WHEN 1 = 1 DO SET ?X = pre[0]\n")
+                .status,
+            "OK");
+  ASSERT_EQ(compiler(vars).compile(), "OK");
+  model.reset();
+  plan                  = vars;
+  model                 = rdbtest::ok(dataModel::create(plan));
+  pProc                 = model.get();
+  const auto variableIn = [this](const char *id) { return rdbtest::ok(model->getPayload(id))->getItemVT(1); };
+
+  ASSERT_RDB_OK(model->processZeroStep());
+  ASSERT_RDB_OK(model->processRows(allDue(), 1));  // pre = 10 pisze X; post liczy sie po regule w tym samym slocie
+  EXPECT_EQ(variableIn("pre"), std::optional<rdb::descFldVT>(0));
+  EXPECT_EQ(variableIn("post"), std::optional<rdb::descFldVT>(0));
+  ASSERT_RDB_OK(model->processRows(allDue(), 2));
+  EXPECT_EQ(variableIn("pre"), std::optional<rdb::descFldVT>(10));
+  EXPECT_EQ(variableIn("post"), std::optional<rdb::descFldVT>(10));
+
+  // Slot 3: regula na pre pisze X = 30, potem post konczy slot bledem - zapis przepada.
+  auto &postField        = plan["post"].lSchema.front().lProgram;
+  const auto postProgram = postField;
+  postField              = {token(PUSH_VAL, rdb::descFldVT(std::string("x"))), token(PUSH_VAL, rdb::descFldVT(std::string("y"))),
+                            token(SUBTRACT)};
+  EXPECT_RDB_ERROR(model->processRows(allDue(), 3), rdb::Errc::Eval);
+  postField = postProgram;
+  // Slot bez regul: nic do zatwierdzenia; zapis z przerwanego slotu nie moze tu dojsc.
+  ASSERT_RDB_OK(model->processRows(due({"src"}), 4));
+  ASSERT_RDB_OK(model->processRows(allDue(), 5));
+  EXPECT_EQ(variableIn("pre"), std::optional<rdb::descFldVT>(20));
+}
+
 // Odczyty po trzech slotach: a = 10, 20, 30, zrodlo stoi na 40.
 TEST_F(DataModelSlotContract, reads_by_offset_and_forward_index_fall_back_to_null) {
   // covers: datamodel.data-model.9~1, datamodel.data-model.10~1, datamodel.data-model.11~1, datamodel.data-model.12~1

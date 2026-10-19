@@ -264,7 +264,10 @@ fi
 expect_parse_rejected "VAR X = 1" "'VAR' is not supported"
 expect_parse_rejected "SELECT core0[0] * ?X STREAM varref FROM core0" "line 1:18: constant ?X in expression is not declared"
 expect_parse_rejected $'VAR X = 0\nSELECT core0[0] * ?X STREAM varpair FROM core0' "exactly one SELECT or DECLARE"
-if xqry -d | grep -Eq 'varref|varpair'; then
+# Akcja DO SET (#531, D7, etap B): cel to zmienna VAR, a kanal nie zna zmiennych planu - odmowa
+# parsowania, regula nie dochodzi do planu.
+expect_parse_rejected "RULE varset ON dst WHEN 1 = 1 DO SET ?X = 1" "line 1:37: variable ?X in DO SET is not declared"
+if xqry -d | grep -Eq 'varref|varpair|varset'; then
   echo "odrzucone zapytanie z VAR zmienilo plan serwera"
   xqry -d
   exit 1

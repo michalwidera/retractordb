@@ -636,7 +636,8 @@ static rdb::Result<bool> boolCast(const rdb::descFldVT &inVar) {
   return retVal;
 }
 
-rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables) {
+rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry, const std::vector<rdb::descFldVT> *variables,
+                                                      variableWrites *writes) {
   // Kopia payloadu jest potrzebna tylko do ewaluacji warunkow regul - bez regul nie placimy za nia co interwal.
   if (qry.lRules.empty()) return dumpMgr.processStreamChunk(qry.id);
 
@@ -645,7 +646,7 @@ rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry, const st
   for (const auto &r : qry.lRules) {
     // Parser nie buduje reguly bez warunku ani z inna akcja - oba to niezmienniki.
     RDB_ASSERT(!r.condition.empty(), "streamInstance::constructRulesAndUpdate: rule condition is empty");
-    RDB_ASSERT(r.action == rule::DUMP || r.action == rule::SYSTEM,
+    RDB_ASSERT(r.action == rule::DUMP || r.action == rule::SYSTEM || r.action == rule::SET,
                "streamInstance::constructRulesAndUpdate: unsupported rule action");
     // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii -
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
@@ -656,6 +657,17 @@ rdb::Result<> streamInstance::constructRulesAndUpdate(const query &qry, const st
     if (fired) {
       if (r.action == rule::DUMP) {
         RDB_TRY(dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention)));
+      } else if (r.action == rule::SET) {
+        // Zapis idzie do bufora slotu, nie do `variables`: kazda regula i kazde pole tego slotu czyta
+        // wartosc sprzed slotu (D1). Wartosc liczona na tym samym rekordzie i tych samych zmiennych
+        // co warunek; NULL tez jest zapisem (D4). Z kilku zapisow wygrywa pozniejsza regula w tekscie,
+        // niezaleznie od kolejnosci wykonania wezlow (D3).
+        RDB_ASSERT(writes != nullptr && r.setTarget < writes->size(),
+                   "streamInstance::constructRulesAndUpdate: rule '{}' sets a variable outside the write buffer", r.name);
+        RDB_TRY_ASSIGN(auto value, expression.eval(r.setValue, &payload, nullptr, variables));
+        auto &slot = (*writes)[r.setTarget];
+        if (!slot.has_value() || slot->textOrder < r.textOrder)
+          slot = pendingVariableWrite{.textOrder = r.textOrder, .value = std::move(value)};
       } else if (r.action == rule::SYSTEM) {
         auto ret = ::system(r.systemCommand.c_str());
         if (ret == -1) {

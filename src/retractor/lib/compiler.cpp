@@ -1422,20 +1422,24 @@ std::string compiler::resolveFieldReferences() {
     for (auto &r : q.lRules) {  // for each rule in query
       std::string result{resolveTokenReferences(r.condition, q, r.name)};
       if (result != "OK") return result;
+      // Prawa strona SET (#531) liczy sie na tym samym rekordzie co warunek i podlega tej samej regule.
+      result = resolveTokenReferences(r.setValue, q, r.name);
+      if (result != "OK") return result;
       // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM tego strumienia
       // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks - nazwa
       // schematu jest tam ignorowana. Odwolanie do cudzego strumienia czytaloby wiec pod tym
       // indeksem wlasny rekord: cicho i zawsze zle, bo localizeFieldOffsets() warunkow regul
       // nie tyka i nazwa dotrwa do wykonania bez zmian. Jedyne poprawne odwolanie to wlasne.
-      for (const auto &t : r.condition) {
-        if (t.getCommandID() != PUSH_ID) continue;
-        const auto [schema, index] = std::get<std::pair<std::string, int>>(t.getVT());
-        if (schema == q.id) continue;
-        return std::format(
-            "Stream '{}': rule '{}' refers to stream '{}', but a rule condition reads only the record of the stream "
-            "it is attached to. Refer to it by its own name, for example '{}[{}]'.",
-            q.id, r.name, schema, q.id, index);
-      }
+      for (const auto *program : {&r.condition, &r.setValue})
+        for (const auto &t : *program) {
+          if (t.getCommandID() != PUSH_ID) continue;
+          const auto [schema, index] = std::get<std::pair<std::string, int>>(t.getVT());
+          if (schema == q.id) continue;
+          return std::format(
+              "Stream '{}': rule '{}' refers to stream '{}', but a rule condition reads only the record of the stream "
+              "it is attached to. Refer to it by its own name, for example '{}[{}]'.",
+              q.id, r.name, schema, q.id, index);
+        }
     }  // end for each rule in query
   }
   return {"OK"};
@@ -1477,8 +1481,10 @@ void compiler::snapshotNamedSourceRefs() {
   for (const auto &q : coreInstance) {
     for (const auto &f : q.lSchema)
       record(f.lProgram, q.id);
-    for (const auto &r : q.lRules)
+    for (const auto &r : q.lRules) {
       record(r.condition, q.id);
+      record(r.setValue, q.id);
+    }
   }
 }
 
@@ -2867,10 +2873,14 @@ std::string compiler::resolveWindowAggregates() {
     // Warunek reguły jest wyliczany osobnym wywołaniem ewaluatora, poza ścieżką pól, więc
     // okna tam nie sięgają. Gramatyka na taki zapis pozwala (`logic` schodzi do `term`),
     // dlatego odrzucamy go tutaj, a nie milczeniem.
-    for (const auto &r : q.lRules)
+    for (const auto &r : q.lRules) {
       for (const auto &t : r.condition)
         if (isWindowAggregate(t.getCommandID()))
           return "Stream '" + q.id + "' uses a window aggregate in a RULE condition, which is not supported";
+      for (const auto &t : r.setValue)
+        if (isWindowAggregate(t.getCommandID()))
+          return "Stream '" + q.id + "' uses a window aggregate in DO SET of rule '" + r.name + "', which is not supported";
+    }
 
     for (auto &f : q.lSchema) {
       bool fieldHasWindow = false;
@@ -3217,7 +3227,9 @@ std::string compiler::inferFieldShapes() {
 /// Tutaj zakresu nie zawezamy: pytanie „czy to sie policzy" nie zalezy od tego, czy wezel
 /// syntetyzuje wlasny schemat.
 ///
-/// Przebieg NIE ustala ksztaltow i niczego nie zapisuje - czyta tylko status `rejected`.
+/// Przebieg NIE ustala ksztaltow i niczego nie zapisuje - czyta tylko status `rejected`, a dla
+/// akcji SET (#531) takze typ prawej strony, ktory musi byc typem zmiennej (D4). Stoi przed R3,
+/// wiec odmowa nie zalezy od RDB_OPT_SIMPLIFY_EXPRESSIONS.
 std::string compiler::checkRuleConditionShapes() {
   auto shapeOfField = [this](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
     const auto sourceField = sourceFieldAt(streamId, flatIndex);
@@ -3239,6 +3251,23 @@ std::string compiler::checkRuleConditionShapes() {
     for (const auto &r : q.lRules) {
       const auto inferred = inferExpressionShape(r.condition, shapeOfField, shapeOfWindow, shapeOfVariable);
       if (inferred.rejected()) return "Stream '" + q.id + "' rule condition: " + inferred.reason;
+      if (r.action != rule::SET) continue;
+
+      // D4 (#531): prawa strona SET ma typ zmiennej z deklaracji, bez niejawnej konwersji. Typu,
+      // ktorego nie da sie ustalic, nie przyjmujemy - zapis rzutowalby wtedy po cichu.
+      const auto &variable = coreInstance.variables.at(r.setTarget);
+      const auto expected  = static_cast<rdb::descFld>(variable.initial.index());
+      const auto value     = inferExpressionShape(r.setValue, shapeOfField, shapeOfWindow, shapeOfVariable);
+      if (value.rejected()) return "Stream '" + q.id + "' rule '" + r.name + "' DO SET: " + value.reason;
+      const std::string where = r.setPosition + ": rule '" + r.name + "' on stream '" + q.id + "': DO SET ?" + variable.name;
+      if (!value.resolved())
+        return std::format("{} - the type of the expression cannot be determined; variable ?{} is {}", where, variable.name,
+                           rdb::GetStringdescFld(expected));
+      if (value.shape.rtype != expected || value.shape.rarray != 1)
+        return std::format(
+            "{} - expression is {}, but variable ?{} is {} (declared by VAR); no implicit conversion, use an "
+            "explicit conversion function",
+            where, rdb::GetStringdescFld(value.shape.rtype), variable.name, rdb::GetStringdescFld(expected));
     }
   }
 
@@ -3297,8 +3326,10 @@ std::string compiler::simplifyFieldExpressions() {
 
     for (auto &f : q.lSchema)
       rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfSelectField, typeOfVariable));
-    for (auto &r : q.lRules)
+    for (auto &r : q.lRules) {
       rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField, typeOfVariable));
+      rdb::probe::onRewriteR3(simplifyExpression(r.setValue, typeOfField, typeOfVariable));
+    }
 
     // Podwyrazenia okien stoja w tabeli grup, a nie w programie pola - resolveWindowAggregates()
     // wyjmuje je stamtad wczesniej, bo okno adresuje sloty ZRODLA. Bez tej petli `MIN(x*1 : 3)`
@@ -3540,7 +3571,9 @@ std::string compiler::checkFunctionCalls() {
     }
     // Warunek reguly jest osobnym programem i tak samo moze wolac funkcje.
     for (const auto &r : q.lRules) {
-      const auto result = checkProgram(r.condition, q.id);
+      auto result = checkProgram(r.condition, q.id);
+      if (result != "OK") return result;
+      result = checkProgram(r.setValue, q.id);
       if (result != "OK") return result;
     }
   }
@@ -3605,7 +3638,9 @@ std::string compiler::checkStreamReducerFieldRefs() {
       if (result != "OK") return result;
     }
     for (const auto &r : q.lRules) {
-      const auto result = checkProgram(r.condition, q.id);
+      auto result = checkProgram(r.condition, q.id);
+      if (result != "OK") return result;
+      result = checkProgram(r.setValue, q.id);
       if (result != "OK") return result;
     }
   }
@@ -3671,6 +3706,14 @@ std::string compiler::expandStreamGenerators() {
     if (!mentionsOrdinal(q))
       return "Stream generator '" + q.id + "' uses no '$' - it would produce " + std::to_string(q.generatorSize) +
              " identical streams under different names";
+
+    // Regula DO SET na rodzinie (#531, etap B): kazda instancja dostalaby kopie reguly z tym samym
+    // numerem w tekscie, a wszystkie pisalyby jedna zmienna planu w tym samym slocie - D3 nie ma
+    // miedzy nimi czego rozstrzygac. Stan per instancja (tablice zmiennych) jest poza etapem B.
+    for (const auto &r : q.lRules)
+      if (r.action == rule::SET)
+        return "Rule '" + r.name + "' on stream generator '" + q.id + "' uses DO SET: its " + std::to_string(q.generatorSize) +
+               " instances would write one variable in the same slot. Attach the rule to a single stream";
 
     for (int ordinal = 0; ordinal < q.generatorSize; ++ordinal) {
       query instance         = q;

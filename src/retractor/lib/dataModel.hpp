@@ -33,6 +33,7 @@
 /// - [datamodel.data-model.14~1] przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
 /// - [datamodel.data-model.15~1] traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
 /// - [datamodel.data-model.16~1] przy create budować wartości bieżące zmiennych VAR z wartości deklaracji qTree::variables (D6, #531) i przekazywać je w processRows wyrażeniom pól i warunkom reguł każdego liczonego strumienia.
+/// - [datamodel.data-model.17~1] w processRows zbierać zapisy reguł SET całego slotu w buforze i dopiero po przesunięciu źródeł deklarowanych, na samym końcu udanego slotu, przepisywać je do wartości bieżących zmiennych VAR (D1, #531); slot przerwany błędem nie zmienia zmiennych, a jego zapisy nie przechodzą do następnego slotu.
 class dataModel {
  private:
   qTree &coreInstance_;
@@ -103,9 +104,13 @@ class dataModel {
  private:
   dataModel(qTree &coreInstance, rdb::MemoryStore *memory);
 
-  /// Wartosci biezace zmiennych VAR planu, indeksowane jak qTree::variables (#531). Etap A ich nie
-  /// zmienia - zostaja wartosciami z deklaracji (D6).
+  /// Wartosci biezace zmiennych VAR planu, indeksowane jak qTree::variables (#531). Zaczynaja od
+  /// wartosci z deklaracji (D6); zmienia je wylacznie zatwierdzenie zapisow SET na koncu slotu (D1).
   std::vector<rdb::descFldVT> variables_;
+
+  /// Zapisy regul SET biezacego slotu (#531, etap B), indeksowane jak variables_. Zatwierdza je
+  /// koniec processRows (D1); do tego czasu kazde pole i kazda regula czyta variables_ sprzed slotu.
+  variableWrites pendingWrites_;
 
  public:
   /// Model planu: instancja kazdego strumienia z otwartym magazynem. Blad otwarcia magazynu wraca
