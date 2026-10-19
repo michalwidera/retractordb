@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <iosfwd>
+#include <map>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -17,6 +18,27 @@
 
 class qTree;
 
+/// Stala `LET NAZWA = wartosc` (#440). Stala ma typ swojego literalu: kazdy kontekst zamienia ja ta
+/// sama konwersja, ktora stosuje do literalu tej postaci. Dziesietna nie ma tu wartosci liczbowej, bo
+/// literal dziesietny ma w roznych kontekstach rozne typy (FLOAT w wyrazeniu, Rationalize w
+/// rational_se) - kontekst parsuje jej tekst. Uzycie, ktorego literal tej postaci nie ma (dziesietna
+/// w kontekscie calkowitym, ulamek w wyrazeniu), jest odmowa - bez niejawnej konwersji.
+/// @requirements-exempt RqlConstant: Rekord tablicy stalych; logike ma parser.
+struct RqlConstant {
+  enum class Kind { integer, decimal, fraction };
+  Kind kind{Kind::integer};
+  std::string text;  ///< Prawa strona deklaracji, ze znakiem - do komunikatow i parsowania dziesietnej.
+  int integer{0};    ///< Wartosc, gdy kind == integer.
+  int nom{0};        ///< Licznik ze znakiem, gdy kind == fraction.
+  int den{1};        ///< Mianownik, dodatni, gdy kind == fraction.
+  size_t line{0};    ///< Wiersz deklaracji w pliku planu.
+  bool used{false};  ///< Czy plan odwolal sie do stalej - podstawa ostrzezenia o nieuzytej.
+};
+
+/// Tablica stalych JEDNEGO planu: nazwa (bez `?`) -> stala. Zyje dluzej niz jedno wywolanie
+/// parserRQLString, bo plan jest parsowany po jednej instrukcji (readLogicalLines).
+using RqlConstants = std::map<std::string, RqlConstant>;
+
 /// Funkcja parserRQLString powinna:
 /// - [rqlparser.parser-rql-string.1~1] parsować porcję tekstu RQL `inlet` i dopisywać węzły jej instrukcji do coreInstance.
 /// - [rqlparser.parser-rql-string.2~1] zwracać krotkę {status, pierwsze słowo kluczowe porcji wielkimi literami, nazwa strumienia pierwszej instrukcji SELECT, DECLARE albo RULE}.
@@ -30,11 +52,19 @@ class qTree;
 ///   rzucajacy wyjatek; biblioteka zostaje bez haka. Zmiana tworzenia strumienia nie wycisza testu: przy innym typie
 ///   strumienia nic nie rzuca i status wraca "OK" (czerwony), przy nazwie kwalifikowanej podmiana sie nie kompiluje.
 /// - [rqlparser.parser-rql-string.9~1] po błędzie nie cofać zmian już naniesionych w coreInstance.
+/// - [rqlparser.parser-rql-string.10~1] dopisywać deklaracje LET porcji do tablicy constants i rozwiązywać z niej odwołania `?NAZWA`, oznaczając stałą jako użytą; przeciążenia bez tej tablicy parsują z pustą tablicą lokalną, więc stała nie wychodzi poza porcję.
+/// - [rqlparser.parser-rql-string.11~1] odwołanie do stałej nieznanej, niecałkowitej albo o wartości łamiącej ograniczenia kontekstu oraz ponowną deklarację LET i nazwę z `$` zwracać jako błąd semantyczny z nazwą stałej i pozycją `line L:C`.
+/// - [rqlparser.parser-rql-string.12~1] rozwiązywać `?NAZWA` w `rational_se` (interwał DECLARE, `&`, `%`, `-`, TIMEOUT) tą samą konwersją co literał całkowity, dziesiętny albo ułamek tej postaci; stałą ujemną odrzucać, a w TIMEOUT `-?NAZWA` negować wartość i odrzucać wynik ujemny.
+/// - [rqlparser.parser-rql-string.13~1] rozwiązywać `'-'? ?NAZWA` w wyrażeniu SELECT i RULE WHEN jak literał `'-'? DECIMAL` (INTEGER) albo `'-'? FLOAT` (FLOAT z tekstu stałej); ułamek oraz negację wychodzącą poza zakres INTEGER odrzucać.
 ///
 /// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
 ///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca
 ///       wolajacy (caly plan w launcherze, kopie planu w executorsm::getAdHoc). Plik ma jedyna w
 ///       retractorcore wyspe wyjatkow (RDB_NOEXCEPT_CHECK), bo ANTLR przerywa parsowanie rzutem.
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile, RqlConstants &constants);
+
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
                                                                   std::vector<std::string> &statementKeywords, size_t firstLine,
                                                                   std::string_view sourceFile = {});
@@ -59,6 +89,7 @@ std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file)
 /// Funkcja parserRQLFile_4Test powinna:
 /// - [rqlparser.parser-rql-file-4-test.1~1] dla pliku, którego nie da się otworzyć, logować błąd i zwracać "Unable to open file.".
 /// - [rqlparser.parser-rql-file-4-test.2~1] parsować kolejno instrukcje z readLogicalLines przez parserRQLString z numerem pierwszego wiersza i nazwą pliku.
+/// - [rqlparser.parser-rql-file-4-test.5~1] parsować wszystkie instrukcje pliku z jedną tablicą stałych LET.
 /// - [rqlparser.parser-rql-file-4-test.3~1] przy pierwszej nieudanej instrukcji logować ją i zwracać jej status.
 /// - [rqlparser.parser-rql-file-4-test.4~1] zwracać "OK" po udanym sparsowaniu wszystkich instrukcji, a "Empty file." dla pliku bez instrukcji.
 ///

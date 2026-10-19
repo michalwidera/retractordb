@@ -153,6 +153,8 @@ std::string executorsm::validatePlanText(const std::string &planText) {
         std::println(std::cerr, "xretractor: warning: {}", warning);
     for (const std::string &warning : deviceTimeoutWarnings(candidate, cfgSourcesTimeout))
       SPDLOG_ERROR("Reset plan: {}", warning);
+    for (const std::string &warning : loaded.warnings)
+      SPDLOG_ERROR("Reset plan: {}", warning);
     // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.
     // Poziom ERROR z tego samego powodu co raport ad-hoc (executorsmAdHoc.cpp): Release wycina nizsze.
     for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())

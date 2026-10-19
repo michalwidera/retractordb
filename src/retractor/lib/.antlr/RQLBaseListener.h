@@ -22,6 +22,15 @@ public:
   virtual void enterDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
   virtual void exitDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
 
+  virtual void enterLet(RQLParser::LetContext * /*ctx*/) override { }
+  virtual void exitLet(RQLParser::LetContext * /*ctx*/) override { }
+
+  virtual void enterLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
+  virtual void exitLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
+
+  virtual void enterInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
+  virtual void exitInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
+
   virtual void enterCoption(RQLParser::CoptionContext * /*ctx*/) override { }
   virtual void exitCoption(RQLParser::CoptionContext * /*ctx*/) override { }
 
@@ -48,6 +57,9 @@ public:
 
   virtual void enterRationalAsDecimal(RQLParser::RationalAsDecimalContext * /*ctx*/) override { }
   virtual void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext * /*ctx*/) override { }
+
+  virtual void enterRationalAsConst(RQLParser::RationalAsConstContext * /*ctx*/) override { }
+  virtual void exitRationalAsConst(RQLParser::RationalAsConstContext * /*ctx*/) override { }
 
   virtual void enterRetention(RQLParser::RetentionContext * /*ctx*/) override { }
   virtual void exitRetention(RQLParser::RetentionContext * /*ctx*/) override { }
@@ -174,6 +186,9 @@ public:
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
   virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
+
+  virtual void enterExpConst(RQLParser::ExpConstContext * /*ctx*/) override { }
+  virtual void exitExpConst(RQLParser::ExpConstContext * /*ctx*/) override { }
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }

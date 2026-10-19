@@ -20,6 +20,15 @@ public:
   virtual void enterDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
   virtual void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
 
+  virtual void enterLet(RQLParser::LetContext *ctx) = 0;
+  virtual void exitLet(RQLParser::LetContext *ctx) = 0;
+
+  virtual void enterLet_value(RQLParser::Let_valueContext *ctx) = 0;
+  virtual void exitLet_value(RQLParser::Let_valueContext *ctx) = 0;
+
+  virtual void enterInt_const(RQLParser::Int_constContext *ctx) = 0;
+  virtual void exitInt_const(RQLParser::Int_constContext *ctx) = 0;
+
   virtual void enterCoption(RQLParser::CoptionContext *ctx) = 0;
   virtual void exitCoption(RQLParser::CoptionContext *ctx) = 0;
 
@@ -46,6 +55,9 @@ public:
 
   virtual void enterRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
   virtual void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
+
+  virtual void enterRationalAsConst(RQLParser::RationalAsConstContext *ctx) = 0;
+  virtual void exitRationalAsConst(RQLParser::RationalAsConstContext *ctx) = 0;
 
   virtual void enterRetention(RQLParser::RetentionContext *ctx) = 0;
   virtual void exitRetention(RQLParser::RetentionContext *ctx) = 0;
@@ -172,6 +184,9 @@ public:
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
   virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
+
+  virtual void enterExpConst(RQLParser::ExpConstContext *ctx) = 0;
+  virtual void exitExpConst(RQLParser::ExpConstContext *ctx) = 0;
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;

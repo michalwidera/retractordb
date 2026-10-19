@@ -247,6 +247,18 @@ for _ in $(seq 2 17); do wide_list="$wide_list, to_string(core0[0]:65536)"; done
 expect_parse_rejected "SELECT $wide_list STREAM wide FROM core0" \
   "Stream 'wide' needs a record of 1114112 bytes; the limit is 1048576" "Fail local chain compiler"
 
+# Stale LET (#440, O1): kanal ad-hoc parsuje z pusta tablica stalych, a stala z porcji nie wychodzi
+# poza nia. Deklaracja to odmowa filtra kanalu, odwolanie - nieznana stala; para LET + SELECT
+# w jednym zapytaniu jest dwiema instrukcjami. Zadna z odmow nie zmienia planu serwera.
+expect_parse_rejected "LET X = 1" "'LET' is not supported"
+expect_parse_rejected "SELECT core0[?X] STREAM letref FROM core0" "line 1:13: constant ?X in field index is not declared"
+expect_parse_rejected $'LET X = 0\nSELECT core0[?X] STREAM letpair FROM core0' "exactly one SELECT or DECLARE"
+if xqry -d | grep -Eq 'letref|letpair'; then
+  echo "odrzucone zapytanie z LET zmienilo plan serwera"
+  xqry -d
+  exit 1
+fi
+
 # A2 C2 (#328): `-pole` ad hoc konczylo serwer (kod 1), a `pole * -pole` bylo przyjmowane i konczylo
 # go dopiero w pierwszym slocie (kod 4). `~` nad INTEGER i `-` nad napisem to odmowy kompilatora.
 expect_parse_rejected "SELECT ~core0[0] STREAM bitnot FROM core0" \

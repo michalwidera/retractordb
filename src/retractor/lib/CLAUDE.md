@@ -22,7 +22,7 @@ Function names are **not** grammar literals. `function_call` takes a plain `ID`,
 
 `compiler::checkFunctionCalls()` rejects an unknown name or a bad arity through the `Check result:` channel, so `-c` is a gate: a program that cannot run does not compile.
 
-**Two-argument functions.** The grammar has exactly two shapes - `f(expr)` and `f(expr : DECIMAL)`. The second belongs to `to_string` alone: `N` is the declared output field width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two **evaluated** arguments needs one more grammar alternative (`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the arity row - never a `COMMA` separator, see the rule above.
+**Two-argument functions.** The grammar has exactly two shapes - `f(expr)` and `f(expr : int_const)`. The second belongs to `to_string` alone: `N` (a literal or a `LET` constant `?NAME`, #440) is the declared output field width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two **evaluated** arguments needs one more grammar alternative (`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the arity row - never a `COMMA` separator, see the rule above.
 
 **`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer tokens ahead of `ID` (stream reducers), so they never lex as a function name. A scalar minimum must be called something else.
 

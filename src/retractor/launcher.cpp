@@ -585,6 +585,11 @@ int main(int argc, char *argv[]) try {
         return refusePlan();
       }
       processedLines = loaded.lines;
+      // Nieuzyta stala LET (#440) zawsze, takze z --quiet: plany sprzed LET tego wyjscia nie dostana.
+      for (const std::string &warning : loaded.warnings) {
+        std::println(std::cerr, "{}: warning: {}", argv[0], warning);
+        SPDLOG_WARN("{}", warning);
+      }
     }
 
     // Plan pusty - z braku argumentu albo z pliku bez ani jednej instrukcji. Dla usługi to
