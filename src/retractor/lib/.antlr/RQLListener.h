@@ -20,6 +20,15 @@ public:
   virtual void enterDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
   virtual void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
 
+  virtual void enterLet(RQLParser::LetContext *ctx) = 0;
+  virtual void exitLet(RQLParser::LetContext *ctx) = 0;
+
+  virtual void enterLet_value(RQLParser::Let_valueContext *ctx) = 0;
+  virtual void exitLet_value(RQLParser::Let_valueContext *ctx) = 0;
+
+  virtual void enterInt_const(RQLParser::Int_constContext *ctx) = 0;
+  virtual void exitInt_const(RQLParser::Int_constContext *ctx) = 0;
+
   virtual void enterCoption(RQLParser::CoptionContext *ctx) = 0;
   virtual void exitCoption(RQLParser::CoptionContext *ctx) = 0;
 

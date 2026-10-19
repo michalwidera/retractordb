@@ -24,6 +24,8 @@ struct PlanSource {
   /// Pary (nazwa strumienia z zapisu, tresc instrukcji) w kolejnosci wystapienia.
   /// Zasila `processedLines` - diagnostyke `xqry -t` i sprzatanie artefaktow.
   std::vector<std::pair<std::string, std::string>> lines;
+  /// Ostrzezenia planu przyjetego: stale LET bez zadnego odwolania (#440), w kolejnosci wierszy.
+  std::vector<std::string> warnings;
 };
 
 /// Funkcja parsePlanText powinna:
@@ -31,6 +33,7 @@ struct PlanSource {
 /// - [plansource.parse-plan-text.2~1] dla każdej udanej instrukcji dopisywać do lines parę (nazwa strumienia z zapisu, treść instrukcji) w kolejności wystąpienia.
 /// - [plansource.parse-plan-text.3~1] przy pierwszej nieudanej instrukcji przerywać i zwracać jej komunikat jako status, z lines obejmującym tylko instrukcje sprzed niej.
 /// - [plansource.parse-plan-text.4~1] dla tekstu pustego albo złożonego wyłącznie z komentarzy i pustych wierszy zwracać status "OK" i pustą listę instrukcji.
+/// - [plansource.parse-plan-text.5~1] parsować wszystkie instrukcje tekstu z jedną tablicą stałych LET, która ginie razem z wywołaniem, i dla planu przyjętego dopisywać do warnings po jednym ostrzeżeniu `line N: constant ?X is declared but never used` na stałą bez odwołania, w kolejności wierszy deklaracji.
 ///
 /// @note Pusty plan nie jest tu bledem: dla uslugi to tryb bezczynny, dla `--onlycompile` blad - rozstrzyga
 ///       wolajacy. Funkcja jest wspolna dla startu z pliku (launcher) i przeladowania `reset` (executorsm),

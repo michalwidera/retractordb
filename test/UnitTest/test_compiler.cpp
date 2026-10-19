@@ -19,6 +19,7 @@
 #include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "rdb/sizeLimits.hpp"
 #include "retractor/lib/appConfig.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
@@ -5205,5 +5206,222 @@ TEST(xcompiler, missing_from_source_and_non_positive_agse_step_are_refused_after
     plan["dst"].lProgram.back() = token(STREAM_AGSE, std::pair{step, 3});
     EXPECT_EQ(compiler(plan).compile(),
               "Stream 'dst' has an AGSE step of " + std::to_string(step) + "; the step in @(step,window) must be > 0");
+  }
+}
+
+// --- LET i ?NAZWA (#440, etap A): stale rozwiazuje parser, kompilator dostaje liczby -----------
+
+namespace {
+
+/// Naglowek planow LET: dwa pola liczbowe i napis, ktorego dlugosc tez bywa stala.
+constexpr const char *kLetHeader = "DECLARE a INTEGER, b INTEGER, t STRING[8] STREAM s, 1 TEXTFILE 'in.txt'";
+
+/// Odcisk SKOMPILOWANEGO planu: programy i schematy pol, rozmiary, generatory, latencje, retencja,
+/// okna rekordowe i reguly. Para literaly/LET ma dac ten sam odcisk (D4) - wtedy LET znika przed
+/// wykonaniem, bo do kompilatora nie dochodzi nic poza liczbami.
+std::string letPlanFingerprint(const std::string &rql) {
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan, rql);
+  if (loaded.status != "OK") return "parse: " + loaded.status;
+  if (const auto status = compiler(plan).compile(); status != "OK") return "compile: " + status;
+  std::ostringstream os;
+  for (auto &q : plan) {
+    os << q << "|gen:" << q.generatorSize << "|lat:" << q.startupLatency << "|origin:" << q.logicalOrigin
+       << "|policy:" << q.policy.first << "," << q.policy.second << "|retention:" << q.retention.segments << ","
+       << q.retention.capacity << "|storage:" << q.storage_policy;
+    for (const auto &f : q.lSchema)
+      os << "|fld:" << f.field_.rname << "," << f.field_.rlen << "," << f.field_.rarray << ","
+         << static_cast<int>(f.field_.rtype);
+    for (const auto &g : q.windowGroups) {
+      os << "|win:" << g.source << "," << g.slot << "," << g.width;
+      for (const auto &t : g.program)
+        os << "," << t;
+    }
+    for (const auto &r : q.lRules) {
+      os << "|rule:" << r.name << "," << static_cast<int>(r.action) << "," << r.dumpRange.first << "," << r.dumpRange.second
+         << "," << r.dump_retention << "," << r.systemCommand;
+      for (const auto &t : r.condition)
+        os << "," << t;
+    }
+    os << '\n';
+  }
+  return os.str();
+}
+
+std::string letPlanStatus(const std::string &rql) {
+  qTree plan;
+  return parsePlanText(plan, rql).status;
+}
+
+}  // namespace
+
+TEST(xparser, let_constants_compile_to_the_literal_plan) {
+  // covers: rqlparser.parser-rql-string.10~1, plansource.parse-plan-text.5~1
+  const std::string header(kLetHeader);
+  // {plan z literalami, plan z LET} - po jednej parze na kazde miejsce etapu A, plus mieszanie
+  // literalow ze stalymi, jedna stala w wielu instrukcjach i wielkosc liter w nazwach.
+  const std::vector<std::pair<std::string, std::string>> pairs = {
+      {header + "\nSELECT * STREAM o FROM s@(3, -4)\nSELECT * STREAM p FROM s@(2, -5)\nSELECT * STREAM q FROM s@(2, 5)",
+       "LET STEP = 3\nLET WIDTH = 4\nLET NEGW = -5\n" + header +
+           "\nSELECT * STREAM o FROM s@(?STEP, -?WIDTH)\nSELECT * STREAM p FROM s@(2, ?NEGW)\n"
+           "SELECT * STREAM q FROM s@(2, -?NEGW)"},
+      {header + "\nSELECT s[0], s[1] STREAM o FROM s",
+       "LET SIGNAL = 0\n" + header + "\nSELECT s[?SIGNAL], s[1] STREAM o FROM s"},
+      {header + "\nSELECT s[1-$] STREAM o[2] FROM s\nSELECT o$1[0] STREAM p FROM o[1]",
+       "LET LAST = 1\nLET FAMILY = 2\n" + header +
+           "\nSELECT s[?LAST-$] STREAM o[?FAMILY] FROM s\nSELECT o$1[0] STREAM p FROM o[?LAST]"},
+      {header + "\nSELECT * STREAM o FROM s",
+       "LET WIDTH = 8\n" + std::string(kLetHeader).replace(header.find("STRING[8]"), 9, "STRING[?WIDTH]") +
+           "\nSELECT * STREAM o FROM s"},
+      {header + "\nSELECT * STREAM o FROM s > 2", "LET SHIFT = 2\n" + header + "\nSELECT * STREAM o FROM s > ?SHIFT"},
+      {header + "\nSELECT AVG(s[0] : 3), to_string(s[1] : 6) STREAM o FROM s",
+       "LET HISTORY = 3\nLET TEXT = 6\n" + header + "\nSELECT AVG(s[0] : ?HISTORY), to_string(s[1] : ?TEXT) STREAM o FROM s"},
+      {header + "\nSELECT * STREAM o FROM s RETENTION 10 2\nSELECT * STREAM p FROM s RETENTION 4 VOLATILE",
+       "LET CAPACITY = 10\nLET SEGMENTS = 2\nLET RING = 4\n" + header +
+           "\nSELECT * STREAM o FROM s RETENTION ?CAPACITY ?SEGMENTS\nSELECT * STREAM p FROM s RETENTION ?RING VOLATILE"},
+      {header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] >= 5 DO DUMP -1 TO 2 RETENTION 3\n"
+                "RULE q ON o WHEN o[0] >= 6 DO DUMP 1 TO 3",
+       "LET BACK = 1\nLET AHEAD = 2\nLET KEEP = 3\nLET BEFORE = -1\n" + header +
+           "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] >= 5 DO DUMP -?BACK TO ?AHEAD RETENTION ?KEEP\n"
+           "RULE q ON o WHEN o[0] >= 6 DO DUMP -?BEFORE TO ?KEEP"},
+      {header + "\nSELECT s[0] STREAM o FROM s@(2, 4)\nSELECT o[0] STREAM p FROM o > 2\nSELECT AVG(p[0] : 2) STREAM q FROM p",
+       "LET N = 2\n" + header +
+           "\nSELECT s[0] STREAM o FROM s@(?N, 4)\nSELECT o[0] STREAM p FROM o > ?N\n"
+           "SELECT AVG(p[0] : ?N) STREAM q FROM p"},
+      {header + "\nSELECT s[0], s[1] STREAM o FROM s",
+       "LET x = 0\nLET X = 1\n" + header + "\nSELECT s[?x], s[?X] STREAM o FROM s"},
+  };
+  for (const auto &[literal, named] : pairs) {
+    SCOPED_TRACE(named);
+    const std::string expected = letPlanFingerprint(literal);
+    ASSERT_EQ(expected.find("parse:"), std::string::npos) << expected;
+    ASSERT_EQ(expected.find("compile:"), std::string::npos) << expected;
+    const std::string actual = letPlanFingerprint(named);
+    EXPECT_EQ(actual, expected);
+    EXPECT_EQ(actual.find('?'), std::string::npos) << actual;
+  }
+}
+
+TEST(xparser, let_refusals_name_the_constant_and_its_position) {
+  // covers: rqlparser.parser-rql-string.11~1
+  const std::string header(kLetHeader);
+  const std::string reach                                      = std::to_string(rdb::limits::kMaxHistoryReach);
+  const std::string over                                       = std::to_string(rdb::limits::kMaxHistoryReach + 1);
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {header + "\nSELECT s[?I] STREAM o FROM s",
+       "line 2:9: constant ?I in field index is not declared; LET must precede its first use"},
+      {header + "\nSELECT * STREAM o FROM s > ?X\nLET X = 1", "line 2:27: constant ?X in time shift is not declared"},
+      {"LET I = 0\nLET I = 1\n" + header, "line 2:4: constant ?I is already declared on line 1"},
+      {"LET X = foo\n" + header, "line 1:8 mismatched input 'foo'"},
+      {"LET X = 1 + 2\n" + header, "line 1:10 extraneous input '+'"},
+      {"LET X = 1\nLET Y = ?X\n" + header, "line 2:8 mismatched input '?X'"},
+      {header + "\nSELECT s[? I] STREAM o FROM s", "line 2:9 token recognition error at: '? '"},
+      {"LET A = 1\n" + header + "\nSELECT s[?A$B] STREAM o FROM s", "line 3:11 no viable alternative"},
+      {"LET A$B = 1\n" + header, "line 1:4: constant name A$B must not contain '$'"},
+      {"LET X = 2.5\n" + header + "\nSELECT * STREAM o FROM s@(?X, 2)",
+       "line 3:26: constant ?X = 2.5 in AGSE step is not an integer"},
+      {"LET X = 1/2\n" + header + "\nSELECT * STREAM o FROM s > ?X",
+       "line 3:27: constant ?X = 1/2 in time shift is not an integer"},
+      {"LET X = -1\n" + header + "\nSELECT s[?X] STREAM o FROM s",
+       "line 3:9: constant ?X = -1 in field index must not be negative"},
+      {"LET X = -3\n" + header + "\nSELECT s[?X-$] STREAM o[2] FROM s",
+       "line 3:9: constant ?X = -3 in generator index must not be negative"},
+      {"LET X = -1\n" + header + "\nSELECT s[0] STREAM o[2] FROM s\nSELECT * STREAM p FROM o[?X]",
+       "line 4:25: constant ?X = -1 in stream index must not be negative"},
+      {"LET X = 0\n" + header + "\nSELECT * STREAM o FROM s@(?X, 2)", "AGSE step ?X = 0 (line 3:26) must be greater than zero"},
+      {"LET X = 0\n" + header + "\nSELECT * STREAM o FROM s@(1, -?X)",
+       "AGSE window ?X = 0 (line 3:30) must be greater than zero"},
+      {"LET X = " + over + "\n" + header + "\nSELECT * STREAM o FROM s > ?X",
+       "time shift ?X = " + over + " (line 3:27) exceeds the limit " + reach},
+      {"LET X = " + over + "\n" + header + "\nSELECT * STREAM o FROM s@(1, -?X)",
+       "AGSE window ?X = " + over + " (line 3:30) exceeds the limit " + reach},
+      {"LET X = 99999999999\n" + header, "line 1:4: value 99999999999 of constant ?X is out of range"},
+      {"LET X = 1/0\n" + header, "line 1:4: fraction 1/0 of constant ?X has a zero denominator"},
+      {"LET X = -3\n" + header + "\nSELECT * STREAM o FROM s RETENTION 4 ?X",
+       "RETENTION segments ?X = -3 (line 3:37) must not be negative"},
+      {"LET X = -2\nDECLARE a STRING[?X] STREAM s, 1 TEXTFILE 'in.txt'",
+       "field size ?X = -2 (line 2:17) must be greater than zero"},
+      {"LET B = 2\n" + header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] = 1 DO DUMP ?B TO ?B",
+       "dump range [2..2] is empty"},
+      {"LET B = " + over + "\n" + header + "\nSELECT * STREAM o FROM s\nRULE r ON o WHEN o[0] = 1 DO DUMP -?B TO 1",
+       "DUMP range bound ?B = " + over + " (line 4:35) exceeds the limit " + reach},
+      {"DECLARE let INTEGER STREAM s, 1 TEXTFILE 'in.txt'", "mismatched input 'let'"},
+  };
+  for (const auto &[rql, expected] : cases) {
+    SCOPED_TRACE(rql);
+    const std::string status = letPlanStatus(rql);
+    EXPECT_NE(status.find(expected), std::string::npos) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
+  // Wartosci graniczne przechodza: ta sama granica co dla literalu, z obu stron znaku.
+  EXPECT_EQ(letPlanStatus("LET X = " + reach + "\n" + header + "\nSELECT * STREAM o FROM s > ?X"), "OK");
+  EXPECT_EQ(letPlanStatus("LET X = " + reach + "\n" + header + "\nSELECT * STREAM o FROM s@(1, -?X)"), "OK");
+  EXPECT_EQ(letPlanStatus("LET X = -" + reach + "\n" + header + "\nSELECT * STREAM o FROM s@(1, ?X)"), "OK");
+}
+
+TEST(xparser, let_question_mark_inside_text_stays_text) {
+  // covers: plansource.parse-plan-text.5~1
+  // Napis, komentarz i polecenie SYSTEM wydziela lekser, wiec `?X` w nich nie jest odwolaniem:
+  // stala zostaje nieuzyta, a tekst dochodzi do planu doslownie.
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan, "LET X = 1\n" + std::string(kLetHeader) +
+                                                    "\nSELECT 'a?X' STREAM o FROM s /* ?Y */ // ?W\n"
+                                                    "RULE r ON o WHEN o[0] = 1 DO SYSTEM 'echo ?Z'\n");
+  ASSERT_EQ(loaded.status, "OK");
+  EXPECT_EQ(loaded.warnings, std::vector<std::string>{"line 1: constant ?X is declared but never used"});
+  EXPECT_EQ(plan.getQuery("o").lSchema.front().lProgram.front().getStr_(), "a?X");
+  EXPECT_EQ(plan.getQuery("o").lRules.front().systemCommand, "echo ?Z");
+}
+
+TEST(xparser, let_constants_live_within_one_plan) {
+  // covers: rqlparser.parser-rql-string.10~1, plansource.parse-plan-text.5~1, rqlparser.parser-rql-file-4-test.5~1
+  const std::string header(kLetHeader);
+  const std::string use = "SELECT s[?X] STREAM o FROM s";
+
+  // Kolejne wiersze jednego planu widza stala; nastepny plan zaczyna od pustej tablicy.
+  EXPECT_EQ(letPlanStatus("LET X = 1\n" + header + "\n" + use), "OK");
+  EXPECT_NE(letPlanStatus(header + "\n" + use).find("constant ?X in field index is not declared"), std::string::npos);
+
+  // Przeciazenie bez tablicy: stala nie wychodzi poza porcje - tak parsuje kanal ad-hoc.
+  {
+    qTree plan;
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, "LET X = 1")), "OK");
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, header)), "OK");
+    EXPECT_NE(std::get<0>(parserRQLString(plan, use)).find("is not declared"), std::string::npos);
+  }
+  // Ta sama sekwencja z tablica wolajacego.
+  {
+    qTree plan;
+    RqlConstants constants;
+    std::vector<std::string> keywords;
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, "LET X = 1", keywords, 1, {}, constants)), "OK");
+    EXPECT_EQ(keywords, std::vector<std::string>{"LET"});
+    EXPECT_TRUE(plan.empty());
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, header, keywords, 2, {}, constants)), "OK");
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, use, keywords, 3, {}, constants)), "OK");
+    EXPECT_TRUE(constants.at("X").used);
+  }
+
+  // Ostrzezenia nieuzytych stalych - w kolejnosci wierszy, nie nazw; plan odrzucony ich nie ma.
+  {
+    qTree plan;
+    const PlanSource loaded = parsePlanText(plan, "LET B = 2\nLET A = 1\nLET X = 0\n" + header + "\n" + use);
+    ASSERT_EQ(loaded.status, "OK");
+    EXPECT_EQ(loaded.warnings, (std::vector<std::string>{"line 1: constant ?B is declared but never used",
+                                                         "line 2: constant ?A is declared but never used"}));
+    EXPECT_EQ(loaded.lines.size(), 5U);
+  }
+  {
+    qTree plan;
+    EXPECT_TRUE(parsePlanText(plan, "LET B = 2\n" + header + "\nSELECT s[?Q] STREAM o FROM s").warnings.empty());
+  }
+
+  // Plik testowy idzie ta sama droga co plan.
+  {
+    const std::string file = "ut_let_constants.rql";
+    std::ofstream(file) << "LET X = 1\n" << header << '\n' << use << '\n';
+    qTree plan;
+    EXPECT_EQ(parserRQLFile_4Test(plan, file), "OK");
+    std::filesystem::remove(file);
   }
 }

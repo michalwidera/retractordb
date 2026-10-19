@@ -22,6 +22,15 @@ public:
   virtual void enterDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
   virtual void exitDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
 
+  virtual void enterLet(RQLParser::LetContext * /*ctx*/) override { }
+  virtual void exitLet(RQLParser::LetContext * /*ctx*/) override { }
+
+  virtual void enterLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
+  virtual void exitLet_value(RQLParser::Let_valueContext * /*ctx*/) override { }
+
+  virtual void enterInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
+  virtual void exitInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
+
   virtual void enterCoption(RQLParser::CoptionContext * /*ctx*/) override { }
   virtual void exitCoption(RQLParser::CoptionContext * /*ctx*/) override { }
 

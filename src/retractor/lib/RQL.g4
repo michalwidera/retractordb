@@ -5,10 +5,29 @@ prog                : ( select_statement
                       | compiler_option
                       | default_statement
                       | rule_statement
+                      | let_statement
                       )+ EOF
                     ;
 
 default_statement   : DEFAULT VOLATILE # DefaultOption
+                    ;
+
+// Nazwana stala (#440): `LET NAZWA = wartosc`, odwolanie `?NAZWA`. Rozwiazuje ja WYLACZNIE parser
+// (RQLParser.cpp, tablica RqlConstants jednego planu) - do kompilatora trafiaja juz liczby, wiec
+// deklaracja nie tworzy wezla, pola ani strumienia. Prawa strona to jeden literal: calkowity,
+// dziesietny albo ulamek. Ulamek ma tu wlasna alternatywe, a nie `fraction_rule`, bo przebiegi
+// rational_se zapisuja kazdy ulamek do interwalu biezacej deklaracji.
+let_statement       : LET name=ID IS_EQ let_value
+                    # Let
+                    ;
+
+let_value           : sign=MINUS? ( DECIMAL | FLOAT | nom=DECIMAL DIVIDE den=DECIMAL )
+                    ;
+
+// Liczba calkowita w kontekstach etapu A #440: literal albo odwolanie do stalej. Ograniczenia
+// kontekstu (zakres, znak) sprawdza handler tak samo dla obu postaci.
+int_const           : DECIMAL
+                    | CONST_REF
                     ;
 
 compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING_PROFILE | STRING ) 
@@ -20,7 +39,7 @@ compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING
 // i lista profili. Bez tych alternatyw parser konczyl SELECT przed STORAGE, bral reszte za
 // dyrektywe `STORAGE 'katalog'` i zglaszal "expecting {STRING_PROFILE, STRING}" (#346).
 select_statement    : SELECT select_list
-                      STREAM stream_name=ID ('[' gen_size=DECIMAL ']')?
+                      STREAM stream_name=ID ('[' gen_size=int_const ']')?
                       FROM stream_expression
                       (FILE file_name=STRING)?
                       (retention_from)?
@@ -56,7 +75,7 @@ rule_statement      : RULE name=ID
                     # Rulez
                     ;
 
-dumppart            : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?
+dumppart            : DUMP '-'? step_back=int_const TO '-'? step_forward=int_const (RETENTION rule_retnetion=int_const)?
                     ;
 
 systempart          : SYSTEM syscmd=STRING
@@ -67,7 +86,7 @@ rational_se         : fraction_rule # RationalAsFraction_proforma
                     | DECIMAL       # RationalAsDecimal
                     ;
 
-retention_from      : RETENTION capacity=DECIMAL (segments=DECIMAL)?
+retention_from      : RETENTION capacity=int_const (segments=int_const)?
                     # Retention
                     ;
 
@@ -76,7 +95,7 @@ fraction_rule       : DECIMAL DIVIDE DECIMAL
                     ;
 
 
-field_declaration   : ID field_type ('[' type_size=DECIMAL ']')?
+field_declaration   : ID field_type ('[' type_size=int_const ']')?
                     # SingleDeclaration
                     ;
 
@@ -95,7 +114,7 @@ select_list         : asterisk                       # SelectListFullscan
 field_id            : column_name=ID                             # FieldID            // id    - ID3
                     | tablename=ID '[' UNDERLINE ']'             # FieldIDUnderline   // id[_] - IDX
                     | tablename=ID DOT column_name=ID            # FieldIDColumnName  // id.id - ID1
-                    | tablename=ID '[' column_index=DECIMAL ']'  # FieldIDTable       // id[x] - ID2
+                    | tablename=ID '[' column_index=int_const ']' # FieldIDTable      // id[x] - ID2
                     | tablename=ID '[' gen_index ']'             # FieldIDGenerated   // id[$] - ID2
                     ;
 
@@ -195,10 +214,10 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
 //
 // Lacznosc operatorow binarnych musi zostac LEWOSTRONNA: compiler sklada nazwe substratu
 // lewostronnie (`OP _arg2 _arg1`), a ta nazwa jest nazwa pliku na dysku.
-stream_expression   : stream_expression AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
+stream_expression   : stream_expression AT '(' step=int_const COMMA '-'? window=int_const ')' # SExpAgse
                     | stream_expression AND rational_se         # SExpAnd
                     | stream_expression MOD rational_se         # SExpMod
-                    | stream_expression '>' DECIMAL             # SExpTimeMove
+                    | stream_expression '>' int_const           # SExpTimeMove
                     | stream_expression MINUS rational_se       # SExpMinus
                     | stream_expression DOT agregator           # SExpAgregate_proforma
                     | stream_expression SHARP stream_expression # SExpHash
@@ -235,6 +254,7 @@ gen_index           : gen_index STAR gen_index
                     | '(' gen_index ')'
                     | DOLLAR
                     | DECIMAL
+                    | CONST_REF
                     ;
 
 // Notacja przyrostkowa `strumien.avg`. WYGASZANA na rzecz stream_fn_call.
@@ -306,7 +326,7 @@ window_agg          : ( MIN
                     | MAX
                     | AVG
                     | SUMC
-                    ) '(' expression_factor COLON width=DECIMAL ')'
+                    ) '(' expression_factor COLON width=int_const ')'
                     ;
 
 // Wywolanie funkcji skalarnej. Nazwa jest zwyklym ID, a NIE lista literalow: lista
@@ -330,7 +350,7 @@ window_agg          : ( MIN
 // jako smiec, bo CALL2 zdejmuje jeden argument. Separatorem jest COLON, nie COMMA -
 // patrz regula przy `select_list`. Liczbe argumentow sprawdza tabela arnosci.
 function_call       : fn=ID '(' expression_factor ')'
-                    | fn=ID '(' expression_factor COLON DECIMAL ')'
+                    | fn=ID '(' expression_factor COLON width=int_const ')'
                     ;
 
 // sync types with: src/include/rdb/fldType.hpp
@@ -362,6 +382,7 @@ TIMEOUT:            'TIMEOUT'|'timeout';
 VOLATILE:           'VOLATILE'|'volatile';
 PERSISTENT:         'PERSISTENT'|'persistent';
 DEFAULT:            'DEFAULT'|'default';
+LET:                'LET'|'let';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';
@@ -387,6 +408,9 @@ STRING_PROFILE:    '\'' (TYPE_PROFILE | DEFAULT) '\'';
 // tokeny leksera, wiec byly slowami ZASTRZEZONYMI. Teraz leksuja sie jako ID, tak samo jak
 // pozostale nazwy funkcji - inaczej nie przeszlyby przez `function_call : fn=ID ...`.
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
+// Odwolanie do stalej LET (#440): jeden token, bez spacji po `?` i bez `$` w nazwie, zeby nie
+// mylic go z indeksem generatora. `?` nie ma w RQL innego znaczenia.
+CONST_REF:          '?' [A-Za-z] [A-Za-z_0-9]*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;

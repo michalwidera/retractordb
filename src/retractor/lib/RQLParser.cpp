@@ -212,6 +212,9 @@ class ParserListener : public RQLBaseListener {
   /// Listenery bledow trzymaja go z tego samego powodu - patrz abortParse().
   antlr4::Parser &parser_;
 
+  /// Stale LET planu (#440). Nalezy do wolajacego, bo plan przychodzi po jednej instrukcji.
+  RqlConstants &constants_;
+
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
 
@@ -312,26 +315,111 @@ class ParserListener : public RQLBaseListener {
     return T{};
   }
 
-  /// Literal wymiaru z przedzialu [min, max]; min to 0 albo 1.
+  /// Pozycja tokenu w pliku planu, w postaci komunikatow skladni: `line L:C`.
+  [[nodiscard]] std::string position(const antlr4::Token *token) const {
+    return "line " + std::to_string(firstLine_ + token->getLine() - 1) + ":" + std::to_string(token->getCharPositionInLine());
+  }
+
+  /// Wartosc odwolania `?NAZWA` w kontekscie calkowitym (#440) albo nullopt po zgloszonej odmowie.
   ///
-  /// Gramatyka bierze tu DECIMAL, wiec wartosc ujemna nie istnieje. Zero przechodzilo parser tam,
-  /// gdzie nic nie znaczy: krok 0 konczyl proces FatalError-em w kompilatorze, okno 0 przy tworzeniu
-  /// magazynu, pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset` smierc serwera (#308).
-  /// Gorna granica (rdb/sizeLimits.hpp) zamyka te sama droge od drugiej strony: wartosc, ktora miesci
-  /// sie w int, a jest absurdalna jako rozmiar, konczyla sie std::bad_alloc, OOM killerem albo
-  /// przepelnieniem int dalej w silniku (A2 M11).
-  /// Literal spoza zakresu int ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
-  int boundedLiteral(const std::string &what, const std::string &text, int min, int max = std::numeric_limits<int>::max()) {
-    const auto value = parseLiteral<int>(text);
-    if (!value) {
-      reportOutOfRange(text);
+  /// Uzycie przed deklaracja i nazwa nieznana to ten sam przypadek: tablica rosnie w kolejnosci
+  /// planu, wiec pozniejszego LET jeszcze w niej nie ma. Stala dziesietna albo ulamek w kontekscie
+  /// calkowitym jest odmowa, bo literal tej postaci bylby tu bledem skladni.
+  std::optional<int> constantValue(const antlr4::Token *ref, const std::string &what) {
+    const std::string name = ref->getText().substr(1);
+    const auto found       = constants_.find(name);
+    if (found == constants_.end()) {
+      reportSemanticError(position(ref) + ": constant ?" + name + " in " + what +
+                          " is not declared; LET must precede its first use");
+      return std::nullopt;
+    }
+    found->second.used = true;
+    if (found->second.kind != RqlConstant::Kind::integer) {
+      reportSemanticError(position(ref) + ": constant ?" + name + " = " + found->second.text + " in " + what +
+                          " is not an integer");
+      return std::nullopt;
+    }
+    return found->second.integer;
+  }
+
+  /// Liczba `int_const` - literal albo stala - z tekstem do komunikatow. Brak wartosci znaczy, ze
+  /// odmowa jest juz zgloszona.
+  /// @requirements-exempt IntArg: Para tekst-wartosc do komunikatow; logike maja intArg i bounded.
+  struct IntArg {
+    std::string text;
+    std::optional<int> value;
+  };
+
+  /// Tekst literalu zostaje doslowny, wiec komunikaty planow bez LET sie nie zmieniaja. Stala
+  /// pokazuje nazwe, wartosc i pozycje: `?WINDOW = 0 (line 3:28)`.
+  IntArg intArg(RQLParser::Int_constContext *ctx, const std::string &what) {
+    if (ctx->CONST_REF() == nullptr) {
+      const std::string text = ctx->getText();
+      const auto value       = parseLiteral<int>(text);
+      if (!value) reportOutOfRange(text);
+      return {text, value};
+    }
+    const antlr4::Token *ref = ctx->CONST_REF()->getSymbol();
+    const auto value         = constantValue(ref, what);
+    return {ref->getText() + " = " + (value ? std::to_string(*value) : "?") + " (" + position(ref) + ")", value};
+  }
+
+  /// Wymiar z przedzialu [min, max]; min to 0 albo 1.
+  ///
+  /// Literal jest tu DECIMAL, wiec wartosc ujemna moze przyjsc wylacznie ze stalej (#440). Zero
+  /// przechodzilo parser tam, gdzie nic nie znaczy: krok 0 konczyl proces FatalError-em w kompilatorze,
+  /// okno 0 przy tworzeniu magazynu, pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset`
+  /// smierc serwera (#308). Gorna granica (rdb/sizeLimits.hpp) zamyka te sama droge od drugiej strony:
+  /// wartosc, ktora miesci sie w int, a jest absurdalna jako rozmiar, konczyla sie std::bad_alloc, OOM
+  /// killerem albo przepelnieniem int dalej w silniku (A2 M11).
+  /// Wartosc odrzucona wczesniej ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
+  int bounded(const std::string &what, RQLParser::Int_constContext *ctx, int min, int max = std::numeric_limits<int>::max()) {
+    const IntArg arg = intArg(ctx, what);
+    if (!arg.value) return 0;
+    if (*arg.value < min)
+      reportSemanticError(what + " " + arg.text + (min > 0 ? " must be greater than zero" : " must not be negative"));
+    else if (*arg.value > max)
+      reportSemanticError(what + " " + arg.text + " exceeds the limit " + std::to_string(max));
+    return *arg.value;
+  }
+
+  /// Wartosc w miejscu `'-'? int_const`: minus neguje literal albo wartosc stalej (#440, O5), a granice
+  /// [min, max] obowiazuja wartosc bezwzgledna - jak dla literalu z minusem. Stala ujemna bez minusa
+  /// znaczy to samo, co literal ujemny w tym miejscu.
+  int boundedSigned(const std::string &what, RQLParser::Int_constContext *ctx, bool negated, int min, int max) {
+    const IntArg arg = intArg(ctx, what);
+    if (!arg.value) return 0;
+    const long long value     = negated ? -static_cast<long long>(*arg.value) : *arg.value;
+    const long long magnitude = value < 0 ? -value : value;
+    if (magnitude < min) {
+      reportSemanticError(what + " " + arg.text + " must be greater than zero");
       return 0;
     }
-    if (*value < min)
-      reportSemanticError(what + " " + text + " must be greater than zero");
-    else if (*value > max)
-      reportSemanticError(what + " " + text + " exceeds the limit " + std::to_string(max));
-    return *value;
+    if (magnitude > max) {
+      reportSemanticError(what + " " + arg.text + " exceeds the limit " + std::to_string(max));
+      return 0;
+    }
+    return static_cast<int>(value);
+  }
+
+  /// Tekst odwolania z liczbami w miejscu stalych: `src[?I]` -> `src[3]`, `cells[?LAST-$]` ->
+  /// `cells[23-$]` (#440). Kompilator czyta indeks z tekstu tokenu (expandStreamGenerators,
+  /// rozwiazywanie pol), wiec stala musi zniknac juz tutaj; literal zostaje doslowny. Wartosc ujemna
+  /// jest odmowa: literal w nawiasie jest zawsze nieujemny, a genIndexFolder nie zna minusa unarnego.
+  std::string resolvedText(antlr4::tree::ParseTree *tree, const std::string &what) {
+    if (auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(tree)) {
+      const antlr4::Token *symbol = terminal->getSymbol();
+      if (symbol->getType() != RQLParser::CONST_REF) return terminal->getText();
+      const auto value = constantValue(symbol, what);
+      if (value && *value < 0)
+        reportSemanticError(position(symbol) + ": constant " + symbol->getText() + " = " + std::to_string(*value) + " in " +
+                            what + " must not be negative");
+      return std::to_string(value.value_or(0));
+    }
+    std::string text;
+    for (auto *child : tree->children)
+      text += resolvedText(child, what);
+    return text;
   }
 
   /// Plik zrzutu to <strumien>_<regula> z przyrostkiem _dump.tmp albo _dump_K.tmp
@@ -424,10 +512,11 @@ class ParserListener : public RQLBaseListener {
   }
 
  public:
-  ParserListener(qTree &coreInstance, antlr4::Parser &parser, size_t firstLine)
+  ParserListener(qTree &coreInstance, antlr4::Parser &parser, size_t firstLine, RqlConstants &constants)
       : coreInstance(coreInstance),
         firstLine_(firstLine),
-        parser_(parser) {};
+        parser_(parser),
+        constants_(constants) {};
 
   [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
 
@@ -460,8 +549,9 @@ class ParserListener : public RQLBaseListener {
   /// jako `core0[0]`, a `core0[4294967295]` dawalo PUSH_ID z indeksem -1, ktory ad-hoc
   /// przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (#306, A2 M10).
   void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override {
-    if (!parseLiteral<int>(ctx->column_index->getText())) reportOutOfRange(ctx->column_index->getText());
-    recpToken(PUSH_ID2, ctx->getText());
+    if (ctx->column_index->CONST_REF() == nullptr && !parseLiteral<int>(ctx->column_index->getText()))
+      reportOutOfRange(ctx->column_index->getText());
+    recpToken(PUSH_ID2, resolvedText(ctx, "field index"));
   }
 
   /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
@@ -469,7 +559,9 @@ class ParserListener : public RQLBaseListener {
   /// Wystawia DOKLADNIE ten sam token co `cells[3]`: rozny jest wylacznie tekst, ktory
   /// compiler::expandStreamGenerators() zwija do postaci literalowej zanim zobaczy go
   /// ktorykolwiek dalszy przebieg. Osobny opcode byl tu zbedny.
-  void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
+  void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) override {
+    recpToken(PUSH_ID2, resolvedText(ctx, "generator index"));
+  }
 
   void exitExpPlus(RQLParser::ExpPlusContext *ctx) override { recpToken(ADD); }
   void exitExpMinus(RQLParser::ExpMinusContext *ctx) override { recpToken(SUBTRACT); }
@@ -530,7 +622,7 @@ class ParserListener : public RQLBaseListener {
   /// Szerokosc spoza 1..kMaxHistoryReach odrzucamy tutaj (A2 M11): kazdy rekord okna to rekord
   /// historii zrodla, wiec literal w zakresie int, ale absurdalny, stawal sie pojemnoscia bufora.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
-    const int width = boundedLiteral("record window width", ctx->width->getText(), 1, rdb::limits::kMaxHistoryReach);
+    const int width = bounded("record window width", ctx->width, 1, rdb::limits::kMaxHistoryReach);
     if (windowArgMarks.empty())
       abortInternal(fmt::format("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText()));
     const auto argStart = static_cast<int>(windowArgMarks.back());
@@ -631,12 +723,10 @@ class ParserListener : public RQLBaseListener {
   void exitSExpMinus(RQLParser::SExpMinusContext *ctx) override { recpToken(STREAM_SUBTRACT, rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext *ctx) override {
-    int window{0};
-    int step{0};
     // Minus przed szerokoscia jest legalny (kompilator bierze abs), wiec zerem jest tez `-0`.
-    const int windowAbs = boundedLiteral("AGSE window", ctx->window->getText(), 1, rdb::limits::kMaxHistoryReach);
-    window              = (ctx->children[kAgseWindowSignChildIndex]->getText() == "-") ? -windowAbs : windowAbs;
-    step                = boundedLiteral("AGSE step", ctx->step->getText(), 1, rdb::limits::kMaxHistoryReach);
+    const bool negated = ctx->children[kAgseWindowSignChildIndex]->getText() == "-";
+    const int window   = boundedSigned("AGSE window", ctx->window, negated, 1, rdb::limits::kMaxHistoryReach);
+    const int step     = bounded("AGSE step", ctx->step, 1, rdb::limits::kMaxHistoryReach);
 
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
@@ -654,9 +744,8 @@ class ParserListener : public RQLBaseListener {
     const std::string name    = known ? std::string(known->canonical) : written;
 
     // Szerokosc `to_string(x : N)` to dlugosc pola STRING, wiec ma granice pola (A2 M11).
-    if (ctx->DECIMAL() != nullptr)
-      recpToken(CALL2, std::make_pair(
-                           name, boundedLiteral(name + " width", ctx->DECIMAL()->getText(), 1, rdb::limits::kMaxFieldLength)));
+    if (ctx->width != nullptr)
+      recpToken(CALL2, std::make_pair(name, bounded(name + " width", ctx->width, 1, rdb::limits::kMaxFieldLength)));
     else
       recpToken(CALL, name);
   }
@@ -790,9 +879,9 @@ class ParserListener : public RQLBaseListener {
 
   void exitSelect(RQLParser::SelectContext *ctx) override {
     // Kazda instancja generatora to kopia zapytania i wlasny strumien, wiec rozmiar ma granice planu (A2 M11).
-    qry.generatorSize = (ctx->gen_size != nullptr) ? boundedLiteral("stream generator size", ctx->gen_size->getText(), 1,
-                                                                    static_cast<int>(rdb::limits::kMaxPlanStreams))
-                                                   : query::notAGenerator;
+    qry.generatorSize = (ctx->gen_size != nullptr)
+                            ? bounded("stream generator size", ctx->gen_size, 1, static_cast<int>(rdb::limits::kMaxPlanStreams))
+                            : query::notAGenerator;
 
     // this loop creates field names in streamName + "_" + counter++
     //
@@ -901,12 +990,12 @@ class ParserListener : public RQLBaseListener {
   void exitRetention(RQLParser::RetentionContext *ctx) override {
     if (ctx->segments != nullptr) {
       // retention {capacity} !{segments}
-      qry.retention = std::pair<int, int>(         //
-          literal<int>(ctx->segments->getText()),  //
-          boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1));
+      qry.retention = std::pair<int, int>(                  //
+          bounded("RETENTION segments", ctx->segments, 0),  //
+          bounded("RETENTION capacity", ctx->capacity, 1));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.policy.second = boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1);
+      qry.policy.second = bounded("RETENTION capacity", ctx->capacity, 1);
     }
   }
 
@@ -936,10 +1025,9 @@ class ParserListener : public RQLBaseListener {
   /// w Debug konczylo sie to asercja biblioteki standardowej, w Release odczytem spoza zakresu,
   /// a z kanalu ad-hoc - smiercia serwera po `DO DUMP 5 TO 5`. Dlatego pytamy o sasiada samej
   /// liczby, zamiast liczyc pozycje z gory.
-  static bool negatedBefore(RQLParser::DumppartContext *ctx, const antlr4::Token *number) {
+  static bool negatedBefore(RQLParser::DumppartContext *ctx, const antlr4::tree::ParseTree *number) {
     for (size_t i = 1; i < ctx->children.size(); ++i) {
-      const auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(ctx->children[i]);
-      if (terminal == nullptr || terminal->getSymbol() != number) continue;
+      if (ctx->children[i] != number) continue;
       return ctx->children[i - 1]->getText() == "-";
     }
     return false;
@@ -950,13 +1038,13 @@ class ParserListener : public RQLBaseListener {
   /// z ktorych kazde trzyma otwarty deskryptor pliku - stad granice z rdb/sizeLimits.hpp (A2 M11).
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
-    dump_left  = boundedLiteral("DUMP range bound", ctx->step_back->getText(), 0, rdb::limits::kMaxHistoryReach);
-    if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
-    dump_right = boundedLiteral("DUMP range bound", ctx->step_forward->getText(), 0, rdb::limits::kMaxHistoryReach);
-    if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
+    dump_left =
+        boundedSigned("DUMP range bound", ctx->step_back, negatedBefore(ctx, ctx->step_back), 0, rdb::limits::kMaxHistoryReach);
+    dump_right = boundedSigned("DUMP range bound", ctx->step_forward, negatedBefore(ctx, ctx->step_forward), 0,
+                               rdb::limits::kMaxHistoryReach);
 
     if (ctx->rule_retnetion != nullptr)
-      dump_retention = boundedLiteral("DUMP RETENTION", ctx->rule_retnetion->getText(), 0, rdb::limits::kMaxDumpRetention);
+      dump_retention = bounded("DUMP RETENTION", ctx->rule_retnetion, 0, rdb::limits::kMaxDumpRetention);
     else
       dump_retention = 0;  // Default: no retention
   }
@@ -967,6 +1055,55 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     systemCommand.erase(systemCommand.size() - 1);
     systemCommand.erase(0, 1);
+  }
+
+  /// `LET NAZWA = wartosc` (#440): wpis do tablicy stalych planu, bez zadnego sladu w coreInstance.
+  /// Nazwa rozroznia wielkosc liter jak kazdy ID; `$` jest w ID legalny, ale nie w nazwie stalej,
+  /// bo token odwolania `?NAZWA` go nie obejmuje.
+  void exitLet(RQLParser::LetContext *ctx) override {
+    const std::string name  = ctx->name->getText();
+    const std::string where = position(ctx->name);
+    auto *value             = ctx->let_value();
+    if (name.find('$') != std::string::npos) {
+      reportSemanticError(where + ": constant name " + name + " must not contain '$'");
+      return;
+    }
+    if (const auto found = constants_.find(name); found != constants_.end()) {
+      reportSemanticError(where + ": constant ?" + name + " is already declared on line " + std::to_string(found->second.line));
+      return;
+    }
+    RqlConstant constant{.text = value->getText(), .line = firstLine_ + ctx->name->getLine() - 1};
+    const auto outOfRange = [&](const std::string &text) {
+      reportSemanticError(where + ": value " + text + " of constant ?" + name + " is out of range");
+    };
+    if (value->FLOAT() != nullptr) {
+      constant.kind = RqlConstant::Kind::decimal;
+      if (!parseLiteral<double>(value->FLOAT()->getText())) {
+        outOfRange(constant.text);
+        return;
+      }
+    } else if (value->DIVIDE() != nullptr) {
+      constant.kind  = RqlConstant::Kind::fraction;
+      const auto nom = parseLiteral<int>(value->nom->getText());
+      const auto den = parseLiteral<int>(value->den->getText());
+      if (!nom || !den) {
+        outOfRange(nom ? value->den->getText() : value->nom->getText());
+        return;
+      }
+      if (*den == 0) {
+        reportSemanticError(where + ": fraction " + constant.text + " of constant ?" + name + " has a zero denominator");
+        return;
+      }
+    } else {
+      // Tekst niesie znak, wiec std::stoi przyjmuje takze najmniejsza wartosc int.
+      const auto integer = parseLiteral<int>(constant.text);
+      if (!integer) {
+        outOfRange(constant.text);
+        return;
+      }
+      constant.integer = *integer;
+    }
+    constants_.emplace(name, std::move(constant));
   }
 
   void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) override {
@@ -1021,7 +1158,7 @@ class ParserListener : public RQLBaseListener {
 
   /// Przesuniecie o N rekordow to N rekordow historii zrodla (A2 M11).
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) override {
-    recpToken(STREAM_TIMEMOVE, boundedLiteral("time shift", ctx->DECIMAL()->getText(), 0, rdb::limits::kMaxHistoryReach));
+    recpToken(STREAM_TIMEMOVE, bounded("time shift", ctx->int_const(), 0, rdb::limits::kMaxHistoryReach));
   }
 
   /// Nazwa strumienia. Pozostale alternatywy `stream_factor` - `( e )` i wywolanie
@@ -1035,7 +1172,7 @@ class ParserListener : public RQLBaseListener {
     // `cell[3]` i `cell[$]` musza wejsc z nawiasem: samo ctx->ID() zgubiloby indeks, a to on
     // wskazuje instancje rodziny. Nazwe fizyczna (`cell$3`) podstawia expandStreamGenerators().
     if (ctx->gen_index() != nullptr)
-      program.emplace_back(PUSH_STREAM, ctx->getText());
+      program.emplace_back(PUSH_STREAM, resolvedText(ctx, "stream index"));
     else
       program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
   }
@@ -1114,8 +1251,7 @@ class ParserListener : public RQLBaseListener {
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) override {
     auto fTypeSizeArray = 1;  // Default:1
     // Ta sama granica obowiazuje w gramatyce DESC - .desc czyta takze serwer (A2 M11).
-    if (ctx->type_size != nullptr)
-      fTypeSizeArray = boundedLiteral("field size", ctx->type_size->getText(), 1, rdb::limits::kMaxFieldLength);
+    if (ctx->type_size != nullptr) fTypeSizeArray = bounded("field size", ctx->type_size, 1, rdb::limits::kMaxFieldLength);
     std::list<token> emptyProgram;
     qry.lSchema.emplace_back(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram);
     fType = rdb::BYTE;
@@ -1126,7 +1262,7 @@ namespace {
 
 std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstance, const std::string &inlet,
                                                                std::vector<std::string> &statementKeywords, size_t firstLine,
-                                                               std::string_view sourceFile) {
+                                                               std::string_view sourceFile, RqlConstants &constants) {
   statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -1142,7 +1278,7 @@ std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstan
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
   ParserErrorListener parserErrorListener(parser, firstLine, sourceFile);
-  ParserListener parserListener(coreInstance, parser, firstLine);
+  ParserListener parserListener(coreInstance, parser, firstLine, constants);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
@@ -1201,9 +1337,9 @@ std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstan
 /// ktory wolajacy odrozniaja od bledu planu.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
                                                                   std::vector<std::string> &statementKeywords, size_t firstLine,
-                                                                  std::string_view sourceFile) {
+                                                                  std::string_view sourceFile, RqlConstants &constants) {
   try {
-    return parseRqlText(coreInstance, inlet, statementKeywords, firstLine, sourceFile);
+    return parseRqlText(coreInstance, inlet, statementKeywords, firstLine, sourceFile, constants);
   } catch (const RQLInternalError &error) {
     return {std::string(kInternalCompilerError) + error.message, "UNRECOGNIZED", ""};
   } catch (const std::exception &error) {
@@ -1211,6 +1347,13 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   } catch (...) {
     return {std::string(kInternalCompilerError) + "RQL parser: unknown failure", "UNRECOGNIZED", ""};
   }
+}
+
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile) {
+  RqlConstants portionOnly;
+  return parserRQLString(coreInstance, inlet, statementKeywords, firstLine, sourceFile, portionOnly);
 }
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
@@ -1269,9 +1412,11 @@ std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFi
 
   std::string status = "Empty file.";
   std::vector<std::string> statementKeywords;
+  RqlConstants constants;
   for (const auto &[stmt, firstLine] : readLogicalLines(file)) {
-    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine, sInputFile);
-    status                                    = result;
+    auto [result, first_keyword, stream_name] =
+        parserRQLString(coreInstance, stmt, statementKeywords, firstLine, sInputFile, constants);
+    status = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, stmt);
       return status;

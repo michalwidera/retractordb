@@ -134,14 +134,23 @@ PlanSource parsePlanText(qTree &plan, const std::string &text, std::string_view 
   // Numer wiersza idzie do parsera, bo tylko tutaj wiadomo, w ktorym miejscu pliku stoi
   // instrukcja: parser dostaje ja wyjeta z kontekstu i sam liczylby od jedynki.
   std::vector<std::string> statementKeywords;
+  // Stale LET (#440) obowiazuja w kolejnych instrukcjach tego samego planu i nigdzie dalej.
+  RqlConstants constants;
   for (const auto &[stmt, firstLine] : readLogicalLines(source)) {
-    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt, statementKeywords, firstLine, sourceFile);
+    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt, statementKeywords, firstLine, sourceFile, constants);
     if (status != "OK") {
       retVal.status = status;
       return retVal;
     }
     retVal.lines.emplace_back(stream_name, stmt);
   }
+  // Ostrzezenie, nie blad (#440, O2): nieuzyta stala nie zmienia planu, ale zwykle znaczy literowke.
+  std::vector<std::pair<size_t, std::string>> unused;
+  for (const auto &[name, constant] : constants)
+    if (!constant.used) unused.emplace_back(constant.line, name);
+  std::ranges::sort(unused);
+  for (const auto &[line, name] : unused)
+    retVal.warnings.push_back(std::format("line {}: constant ?{} is declared but never used", line, name));
   return retVal;
 }
 
