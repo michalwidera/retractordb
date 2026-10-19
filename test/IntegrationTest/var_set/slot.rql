@@ -1,0 +1,12 @@
+# Semantyka slotu (#531, D1): zapis reguly w slocie t jest widoczny od slotu t+1 dla kazdego
+# czytelnika - wezla przed regula (early) i za nia (late) w planie, strumienia samej reguly (writer)
+# i strumienia o innym interwale (other).
+STORAGE 'temp'
+VAR X = 0
+DECLARE a INTEGER STREAM src, 1 TEXTFILE 'slot_src.txt'
+DECLARE b INTEGER STREAM slow, 2 TEXTFILE 'slot_slow.txt'
+SELECT src[0], ?X STREAM early FROM src
+SELECT early[0], ?X STREAM writer FROM early
+SELECT writer[0], ?X STREAM late FROM writer
+SELECT slow[0], ?X STREAM other FROM slow
+RULE w ON writer WHEN 1 = 1 DO SET ?X = writer[0]

@@ -1,0 +1,9 @@
+# Konflikt zapisu (#531, D3): dwie reguly pisza ?X w tym samym slocie. Wygrywa pozniejsza w tekscie
+# (tu r_up), choc jej wezel liczy sie w planie wczesniej. Para z conflict_ba.rql.
+STORAGE 'temp'
+VAR X = 0
+DECLARE a INTEGER STREAM src, 1 TEXTFILE 'conflict.txt'
+SELECT src[0], ?X STREAM up FROM src
+SELECT up[0], ?X STREAM down FROM up
+RULE r_down ON down WHEN down[0] > 0 DO SET ?X = down[0]
+RULE r_up ON up WHEN up[0] > 50 DO SET ?X = 0 - up[0]

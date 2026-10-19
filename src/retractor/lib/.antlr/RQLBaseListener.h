@@ -52,6 +52,9 @@ public:
   virtual void enterSystempart(RQLParser::SystempartContext * /*ctx*/) override { }
   virtual void exitSystempart(RQLParser::SystempartContext * /*ctx*/) override { }
 
+  virtual void enterSetpart(RQLParser::SetpartContext * /*ctx*/) override { }
+  virtual void exitSetpart(RQLParser::SetpartContext * /*ctx*/) override { }
+
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }
 

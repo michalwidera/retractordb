@@ -1,0 +1,16 @@
+# Wyrocznia R3 (#531): histereza, licznik i srednia wykladnicza (EMA) ustawiane regulami DO SET,
+# oraz zapis NULL z przepelnienia INTEGER, ktory propaguje sie w nastepnych slotach (D4).
+STORAGE 'temp'
+LET T_ON = 250
+LET T_OFF = 200
+VAR ALARM = 0
+VAR COUNT = 0
+VAR E = 0.0
+VAR P = 1
+DECLARE x INTEGER STREAM ch, 1 TEXTFILE 'signal.txt'
+SELECT ch[0], ?ALARM, ?COUNT, ?E, ?P STREAM st FROM ch
+RULE alarm_on ON st WHEN st[0] >= ?T_ON DO SET ?ALARM = 1
+RULE alarm_off ON st WHEN st[0] < ?T_OFF DO SET ?ALARM = 0
+RULE count ON st WHEN st[0] > 100 DO SET ?COUNT = ?COUNT + 1
+RULE ema ON st WHEN 1 = 1 DO SET ?E = ?E * 0.9 + st[0] * 0.1
+RULE grow ON st WHEN 1 = 1 DO SET ?P = ?P * 1000

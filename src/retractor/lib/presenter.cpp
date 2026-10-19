@@ -182,6 +182,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
             if (r.dump_retention != 0) xout << "\\n RETENTION " << r.dump_retention;
           } else if (r.action == rule::SYSTEM) {
             xout << "DO SYSTEM \\n'" << recordLabel(r.systemCommand) << "'";
+          } else if (r.action == rule::SET) {
+            xout << "DO SET ?" << recordLabel(coreInstance.variables.at(r.setTarget).name);
           } else {
             xout << "UNKNOWN_ACTION";
           };
@@ -191,6 +193,10 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
           if (bShowRuleProgram) {
             xout << "|{";
             recordProgram(xout, r.condition);
+            if (r.action == rule::SET) {
+              xout << "|";
+              recordProgram(xout, r.setValue);
+            }
             xout << "}";
           }
 
@@ -345,6 +351,8 @@ void presenter::qRules() {
         if (r.dump_retention != 0) std::cout << " RETENTION " << r.dump_retention;
       } else if (r.action == rule::SYSTEM) {
         std::cout << "SYSTEM '" << r.systemCommand << "'";
+      } else if (r.action == rule::SET) {
+        std::cout << "SET ?" << coreInstance.variables.at(r.setTarget).name;
       } else {
         std::cout << "UNKNOWN_ACTION";
       }
@@ -430,13 +438,16 @@ void presenter::onlyCompileShowProgram() {
     for (const auto &r : q.lRules) {
       std::cout << "\tRULE " << r.name << '\n';
 
-      for (auto tf1 : r.condition) {
-        if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "CALL2") ||
-            (tf1.getStrCommandID() == "PUSH_VAL") || (tf1.getStrCommandID() == "PUSH_VAR"))
-          std::cout << "\t\t" << tf1 << '\n';
-        else
-          std::cout << "\t\t" << tf1.getStrCommandID() << '\n';
-      }
+      const auto printProgram = [](const std::list<token> &program) {
+        for (auto tf1 : program) {
+          if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "CALL2") ||
+              (tf1.getStrCommandID() == "PUSH_VAL") || (tf1.getStrCommandID() == "PUSH_VAR"))
+            std::cout << "\t\t" << tf1 << '\n';
+          else
+            std::cout << "\t\t" << tf1.getStrCommandID() << '\n';
+        }
+      };
+      printProgram(r.condition);
 
       switch (r.action) {
         case rule::DUMP:
@@ -446,6 +457,11 @@ void presenter::onlyCompileShowProgram() {
         case rule::SYSTEM:
           std::cout << "\t\t" << "DO SYSTEM '" << r.systemCommand << "'";
           break;
+        case rule::SET:
+          // Program prawej strony pod naglowkiem akcji - w tej samej postaci co warunek.
+          std::cout << "\t\t" << "DO SET ?" << coreInstance.variables.at(r.setTarget).name << " =" << '\n';
+          printProgram(r.setValue);
+          continue;
         default:
           std::cout << "\t\t" << "UNKNOWN_ACTION";
           rdb::fatal("presenter::onlyCompileShowProgram: unknown rule action");

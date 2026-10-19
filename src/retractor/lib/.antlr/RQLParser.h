@@ -18,27 +18,28 @@ public:
     DEVICE = 19, STORAGE = 20, ROTATION = 21, SUBSTRAT = 22, RULE = 23, 
     DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, TIMEOUT = 27, VOLATILE = 28, 
     PERSISTENT = 29, DEFAULT = 30, LET = 31, VAR = 32, ON = 33, WHEN = 34, 
-    DUMP = 35, SYSTEM = 36, DO = 37, TO = 38, AND_C = 39, OR_C = 40, NOT_C = 41, 
-    MIN = 42, MAX = 43, AVG = 44, SUMC = 45, TYPE_PROFILE = 46, STRING_PROFILE = 47, 
-    ID = 48, CONST_REF = 49, STRING = 50, FLOAT = 51, DECIMAL = 52, REAL = 53, 
-    IS_EQ = 54, IS_NQ = 55, IS_GR = 56, IS_LS = 57, IS_GE = 58, IS_LE = 59, 
-    EXCLAMATION = 60, DOUBLE_BAR = 61, DOT = 62, UNDERLINE = 63, AT = 64, 
-    SHARP = 65, AND = 66, MOD = 67, DOLLAR = 68, COMMA = 69, SEMI = 70, 
-    COLON = 71, DOUBLE_COLON = 72, STAR = 73, DIVIDE = 74, PLUS = 75, MINUS = 76, 
-    BIT_NOT = 77, BIT_OR = 78, BIT_XOR = 79, SPACE = 80, COMMENT = 81, LINE_COMMENT2 = 82
+    DUMP = 35, SYSTEM = 36, SET = 37, DO = 38, TO = 39, AND_C = 40, OR_C = 41, 
+    NOT_C = 42, MIN = 43, MAX = 44, AVG = 45, SUMC = 46, TYPE_PROFILE = 47, 
+    STRING_PROFILE = 48, ID = 49, CONST_REF = 50, STRING = 51, FLOAT = 52, 
+    DECIMAL = 53, REAL = 54, IS_EQ = 55, IS_NQ = 56, IS_GR = 57, IS_LS = 58, 
+    IS_GE = 59, IS_LE = 60, EXCLAMATION = 61, DOUBLE_BAR = 62, DOT = 63, 
+    UNDERLINE = 64, AT = 65, SHARP = 66, AND = 67, MOD = 68, DOLLAR = 69, 
+    COMMA = 70, SEMI = 71, COLON = 72, DOUBLE_COLON = 73, STAR = 74, DIVIDE = 75, 
+    PLUS = 76, MINUS = 77, BIT_NOT = 78, BIT_OR = 79, BIT_XOR = 80, SPACE = 81, 
+    COMMENT = 82, LINE_COMMENT2 = 83
   };
 
   enum {
     RuleProg = 0, RuleDefault_statement = 1, RuleLet_statement = 2, RuleLet_value = 3, 
     RuleVar_statement = 4, RuleInt_const = 5, RuleCompiler_option = 6, RuleSelect_statement = 7, 
     RuleDeclare_statement = 8, RuleRule_statement = 9, RuleDumppart = 10, 
-    RuleSystempart = 11, RuleRational_se = 12, RuleRetention_from = 13, 
-    RuleFraction_rule = 14, RuleField_declaration = 15, RuleField_type = 16, 
-    RuleSelect_list = 17, RuleField_id = 18, RuleUnary_op_expression = 19, 
-    RuleAsterisk = 20, RuleExpression = 21, RuleLogic = 22, RuleExpression_logic = 23, 
-    RuleTerm_logic = 24, RuleExpression_factor = 25, RuleTerm = 26, RuleStream_expression = 27, 
-    RuleStream_factor = 28, RuleGen_index = 29, RuleAgregator = 30, RuleStream_fn_call = 31, 
-    RuleWindow_agg = 32, RuleFunction_call = 33
+    RuleSystempart = 11, RuleSetpart = 12, RuleRational_se = 13, RuleRetention_from = 14, 
+    RuleFraction_rule = 15, RuleField_declaration = 16, RuleField_type = 17, 
+    RuleSelect_list = 18, RuleField_id = 19, RuleUnary_op_expression = 20, 
+    RuleAsterisk = 21, RuleExpression = 22, RuleLogic = 23, RuleExpression_logic = 24, 
+    RuleTerm_logic = 25, RuleExpression_factor = 26, RuleTerm = 27, RuleStream_expression = 28, 
+    RuleStream_factor = 29, RuleGen_index = 30, RuleAgregator = 31, RuleStream_fn_call = 32, 
+    RuleWindow_agg = 33, RuleFunction_call = 34
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -70,6 +71,7 @@ public:
   class Rule_statementContext;
   class DumppartContext;
   class SystempartContext;
+  class SetpartContext;
   class Rational_seContext;
   class Retention_fromContext;
   class Fraction_ruleContext;
@@ -386,6 +388,7 @@ public:
     antlr4::tree::TerminalNode* ID(size_t i);
     DumppartContext *dumppart();
     SystempartContext *systempart();
+    SetpartContext *setpart();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -428,6 +431,24 @@ public:
   };
 
   SystempartContext* systempart();
+
+  class  SetpartContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *target = nullptr;
+    RQLParser::Expression_factorContext *value = nullptr;
+    SetpartContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *SET();
+    antlr4::tree::TerminalNode *IS_EQ();
+    antlr4::tree::TerminalNode *CONST_REF();
+    Expression_factorContext *expression_factor();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  SetpartContext* setpart();
 
   class  Rational_seContext : public antlr4::ParserRuleContext {
   public:

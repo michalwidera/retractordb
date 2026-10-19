@@ -59,6 +59,9 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 /// - [compiler.compiler.12~1] przez importFrom dopisywać do planu węzły źródła nieobecne w nim, z pominięciem dyrektyw, zwracać ich nazwy i ograniczać współdzielenie SELECT w następnej kompilacji do tych węzłów, tak aby nie przepisać istniejących instancji strumieni.
 /// - [compiler.compiler.13~1] przez reset kasować stan zebrany podczas kompilacji, zachowując powiązanie z tym samym planem, tak aby kompilacja nowego planu nie widziała strumieni poprzedniego.
 /// - [compiler.compiler.14~1] przez unboundedDiskStreams zwracać strumienie wynikowe zapisywane na dysku bez granicy retencji wraz z powodem.
+/// - [compiler.compiler.15~1] program prawej strony akcji SET (#531) prowadzić przez te same kontrole, rozwiązanie odwołań i uproszczenia co warunek reguły,
+///   a plan, w którym jego typ nie jest typem zmiennej z deklaracji albo nie daje się ustalić, odrzucać z pozycją celu, nazwą reguły i oboma typami (D4);
+///   regułę SET na rodzinie generatora strumieni odrzucać, bo jej kopie w instancjach pisałyby jedną zmienną z tym samym numerem w tekście.
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
   compiler() = delete;

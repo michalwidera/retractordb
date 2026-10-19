@@ -1,0 +1,15 @@
+# Szkic uc14 (#531): parking - bilans zajetosci od startu i korekta wolnym taktem. W slocie korekty
+# balance i correct pisza ?OCC; correct stoi pozniej w tekscie i wygrywa (D3). Takt dobowy 86400
+# przeskalowany do 20, pojemnosc 400 do 40.
+STORAGE 'temp'
+LET CAPACITY = 40
+VAR OCC = 0
+VAR FULL = 0
+DECLARE vin INTEGER, vout INTEGER STREAM gate, 1 TEXTFILE 'uc14_gate.txt'
+DECLARE counted INTEGER STREAM recount, 20 TEXTFILE 'uc14_recount.txt'
+SELECT gate[0], gate[1], ?OCC, ?FULL STREAM parking FROM gate
+SELECT recount[0] STREAM recount_tick FROM recount
+RULE balance ON parking WHEN 1 = 1 DO SET ?OCC = ?OCC + (parking[0] - parking[1])
+RULE full_on ON parking WHEN ?OCC >= ?CAPACITY DO SET ?FULL = 1
+RULE full_off ON parking WHEN ?OCC <= (?CAPACITY - 5) DO SET ?FULL = 0
+RULE correct ON recount_tick WHEN 1 = 1 DO SET ?OCC = recount_tick[0]
