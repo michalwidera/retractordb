@@ -24,8 +24,10 @@ Allowed options:
   -l [ --hello ]                 diagnostic - hello db world
   -k [ --kill ]                  kill xretractor server
   -d [ --dir ]                   list of queries
-  -y [ --yaml ]                  yaml output format for --dir, --detail and
-                                 --bus
+  -v [ --vars ]                  list plan variables (VAR) with their current
+                                 values
+  -y [ --yaml ]                  yaml output format for --dir, --detail, --vars
+                                 and --bus
   -j [ --jsonl ]                 versioned JSON Lines API output
   -i [ --idle-timeout ] arg (=0) JSONL idle timeout in ms; 0 disables
   -r [ --raw ]                   raw output mode (default)
@@ -53,7 +55,7 @@ without warranty of any kind. For more information, see the LICENSE file.
 
 ## Before you call xqry
 
-Server-directed commands (`--select`, `--detail`, `--adhoc`, `--reset`, `--dir`, `--hello`, and `--kill`) require a running `xretractor` instance. Without one, a request such as `xqry -d` normally ends with an IPC error:
+Server-directed commands (`--select`, `--detail`, `--adhoc`, `--reset`, `--dir`, `--vars`, `--hello`, and `--kill`) require a running `xretractor` instance. Without one, a request such as `xqry -d` normally ends with an IPC error:
 
 ```
 $ xqry -d
@@ -86,9 +88,24 @@ str2  | 1/2      | 0    | 0     |               | 0
 | `location` | source file of a declared stream (`FILE '...'`); empty for computed streams |
 | `cap` | buffer capacity in records, as computed by the compiler |
 
+## Listing plan variables - `xqry -v`
+
+`-v` (`--vars`) prints the `VAR` variables of the running plan, one row per variable in declaration order, in the same table form as `-d`. `type` is the type of the declared literal; `value` is the value committed at the end of the last slot (a `DO SET` becomes visible from the next slot), `null` when the variable holds NULL. Before the first slot every variable shows its declared value.
+
+```
+$ xqry -v
+name  | type     | value
+------+----------+------
+COUNT | INTEGER  | 42
+GAIN  | FLOAT    | 0.5
+RATIO | RATIONAL | 1/3
+```
+
+A plan without variables prints the header alone; an instance without a plan prints `no active plan` and exits with `0`, as `-d` does. With `-y` the list is a YAML document (`variables: []` when there is nothing to list). `--jsonl` does not support `-v`. Variables are read-only from `xqry`; only rules (`DO SET`) change them.
+
 ## One command at a time
 
-`-s`, `-t`, `-a`, `-q`, `-d`, `-b` and `-l` each do something different, so giving two of them at once is refused with exit code `22` instead of silently running the first one. This also stops a whole class of typos: boost glues a value onto a short option, so `xqry -t str1 -yaml` parses as `-y -a ml`, i.e. an ad-hoc query `ml` sent to the server instead of the requested detail.
+`-s`, `-t`, `-a`, `-q`, `-d`, `-v`, `-b` and `-l` each do something different, so giving two of them at once is refused with exit code `22` instead of silently running the first one. This also stops a whole class of typos: boost glues a value onto a short option, so `xqry -t str1 -yaml` parses as `-y -a ml`, i.e. an ad-hoc query `ml` sent to the server instead of the requested detail.
 
 `-k` is not part of the set - `xqry -s <stream> -m N -k` (kill after the element budget) and `xqry -k -a "..."` are deliberate combinations.
 
@@ -100,7 +117,7 @@ Without an explicit target, a single live instance is selected automatically. Wh
 
 - `--select` and `--detail` go to the instance that publishes the named stream.
 - `--adhoc` goes to the common owner of its recognized source streams. A query spanning multiple instances is rejected, and a query with no recognized source requires `--server`.
-- Instance-wide commands (`--dir`, `--hello`, `--kill`, and `--reset`) are ambiguous and require `--server`.
+- Instance-wide commands (`--dir`, `--vars`, `--hello`, `--kill`, and `--reset`) are ambiguous and require `--server`.
 
 `--bus` does not select or contact an instance. Use it to discover valid server names and their streams.
 

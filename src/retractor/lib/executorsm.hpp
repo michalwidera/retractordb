@@ -75,6 +75,7 @@ class dataModel;
 ///   Zakres testow: `it_env_error_exit-rotation-reserve` (rezerwacja numeru przy starcie i po --reset: EIO), `it_env_error_exit-run` (błąd środowiska w slocie: EIO; błąd silnika w slocie: EXIT_FAILURE), `it_fatal_exit_path-run`.
 /// - [executorsm.executorsm.20~1] przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
 ///   Zakres testow: `it_signal_stop-run` (wyjście kodem 0 we wszystkich trybach; część C: subskrybent kończy się kodem 0 na znaczniku po każdym sygnale i po kill). Kontrola strukturalna: ipcServer.stop() i removeAllObjects() przed `return` w executorsm::run.
+/// - [executorsm.executorsm.21~1] obsługiwać komendę vars: dla każdej zmiennej VAR planu, w kolejności deklaracji, nazwę, typ z deklaracji i wartość zatwierdzoną na końcu ostatniego slotu (NULL jako null), dla planu bez zmiennych pustą listę, a przy braku planu i w trakcie zamykania odpowiedź jak na get.
 struct executorsm {
   /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
   rdb::Refusal initializationError;
@@ -128,6 +129,9 @@ struct executorsm {
   /// w commandProcessor - teraz skladany z wartosci w miejscu wykrycia.
   static ptree engineErrorResponse(std::string_view command, const std::string &message);
   static ptree collectStreamsParameters();
+  /// Odpowiedz na 'vars' (#531, etap D): zmienne VAR planu w kolejnosci deklaracji. Wolajacy trzyma
+  /// plan_epoch_mutex, wiec odczyt wypada miedzy slotami.
+  static ptree collectVariables();
   static ptree getAdHoc(const std::string &adHocQuery);
   static ptree attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName);
 

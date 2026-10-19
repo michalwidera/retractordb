@@ -608,3 +608,47 @@ std::expected<std::string, selectResult> qry::detailShowYaml(const std::string &
 
   return retval.str();
 }
+
+std::expected<std::optional<ptree>, selectResult> qry::varsNode() {
+  ptree pt = netClient("vars", "");
+  // Odpowiedz na 'vars' niesie `db.vars` zamiast `db.stream`; kazda inna przechodzi sitem 'get',
+  // wiec instancja bezczynna, zamykanie i milczacy serwer daja te same werdykty co --dir.
+  if (!pt.get_optional<std::string>("error.response") && pt.get_child_optional("db.vars")) return pt;
+  answerVerdict verdict = classifyAnswer(pt);
+  if (verdict == answerVerdict::idle) return std::nullopt;
+  // Lista strumieni zamiast listy zmiennych to odpowiedz nieprawidlowa, nie sukces.
+  if (verdict == answerVerdict::streams) verdict = answerVerdict::malformed;
+  SPDLOG_ERROR("qry::vars: {}", describe(verdict));
+  return std::unexpected(toSelectResult(verdict));
+}
+
+std::expected<std::string, selectResult> qry::vars() {
+  const auto ptvars = varsNode();
+  if (!ptvars) return std::unexpected(ptvars.error());
+  if (!*ptvars) return std::string(constants::kNoActivePlanReply) + "\n";
+
+  std::vector<std::vector<std::string>> rows;
+  for (const auto &v : (*ptvars)->get_child("db.vars"))
+    rows.push_back({v.second.get<std::string>(""), v.second.get<std::string>("type"), v.second.get<std::string>("value")});
+  return columnTable({"name", "type", "value"}, rows);
+}
+
+std::expected<std::string, selectResult> qry::varsYaml() {
+  const auto ptvars = varsNode();
+  if (!ptvars) return std::unexpected(ptvars.error());
+
+  std::stringstream retval;
+  retval << "---\napiVersion: xqry/v1\n";
+  // Plan bez zmiennych i instancja bezczynna daja dokument z pusta lista, jak `--dir -y`.
+  if (!*ptvars || (*ptvars)->get_child("db.vars").empty()) {
+    retval << "variables: []\n";
+    return retval.str();
+  }
+  retval << "variables:\n";
+  for (const auto &v : (*ptvars)->get_child("db.vars")) {
+    retval << indent << "- name: " << v.second.get<std::string>("") << "\n";
+    retval << indent << indent << "type: " << v.second.get<std::string>("type") << "\n";
+    retval << indent << indent << "value: " << v.second.get<std::string>("value") << "\n";
+  }
+  return retval.str();
+}

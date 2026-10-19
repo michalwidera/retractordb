@@ -3,6 +3,7 @@
 #include <expected>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -68,6 +69,7 @@ const char *toString(selectResult result);
 /// - [qry.qry.13~1] przez detailShow i detailShowYaml zwracać nazwę, okres, zapytanie oraz pola strumienia z typami, a dla nieznanego strumienia, instancji bezczynnej, zamykania lub braku odpowiedzi, także przy przeładowaniu planu między get i detail, odpowiedni werdykt zamiast wyjątku.
 /// - [qry.qry.14~1] przez jsonCommand wypisywać na stdout zdarzenia JSON w wersji 1, jedno na wiersz: pong dla hello, streams dla dir, schema dla detail, a dla select schema, kolejne record z wartościami i null oraz end z przyczyną limit albo server_stopped_or_reloaded, a każdą porażkę zgłaszać zdarzeniem error z kodem i kodem wyjścia 1.
 ///   Ograniczenie: st_api_real wymaga osobnego zbudowania i wykonania przez test-api; sam ninja test nie wykonuje protokolu strumieniowego API.
+/// - [qry.qry.15~1] przez vars zwracać tabelę zmiennych VAR planu z nazwą, typem i wartością w kolejności z odpowiedzi serwera, a przez varsYaml dokument YAML z tą samą listą albo z pustą listą dla planu bez zmiennych i instancji bezczynnej; dla instancji bezczynnej vars zwraca wydruk braku planu, a dla braku odpowiedzi, odpowiedzi bez listy zmiennych lub zamykania obie zwracają werdykt zamiast wydruku.
 class qry {
   int elemLimitCnt{0};
   int serverNoDataTimeoutMs_{kDefaultServerNoDataTimeoutMs};
@@ -79,6 +81,9 @@ class qry {
   /// wydruku detalu, bo rozstrzygniecie "jest / nie ma" nalezy do serwera i nie moze zalezec
   /// od wybranego formatu.
   std::expected<boost::property_tree::ptree, selectResult> detailNode(const std::string & /*input*/);
+
+  /// Odpowiedz serwera na 'vars', pusta dla instancji bezczynnej (wartosc, jak w dir()), albo werdykt.
+  std::expected<std::optional<boost::property_tree::ptree>, selectResult> varsNode();
 
  public:
   formatMode outputFormatMode{formatMode::RAW};
@@ -112,6 +117,10 @@ class qry {
   /// kodem wyjscia i bez slowa na stderr, mimo ze kazdy z nich to inna naprawa.
   std::expected<std::string, selectResult> detailShow(const std::string & /*input*/);
   std::expected<std::string, selectResult> detailShowYaml(const std::string & /*input*/);
+  /// Zmienne VAR planu (#531, etap D) - nazwa, typ z deklaracji i wartosc zatwierdzona po ostatnim
+  /// slocie - albo werdykt, jak dir().
+  std::expected<std::string, selectResult> vars();
+  std::expected<std::string, selectResult> varsYaml();
   virtual boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/);
   virtual ~qry();
 };
