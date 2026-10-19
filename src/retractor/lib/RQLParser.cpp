@@ -1324,7 +1324,7 @@ class ParserListener : public RQLBaseListener {
         break;
     }
     variable->variable = coreInstance.variables.size();
-    coreInstance.variables.push_back({.name = ctx->name->getText(), .initial = std::move(initial)});
+    coreInstance.variables.push_back({.name = ctx->name->getText(), .initial = std::move(initial), .line = variable->line});
     constants_.emplace(ctx->name->getText(), std::move(*variable));
   }
 
@@ -1586,6 +1586,15 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet) {
   std::vector<std::string> ignoredKeywords;
   return parserRQLString(coreInstance, inlet, ignoredKeywords, 1);
+}
+
+/// Wpis zmiennej niesie tylko indeks i wiersz: parser rozpoznaje zmienna po `variable`, zanim
+/// siegnie po rodzaj i tekst literalu, ktore maja znaczenie wylacznie dla stalej LET.
+RqlConstants planVariableNames(const qTree &plan) {
+  RqlConstants names;
+  for (size_t i = 0; i < plan.variables.size(); ++i)
+    names.emplace(plan.variables[i].name, RqlConstant{.line = plan.variables[i].line, .variable = i});
+  return names;
 }
 
 /// Wiersze logiczne pliku RQL: komentarze usuniete, kontynuacje `\\` sklejone.

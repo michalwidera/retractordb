@@ -5649,8 +5649,8 @@ TEST(xparser, var_refusals_name_the_variable_the_context_and_its_position) {
 TEST(xparser, var_lives_within_one_plan) {
   // covers: rqlparser.parser-rql-string.14~1
   const std::string use = "SELECT ?X STREAM o FROM s";
-  // Kanal ad-hoc parsuje z pusta tablica: zmienna planu nie jest w nim widoczna (D7, etap A),
-  // mimo ze jej deklaracja stoi w qTree::variables kopii planu.
+  // Przeciazenie bez tablicy parsuje z pusta tablica: zmienna planu nie jest w nim widoczna, mimo ze
+  // jej deklaracja stoi w qTree::variables. Kanal ad-hoc podaje tablice planVariableNames() - nizej.
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan, "VAR X = 1")), "OK");
   EXPECT_EQ(plan.variables.size(), 1U);
@@ -5661,6 +5661,66 @@ TEST(xparser, var_lives_within_one_plan) {
   qTree next;
   EXPECT_NE(parsePlanText(next, std::string(kLetHeader) + "\n" + use).status.find("is not declared"), std::string::npos);
   EXPECT_TRUE(next.variables.empty());
+}
+
+TEST(xparser, adhoc_sees_plan_variables_but_not_plan_constants) {
+  // covers: rqlparser.plan-variable-names.1~1, rqlparser.plan-variable-names.2~1
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, "LET C = 2\nVAR K = 3\nVAR H = 0.5\n" + std::string(kLetHeader) +
+                                    "\nSELECT s[0] * ?C, ?K, ?H STREAM o FROM s\nRULE r ON o WHEN o[0] > ?K DO SET ?K = o[0]")
+                .status,
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+
+  const RqlConstants names = planVariableNames(plan);
+  ASSERT_EQ(names.size(), 2U);
+  EXPECT_FALSE(names.contains("C"));
+  EXPECT_EQ(names.at("K").variable.value_or(99), 0U);
+  EXPECT_EQ(names.at("H").variable.value_or(99), 1U);
+  EXPECT_EQ(names.at("K").line, 2U);
+
+  // Jak executorsm::getAdHoc: kopia zywego planu, tablica z kopii, kompilacja kopii.
+  const auto adhoc = [&plan](const std::string &rql, qTree &copy) {
+    copy                        = plan;
+    RqlConstants planNames      = planVariableNames(copy);
+    std::vector<std::string> kw = {};
+    const std::string status    = std::get<0>(parserRQLString(copy, rql, kw, 1, {}, planNames));
+    return status == "OK" ? compiler(copy).compile() : status;
+  };
+  const auto program = [](const std::list<token> &tokens) {
+    std::ostringstream os;
+    for (const auto &t : tokens)
+      os << t << ";";
+    return os.str();
+  };
+
+  // Odczyt zmiennej planu: ten sam indeks co w planie, typ z deklaracji.
+  qTree read;
+  ASSERT_EQ(adhoc("SELECT o[0], ?H STREAM p FROM o", read), "OK");
+  const auto &fields = read.getQuery("p").lSchema;
+  ASSERT_EQ(fields.size(), 2U);
+  EXPECT_EQ(program(fields.back().lProgram), "PUSH_VAR(H[1]);");
+  EXPECT_EQ(fields.back().field_.rtype, rdb::FLOAT);
+
+  // Regula SET: cel w tablicy planu, numer w tekscie za kazda regula planu (D3).
+  qTree set;
+  ASSERT_EQ(adhoc("RULE count ON o WHEN 1 = 1 DO SET ?K = ?K + 1", set), "OK");
+  const auto &rules = set.getQuery("o").lRules;
+  ASSERT_EQ(rules.size(), 2U);
+  EXPECT_EQ(rules.back().action, rule::SET);
+  EXPECT_EQ(rules.back().setTarget, 0U);
+  EXPECT_GT(rules.back().textOrder, rules.front().textOrder);
+
+  // Stala LET planu nie jest widoczna (#440 O1); kolizja nazwy wskazuje wiersz deklaracji w planie.
+  qTree refused;
+  EXPECT_NE(adhoc("SELECT ?C STREAM p FROM o", refused).find("line 1:7: constant ?C in expression is not declared"),
+            std::string::npos);
+  EXPECT_NE(adhoc("RULE x ON o WHEN 1 = 1 DO SET ?C = 1", refused).find("variable ?C in DO SET is not declared"),
+            std::string::npos);
+  EXPECT_NE(adhoc("VAR K = 1", refused).find("line 1:4: variable ?K is already declared on line 2"), std::string::npos);
+  // D4 w kopii: niezgodny typ prawej strony to odmowa kompilacji.
+  EXPECT_NE(adhoc("RULE x ON o WHEN 1 = 1 DO SET ?K = ?H", refused).find("expression is FLOAT, but variable ?K is INTEGER"),
+            std::string::npos);
 }
 
 // --- DO SET ?NAZWA = wyrazenie (#531, etap B) ------------------------------------------------------

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -18,6 +19,7 @@
 struct planVariable {
   std::string name;        ///< Nazwa bez `?`.
   rdb::descFldVT initial;  ///< Wartosc z deklaracji; jej typ jest typem zmiennej (D4).
+  size_t line{0};          ///< Wiersz deklaracji w pliku planu - do komunikatu kolizji nazwy w ad hoc.
 };
 
 /// Plan zapytan - wektor wezlow w kolejnosci przetwarzania, plus wyszukanie po nazwie.

@@ -54,7 +54,13 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
   // SYSTEM przez kanal ad-hoc bylby wykonaniem dowolnego polecenia powloki na serwerze przez
   // kazdego, kto otworzy segment IPC. W pliku planu autorem reguly jest ten, kto uruchamia
   // usluge - i to jest cala roznica. Akcja zostaje, kanal nie.
-  if (parsed.action != rule::DUMP) return refuse("AdHoc RULE supports DO DUMP only; DO SYSTEM stays available in the plan file");
+  //
+  // SET (#531, D7) przechodzi bez osobnej bramki: kanal `reset` daje temu samemu klientowi IPC caly
+  // plan, z regulami SET wlacznie, wiec regula dolaczona tutaj nie poszerza jego uprawnien. Typ
+  // prawej strony (D4) sprawdza kompilacja kopii nizej. Numer reguly w tekscie nadaje parser z liczby
+  // regul planu, wiec w konflikcie zapisu (D3) regula ad hoc wygrywa z kazda wczesniejsza.
+  if (parsed.action != rule::DUMP && parsed.action != rule::SET)
+    return refuse("AdHoc RULE supports DO DUMP and DO SET only; DO SYSTEM stays available in the plan file");
 
   const long int historyDepth = parsed.dumpRange.first < 0 ? -parsed.dumpRange.first : 0;
 
@@ -111,8 +117,13 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   qTree coreInstanceCopy = *coreInstancePtr;
 
+  // Zapytanie widzi zmienne VAR dzialajacego planu (#531, D7) - czyta je i pisze regula SET - ale nie
+  // jego stale LET, ktore znikaja w parserze (#440 O1). Tablica powstaje z kopii, wiec indeksy
+  // zmiennych sa te same co w zywym planie i jego dataModel.
   std::vector<std::string> statementKeywords;
-  auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery, statementKeywords);
+  RqlConstants planNames = planVariableNames(coreInstanceCopy);
+  auto [parseOut, first_keyword, stream_name] =
+      parserRQLString(coreInstanceCopy, adHocQuery, statementKeywords, 1, {}, planNames);
 
   // Blad skladni rozstrzygamy PRZED first_keyword. Po bledzie parser zwraca "UNRECOGNIZED",
   // a kontrola slowa kluczowego nizej traktuje kazde nieoczekiwane slowo jako USTERKE SILNIKA.

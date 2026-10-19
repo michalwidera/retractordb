@@ -259,13 +259,14 @@ if xqry -d | grep -Eq 'letref|letpair'; then
   exit 1
 fi
 
-# Zmienne VAR (#531, D7): w etapie A deklaracja w kanale ad-hoc to odmowa filtra kanalu, a odczyt
-# `?X` - nieznana nazwa, bo kanal parsuje z pusta tablica nazw. Plan serwera zostaje bez zmian.
+# Zmienne VAR (#531, D7): deklaracja w kanale ad-hoc to odmowa filtra kanalu, a odczyt `?X` - nieznana
+# nazwa, bo kanal zna tylko zmienne dzialajacego planu (etap C), a ten plan ich nie ma. Plan serwera
+# zostaje bez zmian. Odczyt i zapis zmiennych planu w kanale ad-hoc sprawdza it_var_adhoc.
 expect_parse_rejected "VAR X = 1" "'VAR' is not supported"
 expect_parse_rejected "SELECT core0[0] * ?X STREAM varref FROM core0" "line 1:18: constant ?X in expression is not declared"
 expect_parse_rejected $'VAR X = 0\nSELECT core0[0] * ?X STREAM varpair FROM core0' "exactly one SELECT or DECLARE"
-# Akcja DO SET (#531, D7, etap B): cel to zmienna VAR, a kanal nie zna zmiennych planu - odmowa
-# parsowania, regula nie dochodzi do planu.
+# Akcja DO SET (#531, D7): cel to zmienna VAR, a plan nie deklaruje ?X - odmowa parsowania, regula
+# nie dochodzi do planu.
 expect_parse_rejected "RULE varset ON dst WHEN 1 = 1 DO SET ?X = 1" "line 1:37: variable ?X in DO SET is not declared"
 if xqry -d | grep -Eq 'varref|varpair|varset'; then
   echo "odrzucone zapytanie z VAR zmienilo plan serwera"
