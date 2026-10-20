@@ -1,0 +1,24 @@
+# #531 uc15: zatrzask awarii na linii produkcyjnej z kwitowaniem operatora.
+# Symuluje PLC podajacy kod awarii i czujnik sztuki co 1/10 s, panel operatora
+# co 1 s oraz sygnal zmiany. Awaria ustawia LATCH, ktory pamieta ja po ustaniu
+# sygnalu; kwitowanie zwalnia zatrzask, gdy zapamietany FAULT_NOW jest zerowy.
+# Przyklad wymiany stanu miedzy roznymi taktami bez laczenia strumieni.
+# Panel czyta kod awarii z poprzedniego slotu (D1): test obejmuje kwitowanie
+# jednoczesne z nowa awaria oraz odmowe kwitowania awarii juz trwajacej.
+# Licznik sztuk czyta stary LATCH i zeruje sie na sygnal zmiany.
+# Zmiana co 28800 -> 10 s; takty PLC i panelu pozostaja takie jak w szkicu.
+STORAGE 'temp'
+VAR LATCH = 0
+VAR FAULT_NOW = 0
+VAR PIECES = 0
+DECLARE code INTEGER, piece INTEGER STREAM plc, 1/10 TEXTFILE 'plc.txt'
+DECLARE ack INTEGER STREAM panel, 1 TEXTFILE 'panel.txt'
+DECLARE n INTEGER STREAM shift, 10 TEXTFILE 'shift.txt'
+SELECT plc[0], plc[1], ?LATCH, ?PIECES STREAM line FROM plc
+SELECT panel[0] STREAM panel_tick FROM panel
+SELECT shift[0] STREAM shift_tick FROM shift
+RULE fault_set ON line WHEN line[0] != 0 DO SET ?LATCH = 1
+RULE fault_now ON line WHEN 1 = 1 DO SET ?FAULT_NOW = line[0]
+RULE count ON line WHEN line[1] = 1 AND ?LATCH = 0 DO SET ?PIECES = ?PIECES + 1
+RULE ack ON panel_tick WHEN panel_tick[0] = 1 AND ?FAULT_NOW = 0 DO SET ?LATCH = 0
+RULE shift_reset ON shift_tick WHEN 1 = 1 DO SET ?PIECES = 0

@@ -1,0 +1,22 @@
+# #531 uc12: syntetyczny sygnal SpO2 z pulsoksymetru.
+# Symuluje spokojny odczyt w dziesiatych czesciach procenta i cztery epizody
+# spadku saturacji. BASE jest linia bazowa EMA, DESAT pamieta trwajacy epizod,
+# a EVENTS i N sluza do obliczenia liczby zdarzen na godzine.
+# Przyklad filtra rekurencyjnego z progiem adaptacyjnym i histereza: poczatek
+# zdarzenia przy spadku o 3 punkty procentowe, koniec przy powrocie do 1 punktu.
+# Podczas zdarzenia baza jest zamrozona. BASE ma jawny typ FLOAT, tak jak
+# wynik SET (D4, #546); odczyty widza stan sprzed slotu (D1). W pierwszym
+# rekordzie N=0, wiec indeks jest NULL z dzielenia przez zero. Parametry szkicu
+# bez zmiany.
+STORAGE 'temp'
+VAR BASE : FLOAT = 960.0
+VAR DESAT = 0
+VAR EVENTS = 0
+VAR N = 0
+DECLARE s INTEGER STREAM spo2, 1 TEXTFILE 'spo2.txt'
+SELECT spo2[0], ?BASE, ?DESAT, ?EVENTS, (?EVENTS * 3600) / ?N STREAM odi FROM spo2
+RULE tick ON odi WHEN 1 = 1 DO SET ?N = ?N + 1
+RULE base ON odi WHEN ?DESAT = 0 DO SET ?BASE = (?BASE * 0.99) + (odi[0] * 0.01)
+RULE ev_count ON odi WHEN ?DESAT = 0 AND odi[0] <= (?BASE - 30) DO SET ?EVENTS = ?EVENTS + 1
+RULE ev_start ON odi WHEN odi[0] <= (?BASE - 30) DO SET ?DESAT = 1
+RULE ev_end ON odi WHEN odi[0] >= (?BASE - 10) DO SET ?DESAT = 0

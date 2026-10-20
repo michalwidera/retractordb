@@ -1,0 +1,21 @@
+# #531 uc14: bilans zajetosci parkingu z korekta z kamer.
+# Symuluje liczby wjazdow i wyjazdow w kazdej sekundzie oraz okresowe pelne
+# przeliczenie samochodow. OCC pamieta bilans od startu, FULL sygnalizuje
+# osiagniecie pojemnosci 400 i znika po spadku zajetosci do 395.
+# Przyklad akumulatora o nieograniczonym zasiegu historii i nadpisania stanu
+# z wolnego strumienia. W kazdym slocie korekty balance i correct pisza OCC;
+# pozniejsza regula correct wygrywa (D3), zastepujac takze ruch z tego slotu.
+# Test wymusza napelnienie, oproznienie i korekty. Takt dobowy 86400 -> 40 s;
+# pojemnosc i progi histerezy pozostaja takie jak w szkicu.
+STORAGE 'temp'
+LET CAPACITY = 400
+VAR OCC = 0
+VAR FULL = 0
+DECLARE vin INTEGER, vout INTEGER STREAM gate, 1 TEXTFILE 'gate.txt'
+DECLARE counted INTEGER STREAM recount, 40 TEXTFILE 'recount.txt'
+SELECT gate[0], gate[1], ?OCC, ?FULL STREAM parking FROM gate
+SELECT recount[0] STREAM recount_tick FROM recount
+RULE balance ON parking WHEN 1 = 1 DO SET ?OCC = ?OCC + (parking[0] - parking[1])
+RULE full_on ON parking WHEN ?OCC >= ?CAPACITY DO SET ?FULL = 1
+RULE full_off ON parking WHEN ?OCC <= (?CAPACITY - 5) DO SET ?FULL = 0
+RULE correct ON recount_tick WHEN 1 = 1 DO SET ?OCC = recount_tick[0]

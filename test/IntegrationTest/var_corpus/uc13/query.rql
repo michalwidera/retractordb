@@ -1,0 +1,20 @@
+# #531 uc13: sejsmiczny detektor zdarzen STA/LTA.
+# Symuluje przyspieszenie probkowane z czestotliwoscia 100 Hz: szum tla i dwa
+# silne impulsy. STA i LTA sa krotka i dluga srednia wykladnicza modulu sygnalu.
+# TRIG pamieta zdarzenie; LTA jest wtedy zamrozona, aby impuls nie podnosil tla.
+# Przyklad dwoch filtrow rekurencyjnych sprzezonych z histereza na VAR.
+# Prog wlaczenia wynosi 4*LTA, wylaczenia 1.5*LTA. DUMP na zboczu zachowuje
+# 5 s historii i 10 s przyszlego sygnalu. Filtry i reguly czytaja wartosci
+# sprzed slotu (D1). STA i LTA maja jawny typ FLOAT (#546). Takt,
+# wspolczynniki i zakres DUMP sa takie jak w szkicu.
+STORAGE 'temp'
+VAR STA : FLOAT = 0.0
+VAR LTA : FLOAT = 1.0
+VAR TRIG = 0
+DECLARE a INTEGER STREAM acc, 1/100 TEXTFILE 'acc.txt'
+SELECT acc[0], ?STA, ?LTA, ?TRIG STREAM detector FROM acc
+RULE sta ON detector WHEN 1 = 1 DO SET ?STA = (?STA * 0.9) + (Abs(detector[0]) * 0.1)
+RULE lta ON detector WHEN ?TRIG = 0 DO SET ?LTA = (?LTA * 0.999) + (Abs(detector[0]) * 0.001)
+RULE onset_dump ON detector WHEN ?TRIG = 0 AND ?STA > (4 * ?LTA) DO DUMP -500 TO 1000
+RULE trig_on ON detector WHEN ?STA > (4 * ?LTA) DO SET ?TRIG = 1
+RULE trig_off ON detector WHEN ?STA < (1.5 * ?LTA) DO SET ?TRIG = 0
