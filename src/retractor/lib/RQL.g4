@@ -181,9 +181,12 @@ term_logic          : term_logic IS_EQ term_logic                # ExpEq
                     | expression_factor                          # ExpFactor
                     ;
 
-expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
-                    | expression_factor MINUS expression_factor  # ExpMinus
-                    | term                                       # ExpTerm
+// `+` i `-` (a w `term` takze `*` i `/`) stoja w JEDNEJ alternatywie z `op=`, bo ANTLR4
+// nadaje wczesniejszej alternatywie wyzszy priorytet. Do 2026-10-20 byly to dwie osobne
+// alternatywy i `+` wiazal mocniej niz `-`: `a - b + c` liczylo sie jako `a - (b + c)`,
+// a `a / b * c` jako `a / (b * c)` (#441). Teraz oba pietra sa lewostronne i rowne.
+expression_factor   : expression_factor op=(PLUS | MINUS) expression_factor  # ExpAddSub
+                    | term                                                  # ExpTerm
                     ;
 
 // Potegowanie `a^b`. Stoi PIERWSZE, wiec wiaze mocniej niz `*` i `/`: `a*b^2` to `a*(b^2)`.
@@ -202,8 +205,7 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 // (`#` przeplot, `&` i `%` rozplot, `@` okno, `$` indeks generatora, `:` szerokosc
 // to_string), wiec wybor nie zabiera niczego innego.
 term                : <assoc=right> term BIT_XOR term  # ExpPow
-                    | term STAR term               # ExpMult
-                    | term DIVIDE term             # ExpDiv
+                    | term op=(STAR | DIVIDE) term # ExpMulDiv
                     | '(' expression_factor ')'    # ExpIn
                     | '-'? FLOAT                   # ExpFloat
                     | '-'? DECIMAL                 # ExpDec

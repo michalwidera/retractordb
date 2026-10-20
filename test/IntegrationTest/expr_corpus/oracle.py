@@ -19,10 +19,8 @@ Model typow (kontrakt, nie implementacja):
   liczy sie w int (promocja C++), FLOAT w float32, dzielenie przez zero daje NULL;
 * porownanie i wynik logiczny nad napisem to INTEGER 1/0.
 
-Pierwszenstwo operatorow jest KONWENCJONALNE (`+`/`-` rowne, `*`/`/` rowne, `^` prawostronne).
-Gramatyka RQL.g4 ma dzis inna drabine (`a - b + c` liczy jako `a - (b + c)`, `a / b * c` jako
-`a / (b * c)`) - to zgloszony defekt, a nie kontrakt. Wyrocznia nie przepisuje go do siebie:
-wyrazenie, ktorego wartosc zalezy od tej roznicy, jest odrzucane jako zle dobrane do korpusu.
+Pierwszenstwo operatorow jest KONWENCJONALNE (`+`/`-` rowne, `*`/`/` rowne, `^` prawostronne),
+tak samo jak w RQL.g4 od naprawy #441.
 
     python3 oracle.py <plan.rql> <wypis run.sh>
 """
@@ -324,9 +322,6 @@ def call(name, arg):
 TOKEN = re.compile(r"\s*(?:(?P<num>\d+\.\d*|\d+)|(?P<str>'[^']*')|(?P<id>[A-Za-z_]\w*)|(?P<op>!=|<=|>=|[-+*/^()\[\]:=<>]))")
 
 CONVENTIONAL = {"+": (1, "L"), "-": (1, "L"), "*": (2, "L"), "/": (2, "L"), "^": (3, "R")}
-# Drabina z RQL.g4 - wczesniejsza alternatywa wiaze mocniej. Tylko do wykrycia wyrazen,
-# ktorych wartosc od niej zalezy.
-GRAMMAR = {"-": (1, "L"), "+": (2, "L"), "/": (3, "L"), "*": (4, "L"), "^": (5, "R")}
 
 
 def tokenize(text):
@@ -589,12 +584,7 @@ def check_plan(plan_path, out_path):
             if reducer.lower() != "avg":
                 raise SystemExit(f"reduktor {reducer} poza modelem wyroczni")
             rows = [[reduce_avg(r)] for r in rows]
-        trees = []
-        for e in exprs:
-            tree = parse(e)
-            if tree != parse(e, GRAMMAR):
-                errors.append(f"{name}: wyrazenie {e!r} zalezy od drabiny pierwszenstwa RQL.g4 - nie nadaje sie do korpusu")
-            trees.append(tree)
+        trees = [parse(e) for e in exprs]
         expected = [[evaluate(t, row) for t in trees] for row in rows]
         streams[name] = expected
         if not expected:

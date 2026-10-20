@@ -744,11 +744,13 @@ class ParserListener : public RQLBaseListener {
     recpToken(PUSH_ID2, resolvedText(ctx, "generator index"));
   }
 
-  void exitExpPlus(RQLParser::ExpPlusContext *ctx) override { recpToken(ADD); }
-  void exitExpMinus(RQLParser::ExpMinusContext *ctx) override { recpToken(SUBTRACT); }
+  void exitExpAddSub(RQLParser::ExpAddSubContext *ctx) override {
+    recpToken(ctx->op->getType() == RQLParser::PLUS ? ADD : SUBTRACT);
+  }
   void exitExpPow(RQLParser::ExpPowContext *ctx) override { recpToken(POWER); }
-  void exitExpMult(RQLParser::ExpMultContext *ctx) override { recpToken(MULTIPLY); }
-  void exitExpDiv(RQLParser::ExpDivContext *ctx) override { recpToken(DIVIDE); }
+  void exitExpMulDiv(RQLParser::ExpMulDivContext *ctx) override {
+    recpToken(ctx->op->getType() == RQLParser::STAR ? MULTIPLY : DIVIDE);
+  }
   void exitExpAnd(RQLParser::ExpAndContext *ctx) override { recpToken(AND); }
   void exitExpOr(RQLParser::ExpOrContext *ctx) override { recpToken(OR); }
   void exitExpEq(RQLParser::ExpEqContext *ctx) override { recpToken(CMP_EQUAL); }
