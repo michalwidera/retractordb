@@ -17,6 +17,8 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+// cpp_int z RQLParser.cpp siega po EOF, ktore antlr4-runtime.h nizej usuwa - stad przed nim.
+#include <boost/multiprecision/cpp_int.hpp>
 
 #include "fatalError.hpp"
 #include "logCapture.hpp"

@@ -1,7 +1,8 @@
-# Plan odrzucany przez `xqry --reset` (D4): FLOAT do zmiennej INTEGER. Odmowa nie moze zmienic
+# Plan odrzucany przez `xqry --reset` (D4): FLOAT do zmiennej INTEGER - wyrazenie, bo sam literal
+# przechodzi od #546 (O3) konwersje parsera i do kompilatora nie dociera. Odmowa nie moze zmienic
 # dzialajacego planu ani wartosci jego zmiennych.
 STORAGE 'temp_bad'
 VAR LATCH = 0
 DECLARE v INTEGER STREAM src, 1/10 TEXTFILE 'data.txt'
 SELECT src[0], ?LATCH STREAM st_bad FROM src
-RULE latch_on ON st_bad WHEN st_bad[0] >= 250 DO SET ?LATCH = 0.5
+RULE latch_on ON st_bad WHEN st_bad[0] >= 250 DO SET ?LATCH = st_bad[0] * 0.5

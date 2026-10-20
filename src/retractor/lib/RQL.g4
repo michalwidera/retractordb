@@ -28,9 +28,16 @@ let_value           : sign=MINUS? ( DECIMAL | FLOAT | nom=DECIMAL DIVIDE den=DEC
 // Zmienna planu (#531, etap A): `VAR NAZWA = wartosc`, odwolanie `?NAZWA` - ten sam token co stala
 // LET i ta sama tablica nazw (D5). W przeciwienstwie do LET zmienna zyje w wykonaniu: odwolanie
 // w wyrazeniu skalarnym SELECT i RULE WHEN staje sie tokenem PUSH_VAR, a w kazdym kontekscie
-// strukturalnym jest odmowa (D2). Prawa strona jak w LET; typ zmiennej to typ literalu (D4).
-var_statement       : VAR name=ID IS_EQ let_value
+// strukturalnym jest odmowa (D2). Prawa strona jak w LET; typ zmiennej to typ literalu (D4),
+// chyba ze deklaracja podaje go jawnie: `VAR NAZWA : TYP = literal` (#546, H1-H3). Literal jest
+// wtedy konwertowany do TYPU - do calkowitego tylko dokladnie, do RATIONAL dokladnie z tekstu.
+var_statement       : VAR name=ID (COLON var_type)? IS_EQ let_value
                     # Var
+                    ;
+
+// Typy zmiennej (#546, H2). Osobna regula, nie `field_type`: STRING nie ma literalu w let_value,
+// a BYTE nie da sie ustawic wyrazeniem (BYTE op INTEGER daje INTEGER, funkcji to_byte nie ma).
+var_type            : INTEGER_T | UNSIGNED_T | FLOAT_T | DOUBLE_T | RATIONAL_T
                     ;
 
 // Liczba calkowita w kontekstach etapu A #440: literal albo odwolanie do stalej. Ograniczenia
@@ -383,6 +390,8 @@ UNSIGNED_T:         'UINT'|'Uint';
 INTEGER_T:          'INTEGER'|'Integer';
 FLOAT_T:            'FLOAT'|'Float';
 DOUBLE_T:           'DOUBLE'|'Double';
+// RATIONAL_T tylko w var_type (#546) - pole RATIONAL w DECLARE poza zakresem.
+RATIONAL_T:         'RATIONAL'|'Rational';
 
 SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';

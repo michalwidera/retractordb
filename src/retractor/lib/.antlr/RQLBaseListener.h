@@ -31,6 +31,9 @@ public:
   virtual void enterVar(RQLParser::VarContext * /*ctx*/) override { }
   virtual void exitVar(RQLParser::VarContext * /*ctx*/) override { }
 
+  virtual void enterVar_type(RQLParser::Var_typeContext * /*ctx*/) override { }
+  virtual void exitVar_type(RQLParser::Var_typeContext * /*ctx*/) override { }
+
   virtual void enterInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
   virtual void exitInt_const(RQLParser::Int_constContext * /*ctx*/) override { }
 

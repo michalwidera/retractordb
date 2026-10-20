@@ -1,0 +1,16 @@
+# Plan testu it_var_typed (#546, etap H): jawny typ zmiennej w deklaracji VAR. Licznik UINT
+# zerowany literalem (O3), akumulator DOUBLE nad polem DOUBLE i prog RATIONAL z literalu
+# dziesietnego, przywracany literalem 0.1 (dokladnie 1/10). Pole ?suma - 16777216 pokazuje
+# precyzje akumulatora w szesciu cyfrach wydruku xtrdb: w DOUBLE 16777216 + 1 to 16777217,
+# we FLOAT zostaje 16777216.
+STORAGE 'temp'
+VAR licznik : UINT = 0
+VAR suma : DOUBLE = 0
+VAR prog : RATIONAL = 0.25
+DECLARE x DOUBLE, k INTEGER STREAM src, 1 TEXTFILE 'data.txt'
+SELECT src[0], src[1], ?licznik, ?suma, ?suma - 16777216, ?prog STREAM stan FROM src
+RULE count ON stan WHEN stan[0] > ?prog DO SET ?licznik = ?licznik + 1
+RULE acc ON stan WHEN 1 = 1 DO SET ?suma = ?suma + stan[0]
+RULE up ON stan WHEN stan[1] > 0 DO SET ?prog = ?prog * 2
+RULE zero ON stan WHEN stan[1] < 0 DO SET ?licznik = 0
+RULE back ON stan WHEN stan[1] < 0 DO SET ?prog = 0.1
