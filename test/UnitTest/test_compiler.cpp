@@ -2414,6 +2414,21 @@ TEST(xparser, power_is_right_associative) {
   EXPECT_NE(selectFieldProgram("v^w^2"), selectFieldProgram("(v^w)^2"));
 }
 
+// #441: `+` i `-` maja rowny priorytet i sa lewostronne, tak samo `*` i `/`. Do 2026-10-20
+// byly osobnymi alternatywami, wiec `v-w+1` znaczylo `v-(w+1)`, a `v/w*2` - `v/(w*2)`.
+// Program jest przypiety wprost, a roznica wobec dawnego grupowania sprawdzona osobno.
+TEST(xparser, additive_and_multiplicative_operators_are_left_associative) {
+  EXPECT_EQ(selectFieldProgram("v-w+1"), "PUSH_ID3(v);PUSH_ID3(w);SUBTRACT(0);PUSH_VAL(1);ADD(0);");
+  EXPECT_EQ(selectFieldProgram("v/w*2"), "PUSH_ID3(v);PUSH_ID3(w);DIVIDE(0);PUSH_VAL(2);MULTIPLY(0);");
+  EXPECT_NE(selectFieldProgram("v-w+1"), selectFieldProgram("v-(w+1)"));
+  EXPECT_NE(selectFieldProgram("v/w*2"), selectFieldProgram("v/(w*2)"));
+
+  EXPECT_EQ(selectFieldProgram("v-w-1+2"), selectFieldProgram("((v-w)-1)+2"));
+  EXPECT_EQ(selectFieldProgram("v+w-1"), selectFieldProgram("(v+w)-1"));
+  EXPECT_EQ(selectFieldProgram("v*w/2"), selectFieldProgram("(v*w)/2"));
+  EXPECT_EQ(selectFieldProgram("v-w*2+1"), selectFieldProgram("(v-(w*2))+1"));
+}
+
 // Literal ujemny jest PRYMITYWEM tego samego pietra, a `unary_op_expression` siega po caly
 // `term` - stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
 // Test utrwala stan faktyczny: dla `^` zamiar zapisuje sie nawiasem. Program jest przypiety

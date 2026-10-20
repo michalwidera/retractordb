@@ -999,33 +999,24 @@ public:
    
   };
 
-  class  ExpPlusContext : public Expression_factorContext {
-  public:
-    ExpPlusContext(Expression_factorContext *ctx);
-
-    std::vector<Expression_factorContext *> expression_factor();
-    Expression_factorContext* expression_factor(size_t i);
-    antlr4::tree::TerminalNode *PLUS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpMinusContext : public Expression_factorContext {
-  public:
-    ExpMinusContext(Expression_factorContext *ctx);
-
-    std::vector<Expression_factorContext *> expression_factor();
-    Expression_factorContext* expression_factor(size_t i);
-    antlr4::tree::TerminalNode *MINUS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
   class  ExpTermContext : public Expression_factorContext {
   public:
     ExpTermContext(Expression_factorContext *ctx);
 
     TermContext *term();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpAddSubContext : public Expression_factorContext {
+  public:
+    ExpAddSubContext(Expression_factorContext *ctx);
+
+    antlr4::Token *op = nullptr;
+    std::vector<Expression_factorContext *> expression_factor();
+    Expression_factorContext* expression_factor(size_t i);
+    antlr4::tree::TerminalNode *PLUS();
+    antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -1082,6 +1073,19 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpMulDivContext : public TermContext {
+  public:
+    ExpMulDivContext(TermContext *ctx);
+
+    antlr4::Token *op = nullptr;
+    std::vector<TermContext *> term();
+    TermContext* term(size_t i);
+    antlr4::tree::TerminalNode *STAR();
+    antlr4::tree::TerminalNode *DIVIDE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpWindowAggContext : public TermContext {
   public:
     ExpWindowAggContext(TermContext *ctx);
@@ -1096,17 +1100,6 @@ public:
     ExpUnaryContext(TermContext *ctx);
 
     Unary_op_expressionContext *unary_op_expression();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpMultContext : public TermContext {
-  public:
-    ExpMultContext(TermContext *ctx);
-
-    std::vector<TermContext *> term();
-    TermContext* term(size_t i);
-    antlr4::tree::TerminalNode *STAR();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -1147,17 +1140,6 @@ public:
     ExpFnCallContext(TermContext *ctx);
 
     Function_callContext *function_call();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpDivContext : public TermContext {
-  public:
-    ExpDivContext(TermContext *ctx);
-
-    std::vector<TermContext *> term();
-    TermContext* term(size_t i);
-    antlr4::tree::TerminalNode *DIVIDE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

@@ -158,14 +158,11 @@ public:
   virtual void enterExpGe(RQLParser::ExpGeContext *ctx) = 0;
   virtual void exitExpGe(RQLParser::ExpGeContext *ctx) = 0;
 
-  virtual void enterExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
-  virtual void exitExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
-
-  virtual void enterExpMinus(RQLParser::ExpMinusContext *ctx) = 0;
-  virtual void exitExpMinus(RQLParser::ExpMinusContext *ctx) = 0;
-
   virtual void enterExpTerm(RQLParser::ExpTermContext *ctx) = 0;
   virtual void exitExpTerm(RQLParser::ExpTermContext *ctx) = 0;
+
+  virtual void enterExpAddSub(RQLParser::ExpAddSubContext *ctx) = 0;
+  virtual void exitExpAddSub(RQLParser::ExpAddSubContext *ctx) = 0;
 
   virtual void enterExpIn(RQLParser::ExpInContext *ctx) = 0;
   virtual void exitExpIn(RQLParser::ExpInContext *ctx) = 0;
@@ -179,14 +176,14 @@ public:
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
 
+  virtual void enterExpMulDiv(RQLParser::ExpMulDivContext *ctx) = 0;
+  virtual void exitExpMulDiv(RQLParser::ExpMulDivContext *ctx) = 0;
+
   virtual void enterExpWindowAgg(RQLParser::ExpWindowAggContext *ctx) = 0;
   virtual void exitExpWindowAgg(RQLParser::ExpWindowAggContext *ctx) = 0;
 
   virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
   virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
-
-  virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
-  virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
 
   virtual void enterExpPow(RQLParser::ExpPowContext *ctx) = 0;
   virtual void exitExpPow(RQLParser::ExpPowContext *ctx) = 0;
@@ -199,9 +196,6 @@ public:
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
-
-  virtual void enterExpDiv(RQLParser::ExpDivContext *ctx) = 0;
-  virtual void exitExpDiv(RQLParser::ExpDivContext *ctx) = 0;
 
   virtual void enterExpField(RQLParser::ExpFieldContext *ctx) = 0;
   virtual void exitExpField(RQLParser::ExpFieldContext *ctx) = 0;
