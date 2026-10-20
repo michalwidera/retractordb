@@ -861,7 +861,7 @@ rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<doub
   return std::isfinite(result) ? rdb::descFldVT{result} : rdb::descFldVT{std::monostate{}};
 }
 
-rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
+rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &program, const rdb::payload *payload,
                                                       const std::vector<windowStats> *windowValues,
                                                       const std::vector<rdb::descFldVT> *variables) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.

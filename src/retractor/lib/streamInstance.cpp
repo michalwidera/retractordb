@@ -90,6 +90,15 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
                                                                const std::string &instance,  //
                                                                const int windowIndex,        //
                                                                const int sourceIndexBase) const {
+  RDB_TRY_ASSIGN(const auto window, agseWindow(length, step, instance, windowIndex, sourceIndexBase));
+  return *window;
+}
+
+rdb::Result<const rdb::payload *> streamInstance::agseWindow(const int length,             //
+                                                             const int step,               //
+                                                             const std::string &instance,  //
+                                                             const int windowIndex,        //
+                                                             const int sourceIndexBase) const {
   // Krok niedodatni odrzuca kompilator (compiler::resolveStreamIntervals). Parametr jest staly w planie,
   // wiec w Release nie sprawdzamy go dla kazdego okna.
   assert(step > 0);
@@ -103,25 +112,20 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
   auto recordsCountSrc   = source->getRecordsCount();
   auto descriptorSrcSize = source->descriptor.flatElementCount();
 
-  // 1. Descriptor construction process -- shape depends only on (this stream,
-  //    lengthAbs) and is invariant across intervals, so build it once per
-  //    distinct lengthAbs and reuse afterwards (see agseDescriptorCache_).
-  auto cacheIt = agseDescriptorCache_.find(lengthAbs);
-  if (cacheIt == agseDescriptorCache_.end()) {
+  // 1. Payload okna -- ksztalt zalezy tylko od (ten strumien, lengthAbs) i jest niezmienny
+  //    miedzy przedzialami, wiec powstaje raz na kazda dlugosc (patrz agseWindowCache_).
+  //    Petla nizej zapisuje KAZDY element okna (wartosc albo NULL), wiec nic z poprzedniego
+  //    przedzialu w nim nie zostaje.
+  auto cacheIt = agseWindowCache_.find(lengthAbs);
+  if (cacheIt == agseWindowCache_.end()) {
     rdb::Descriptor descriptor;
     auto [maxType, maxLen] = source->descriptor.widestFieldType();
     for (auto i = 0; i < lengthAbs; ++i) {
       descriptor += rdb::Descriptor{rdb::flatSlotField(instance + "_" + std::to_string(i), maxType, maxLen)};
     }
-    cacheIt = agseDescriptorCache_.emplace(lengthAbs, std::move(descriptor)).first;
+    cacheIt = agseWindowCache_.emplace(lengthAbs, descriptor).first;
   }
-  const rdb::Descriptor &descriptor = cacheIt->second;
-
-  // 2. Construct payload (values are per-interval, so this stays; only the
-  //    intermediate heap allocation is gone -- payload(const Descriptor&)
-  //    already copies the shape into its own member, and NRVO avoids a copy
-  //    on return).
-  rdb::payload result(descriptor);
+  rdb::payload &result = cacheIt->second;
 
   // Okno jest stemplowane KOŃCEM przedziału: rekord o indeksie logicznym n obejmuje
   // spłaszczone pozycje n*step-(lengthAbs-1) ... n*step, więc jego najnowsze pole leży
@@ -140,6 +144,7 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
   rdb::probe::onAgseWindow(lengthAbs);
 
   std::optional<size_t> lastReadPosition;
+  const rdb::payload *record = nullptr;
   for (auto i = 0; i < lengthAbs; ++i) {
     const auto flatPosition = windowStart + i;
     // Dzielenie z zaokrągleniem W DÓŁ, nie w stronę zera: pozycja ujemna (okno sięgające
@@ -159,11 +164,15 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {
         rdb::probe::onAgseRead();
-        RDB_TRY_ASSIGN(const auto status, source->revRead(reversePosition));
-        if (status == rdb::ReadStatus::Ok)
+        // Rekord historii zrodla deklarowanego czytany na miejscu, bez kopii calego rekordu do
+        // payloadu magazynu tylko po to, zeby wziac z niego jedno pole (storage::revPeek).
+        RDB_TRY_ASSIGN(record, source->revPeek(reversePosition));
+        if (record != nullptr) {
           lastReadPosition = reversePosition;
-        else
-          fp.rem = -1;  // rekordu nie ma - element okna zostaje nieokreslony
+        } else {
+          lastReadPosition.reset();  // `record` nie wskazuje juz rekordu z lastReadPosition
+          fp.rem = -1;               // rekordu nie ma - element okna zostaje nieokreslony
+        }
       }
     } else
       fp.rem = -1;  // skip to undefined(-1) as value
@@ -174,7 +183,7 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
       // Poprzednio kazdy element szedl bajty->std::any->cast<std::any>->bajty; przy
       // oknach FIR (mwi_long = 180 elementow) to najciezsza per-element konwersja
       // any<->wariant w processRows. Semantyka bez zmian (nullopt => null).
-      auto valueOpt = source->getPayload()->getItemVT(locSrc);
+      auto valueOpt = record->getItemVT(locSrc);
       // Dodatnia szerokość zachowuje historyczną semantykę RetractorDB:
       // najnowsze pole okna jest pierwsze. Znak minus daje odbicie lustrzane,
       // czyli kolejność napływu.
@@ -187,7 +196,7 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
   RDB_TRY(source->revRead(0));
 
   // 4. Return constructed object.
-  return result;
+  return &result;
 }
 
 enum opType : std::uint8_t { maxop, minop, sumop, avgop };
@@ -311,17 +320,18 @@ rdb::Result<windowStats> streamInstance::reduceRecordWindow(const windowGroup &g
     if (recordIndex < 0 || !std::cmp_less(recordIndex, recordsCountSrc)) continue;
 
     const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
-    RDB_TRY_ASSIGN(const auto status, source->revRead(reversePosition));
-    if (status != rdb::ReadStatus::Ok) continue;  // brak rekordu POMIJAMY, nie zerujemy
+    // Bez kopii rekordu historii do payloadu magazynu - patrz storage::revPeek.
+    RDB_TRY_ASSIGN(const auto record, source->revPeek(reversePosition));
+    if (record == nullptr) continue;  // brak rekordu POMIJAMY, nie zerujemy
 
     // JEDNA wartosc z rekordu: okno idzie po czasie, nie po slotach rekordu (patrz windowGroup).
     // Wyrazenie liczy sie na payloadzie TEGO rekordu - ewaluator dostaje program grupy
     // i historyczny rekord zrodla, a nie biezacy payload wejsciowy konsumenta.
     std::optional<rdb::descFldVT> valueOpt;
     if (group.program.empty()) {
-      valueOpt = source->getPayload()->getItemVT(group.slot);
+      valueOpt = record->getItemVT(group.slot);
     } else {
-      RDB_TRY_ASSIGN(auto computed, windowEvaluator.eval(group.program, source->getPayload()));
+      RDB_TRY_ASSIGN(auto computed, windowEvaluator.eval(group.program, record));
       if (!std::holds_alternative<std::monostate>(computed)) valueOpt = std::move(computed);
     }
     if (!valueOpt.has_value()) continue;  // NULL jest pomijany, nie zerowany
@@ -353,7 +363,7 @@ rdb::Result<windowStats> streamInstance::reduceRecordWindow(const windowGroup &g
     ++stats.count;
   }
 
-  RDB_TRY(source->revRead(0));  // Reset source - ten sam porzadek co w constructAgsePayload
+  RDB_TRY(source->revRead(0));  // Reset source - ten sam porzadek co w agseWindow
 
   // Okno bez ani jednej wartosci nie ma sredniej ani sumy: zostaja NULL-e z konstrukcji.
   if (stats.count == 0) return stats;

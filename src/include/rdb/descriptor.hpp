@@ -41,7 +41,15 @@ class Descriptor {
   // Cache mapowan pol jest mutable: metody odczytu (getItem w payload dziala na
   // const Descriptorze) musza moc leniwie przebudowac mapowania bez kopiowania
   // calego deskryptora. Przebudowa jest idempotentna; obiekt jest logicznie const.
-  mutable std::vector<std::pair<int, int>> flatToDescriptorIndexMap_;
+  // Slot plaski: pozycja w deskryptorze (wpis, indeks w tablicy) oraz szerokosc i typ slotu.
+  // Szerokosc i typ sa tu dla operator==, ktory payload::operator= wola przy kazdej kopii
+  // rekordu - bez nich kazde porownanie przechodzilo przez wpis deskryptora i flatSlotSize().
+  struct FlatSlot {
+    std::pair<int, int> position;
+    int slotSize;
+    rdb::descFld rtype;
+  };
+  mutable std::vector<FlatSlot> flatToDescriptorIndexMap_;
   mutable std::vector<int> fieldByteOffsets_;
   mutable int flattenedFieldCount_ = 0;
   mutable size_t dataSizeBytes_    = 0;
@@ -150,7 +158,7 @@ class Descriptor {
   [[nodiscard]] std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex) const {
     if (fieldMappingsDirty_) rebuildFieldMappings();
     if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) return {};
-    return flatToDescriptorIndexMap_[flatIndex];
+    return flatToDescriptorIndexMap_[flatIndex].position;
   }
 
   [[nodiscard]] bool hasField(const std::string_view fieldName) const {

@@ -128,6 +128,11 @@ struct streamInstance {
                                                                const std::string &instance,  //  instance@(_,_)
                                                                int windowIndex,              //  indeks LOGICZNY okna
                                                                int sourceIndexBase = 0) const;
+  /// To samo okno bez kopii: wskaznik do payloadu okna tej dlugosci trzymanego w agseWindowCache_,
+  /// wazny do nastepnego wywolania z ta sama dlugoscia. Goraca petla (dataModel) kopiuje go
+  /// od razu do payloadu wejsciowego wezla.
+  [[nodiscard]] rdb::Result<const rdb::payload *> agseWindow(int length, int step, const std::string &instance, int windowIndex,
+                                                             int sourceIndexBase) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */
@@ -181,16 +186,16 @@ struct streamInstance {
   streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory);
   dumpManager dumpMgr;
 
-  // Ksztalt deskryptora okna @(step,N) zalezy tylko od (ten strumien, |N|) i jest
-  // niezmienny w trakcie dzialania (source->descriptor sie nie zmienia po
-  // konstrukcji) -- cache unika odtwarzania go (string + alokacja na kazde pole
-  // okna) przy kazdym wywolaniu constructAgsePayload. Wywolywane wylacznie z
-  // watku przetwarzania (dataModel::processRows), nie z watku komunikacji IPC,
-  // wiec bez potrzeby synchronizacji.
-  mutable std::unordered_map<int, rdb::Descriptor> agseDescriptorCache_;
+  // Ksztalt okna @(step,N) zalezy tylko od (ten strumien, |N|) i jest niezmienny
+  // w trakcie dzialania (source->descriptor sie nie zmienia po konstrukcji) --
+  // cache trzyma caly payload okna, wiec agseWindow nie odtwarza deskryptora
+  // (string + alokacja na kazde pole okna) ani bufora rekordu w kazdym przedziale.
+  // Wywolywane wylacznie z watku przetwarzania (dataModel::processRows), nie
+  // z watku komunikacji IPC, wiec bez potrzeby synchronizacji.
+  mutable std::unordered_map<int, rdb::payload> agseWindowCache_;
 
   // Najszerszy typ danych wyjscia i pole wyniku reduktora nad nim (reductionResultField). Deskryptor
-  // wyjscia jest staly od create() - jak przy agseDescriptorCache_ - wiec reduceFieldsInto nie
+  // wyjscia jest staly od create() - jak przy agseWindowCache_ - wiec reduceFieldsInto nie
   // przeglada go w kazdym takcie.
   std::pair<rdb::descFld, int> widestOutputField_{rdb::BYTE, 1};
   std::pair<rdb::descFld, int> reductionField_{rdb::BYTE, 1};
