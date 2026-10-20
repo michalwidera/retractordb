@@ -298,6 +298,22 @@ if(RDB_USE_MOLD)
     )
   endif()
   string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=mold")
+  # mold < 2.37 przy LTO wpisuje do --dependency-file tymczasowy plik
+  # ccXXXX.ltrans0.ltrans.o, ktory gcc kasuje po linkowaniu. CMake czyta te
+  # zaleznosci (CMAKE_LINK_DEPENDS_USE_LINKER), wiec brakujacy plik robil kazdy
+  # program nieaktualnym: kazdy przebieg `all` linkowal wszystko od nowa. Na CI
+  # (Ubuntu noble, mold 2.30.0) cpack wola `preinstall` = `all` bez -j i
+  # it_packaging przekroczyl TIMEOUT 60 (2026-10-20, build-release).
+  execute_process(
+    COMMAND ${CMAKE_CXX_COMPILER} -fuse-ld=mold -Wl,--version
+    OUTPUT_VARIABLE RDB_MOLD_VERSION_OUTPUT
+    ERROR_QUIET)
+  if(RDB_MOLD_VERSION_OUTPUT MATCHES "mold ([0-9]+\\.[0-9]+\\.[0-9]+)"
+     AND CMAKE_MATCH_1 VERSION_LESS 2.37)
+    message(
+      STATUS "mold ${CMAKE_MATCH_1} < 2.37: link dependencies from linker OFF")
+    set(CMAKE_LINK_DEPENDS_USE_LINKER OFF)
+  endif()
 endif()
 
 # Watki sa potrzebne samym probom z PlatformChecks (pthread_mutexattr_setrobust,
