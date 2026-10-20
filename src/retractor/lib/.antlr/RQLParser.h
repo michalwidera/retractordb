@@ -885,6 +885,16 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpNotContext : public Expression_logicContext {
+  public:
+    ExpNotContext(Expression_logicContext *ctx);
+
+    antlr4::tree::TerminalNode *NOT_C();
+    Expression_logicContext *expression_logic();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpTermLogicContext : public Expression_logicContext {
   public:
     ExpTermLogicContext(Expression_logicContext *ctx);
@@ -1080,16 +1090,6 @@ public:
     ExpFieldContext(TermContext *ctx);
 
     Field_idContext *field_id();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpNotContext : public TermContext {
-  public:
-    ExpNotContext(TermContext *ctx);
-
-    antlr4::tree::TerminalNode *NOT_C();
-    TermContext *term();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

@@ -167,7 +167,12 @@ logic               : expression_logic
                     # LogicExpression
                     ;
 
-expression_logic    : expression_logic AND_C expression_logic    # ExpAnd
+// `NOT` jest operatorem LOGIKI, jak w SQL: stoi pierwszy, wiec wiaze mocniej niz AND i OR,
+// a jego operandem jest cale porownanie - `NOT x < 0` to `NOT (x < 0)`. Do 2026-10-20 stal
+// w `term`, obejmowal wiec tylko najblizszy operand: `NOT x < 0` liczylo sie jako
+// `(NOT x) < 0`, czyli nigdy (#441). Poza warunkiem RULE `NOT` nie wystepuje.
+expression_logic    : NOT_C expression_logic                     # ExpNot
+                    | expression_logic AND_C expression_logic    # ExpAnd
                     | expression_logic OR_C expression_logic     # ExpOr
                     | term_logic                                 # ExpTermLogic
                     ;
@@ -217,7 +222,6 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
                     | agregator                    # ExpAgg
                     | DOLLAR                       # ExpGenIndex
                     | function_call                # ExpFnCall
-                    | NOT_C term                   # ExpNot
                     ;
 
 // Drabina priorytetow wyrazenia strumieniowego, od NAJMOCNIEJ wiazacego:
