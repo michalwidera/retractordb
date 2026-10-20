@@ -753,12 +753,29 @@ class ParserListener : public RQLBaseListener {
   }
   void exitExpAnd(RQLParser::ExpAndContext *ctx) override { recpToken(AND); }
   void exitExpOr(RQLParser::ExpOrContext *ctx) override { recpToken(OR); }
-  void exitExpEq(RQLParser::ExpEqContext *ctx) override { recpToken(CMP_EQUAL); }
-  void exitExpNq(RQLParser::ExpNqContext *ctx) override { recpToken(CMP_NOT_EQUAL); }
-  void exitExpGr(RQLParser::ExpGrContext *ctx) override { recpToken(CMP_GT); }
-  void exitExpLs(RQLParser::ExpLsContext *ctx) override { recpToken(CMP_LT); }
-  void exitExpGe(RQLParser::ExpGeContext *ctx) override { recpToken(CMP_GE); }
-  void exitExpLe(RQLParser::ExpLeContext *ctx) override { recpToken(CMP_LE); }
+  void exitTerm_logic(RQLParser::Term_logicContext *ctx) override {
+    if (ctx->op == nullptr) return;
+    switch (ctx->op->getType()) {
+      case RQLParser::IS_EQ:
+        recpToken(CMP_EQUAL);
+        break;
+      case RQLParser::IS_NQ:
+        recpToken(CMP_NOT_EQUAL);
+        break;
+      case RQLParser::IS_GR:
+        recpToken(CMP_GT);
+        break;
+      case RQLParser::IS_LS:
+        recpToken(CMP_LT);
+        break;
+      case RQLParser::IS_GE:
+        recpToken(CMP_GE);
+        break;
+      case RQLParser::IS_LE:
+        recpToken(CMP_LE);
+        break;
+    }
+  }
   void exitExpNot(RQLParser::ExpNotContext *ctx) override { recpToken(NOT); }
 
   /// `-a`, `+a`, `~a` nad dowolnym `term` - operand dolozyl juz swoje tokeny, tu dochodzi operator.

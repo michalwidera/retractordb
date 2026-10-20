@@ -898,94 +898,25 @@ public:
   Expression_logicContext* expression_logic(int precedence);
   class  Term_logicContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *op = nullptr;
     Term_logicContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Term_logicContext() = default;
-    void copyFrom(Term_logicContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
     virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  ExpLsContext : public Term_logicContext {
-  public:
-    ExpLsContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
-    antlr4::tree::TerminalNode *IS_LS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpLeContext : public Term_logicContext {
-  public:
-    ExpLeContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
-    antlr4::tree::TerminalNode *IS_LE();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpNqContext : public Term_logicContext {
-  public:
-    ExpNqContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
-    antlr4::tree::TerminalNode *IS_NQ();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpGrContext : public Term_logicContext {
-  public:
-    ExpGrContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
-    antlr4::tree::TerminalNode *IS_GR();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpFactorContext : public Term_logicContext {
-  public:
-    ExpFactorContext(Term_logicContext *ctx);
-
-    Expression_factorContext *expression_factor();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpEqContext : public Term_logicContext {
-  public:
-    ExpEqContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
+    std::vector<Expression_factorContext *> expression_factor();
+    Expression_factorContext* expression_factor(size_t i);
     antlr4::tree::TerminalNode *IS_EQ();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpGeContext : public Term_logicContext {
-  public:
-    ExpGeContext(Term_logicContext *ctx);
-
-    std::vector<Term_logicContext *> term_logic();
-    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_NQ();
+    antlr4::tree::TerminalNode *IS_GR();
+    antlr4::tree::TerminalNode *IS_LS();
     antlr4::tree::TerminalNode *IS_GE();
+    antlr4::tree::TerminalNode *IS_LE();
+
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
   Term_logicContext* term_logic();
-  Term_logicContext* term_logic(int precedence);
+
   class  Expression_factorContext : public antlr4::ParserRuleContext {
   public:
     Expression_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -1437,7 +1368,6 @@ public:
   bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;
 
   bool expression_logicSempred(Expression_logicContext *_localctx, size_t predicateIndex);
-  bool term_logicSempred(Term_logicContext *_localctx, size_t predicateIndex);
   bool expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex);
   bool termSempred(TermContext *_localctx, size_t predicateIndex);
   bool stream_expressionSempred(Stream_expressionContext *_localctx, size_t predicateIndex);

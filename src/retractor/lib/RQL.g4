@@ -172,13 +172,13 @@ expression_logic    : expression_logic AND_C expression_logic    # ExpAnd
                     | term_logic                                 # ExpTermLogic
                     ;
 
-term_logic          : term_logic IS_EQ term_logic                # ExpEq
-                    | term_logic IS_NQ term_logic                # ExpNq
-                    | term_logic IS_GR term_logic                # ExpGr
-                    | term_logic IS_LS term_logic                # ExpLs
-                    | term_logic IS_GE term_logic                # ExpGe
-                    | term_logic IS_LE term_logic                # ExpLe 
-                    | expression_factor                          # ExpFactor
+// Porownanie ma najwyzej DWA operandy - lancuch `0 < x < 10` jest bledem skladni. Do
+// 2026-10-20 regula byla lewostronnie rekurencyjna z osobna alternatywa na kazdy operator,
+// wiec lancuch przechodzil i liczyl sie cicho: `0 < x < 10` jako `(0 < x) < 10`, czyli
+// zawsze 1, a `0 <= x < 10` jako `0 <= (x < 10)` - tez zawsze 1 (#441). Warunek nie ma
+// nawiasu na poziomie logiki, wiec zadnego lancucha nie da sie zapisac z jawnym zamiarem;
+// zakres zapisuje sie przez AND: `0 < x AND x < 10`.
+term_logic          : expression_factor (op=(IS_EQ | IS_NQ | IS_GR | IS_LS | IS_GE | IS_LE) expression_factor)?
                     ;
 
 // `+` i `-` (a w `term` takze `*` i `/`) stoja w JEDNEJ alternatywie z `op=`, bo ANTLR4

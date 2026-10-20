@@ -2488,6 +2488,33 @@ TEST(xparser, unary_minus_in_a_rule_condition_stays_in_the_condition) {
   EXPECT_EQ(out.str(), "PUSH_ID2(t[0]);NEGATE(0);PUSH_VAL(0);CMP_LT(0);");
 }
 
+// #441: porownanie ma najwyzej dwa operandy. Do 2026-10-20 lancuch przechodzil i liczyl sie
+// cicho - `0 < t[0] < 10` jako `(0 < t[0]) < 10`, czyli zawsze 1. Odmowa wskazuje DRUGI
+// operator, a zakres zapisany przez AND daje dwa porownania i jedno AND.
+TEST(xparser, comparison_chain_in_rule_condition_is_a_syntax_error) {
+  const std::string plan = "DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'\nSELECT v STREAM t FROM a\nRULE r ON t WHEN ";
+  for (const auto &[condition, second] : {std::pair<std::string, std::string>{"0 < t[0] < 10", "<"},
+                                          {"0 <= t[0] < 10", "<"},
+                                          {"t[0] = 1 = 1", "="},
+                                          {"t[0] > 1 != 0", "!="},
+                                          {"t[0] >= 0 AND 1 <= t[0] <= 9", "<="}}) {
+    qTree instance;
+    testing::internal::CaptureStderr();
+    auto [parseResult, keyword, streamName] = parserRQLString(instance, plan + condition + " DO DUMP -1 TO 1\n");
+    testing::internal::GetCapturedStderr();
+    EXPECT_NE(parseResult, "OK") << condition;
+    EXPECT_TRUE(parseResult.contains("'" + second + "'")) << condition << ": " << parseResult;
+  }
+
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, plan + "0 < t[0] AND t[0] < 10 DO DUMP -1 TO 1\n");
+  ASSERT_EQ(parseResult, "OK");
+  std::ostringstream out;
+  for (const auto &tk : instance.getQuery("t").lRules.front().condition)
+    out << tk << ";";
+  EXPECT_EQ(out.str(), "PUSH_VAL(0);PUSH_ID2(t[0]);CMP_LT(0);PUSH_ID2(t[0]);PUSH_VAL(10);CMP_LT(0);AND(0);");
+}
+
 namespace {
 
 /// Kompilacja planu z jednym zrodlem `src` typu `type` i jednym wyrazeniem `expression`

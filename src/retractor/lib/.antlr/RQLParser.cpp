@@ -86,7 +86,7 @@ void rqlParserInitialize() {
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,84,489,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,
+  	4,1,84,468,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,
   	7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,2,14,7,
   	14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,7,20,2,21,7,
   	21,2,22,7,22,2,23,7,23,2,24,7,24,2,25,7,25,2,26,7,26,2,27,7,27,2,28,7,
@@ -108,154 +108,146 @@ void rqlParserInitialize() {
   	1,20,1,20,1,20,1,20,1,20,1,20,1,20,1,20,1,20,3,20,275,8,20,1,21,1,21,
   	1,21,1,21,3,21,281,8,21,1,22,1,22,3,22,285,8,22,1,22,1,22,1,23,1,23,1,
   	24,1,24,1,25,1,25,1,25,1,25,1,25,1,25,1,25,1,25,1,25,5,25,302,8,25,10,
-  	25,12,25,305,9,25,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,
-  	26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,1,26,5,26,328,8,26,10,
-  	26,12,26,331,9,26,1,27,1,27,1,27,1,27,1,27,1,27,5,27,339,8,27,10,27,12,
-  	27,342,9,27,1,28,1,28,1,28,1,28,1,28,1,28,3,28,350,8,28,1,28,1,28,3,28,
-  	354,8,28,1,28,1,28,3,28,358,8,28,1,28,1,28,1,28,1,28,1,28,1,28,1,28,1,
-  	28,1,28,1,28,3,28,370,8,28,1,28,1,28,1,28,1,28,1,28,1,28,5,28,378,8,28,
-  	10,28,12,28,381,9,28,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,
-  	1,29,1,29,1,29,1,29,1,29,3,29,398,8,29,1,29,1,29,1,29,1,29,1,29,1,29,
-  	1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,5,29,418,
-  	8,29,10,29,12,29,421,9,29,1,30,1,30,1,30,1,30,1,30,1,30,1,30,1,30,1,30,
-  	1,30,1,30,3,30,434,8,30,1,31,1,31,1,31,1,31,1,31,1,31,1,31,1,31,3,31,
-  	444,8,31,1,31,1,31,1,31,1,31,1,31,1,31,5,31,452,8,31,10,31,12,31,455,
-  	9,31,1,32,1,32,1,32,1,32,3,32,461,8,32,1,33,1,33,1,33,1,33,1,33,1,34,
-  	1,34,1,34,1,34,1,34,1,34,1,34,1,35,1,35,1,35,1,35,1,35,1,35,1,35,1,35,
-  	1,35,1,35,1,35,1,35,3,35,487,8,35,1,35,0,6,50,52,54,56,58,62,36,0,2,4,
-  	6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,
-  	54,56,58,60,62,64,66,68,70,0,10,1,0,7,11,2,0,51,51,54,54,1,0,21,23,2,
-  	0,49,49,52,52,1,0,29,30,4,0,18,20,31,31,48,48,50,50,1,0,17,20,1,0,77,
-  	78,1,0,75,76,1,0,44,47,544,0,79,1,0,0,0,2,85,1,0,0,0,4,88,1,0,0,0,6,98,
-  	1,0,0,0,8,107,1,0,0,0,10,116,1,0,0,0,12,118,1,0,0,0,14,120,1,0,0,0,16,
-  	123,1,0,0,0,18,149,1,0,0,0,20,180,1,0,0,0,22,192,1,0,0,0,24,206,1,0,0,
-  	0,26,209,1,0,0,0,28,218,1,0,0,0,30,220,1,0,0,0,32,225,1,0,0,0,34,229,
-  	1,0,0,0,36,243,1,0,0,0,38,254,1,0,0,0,40,274,1,0,0,0,42,280,1,0,0,0,44,
-  	284,1,0,0,0,46,288,1,0,0,0,48,290,1,0,0,0,50,292,1,0,0,0,52,306,1,0,0,
-  	0,54,332,1,0,0,0,56,369,1,0,0,0,58,382,1,0,0,0,60,433,1,0,0,0,62,443,
-  	1,0,0,0,64,460,1,0,0,0,66,462,1,0,0,0,68,467,1,0,0,0,70,486,1,0,0,0,72,
-  	80,3,16,8,0,73,80,3,18,9,0,74,80,3,14,7,0,75,80,3,2,1,0,76,80,3,20,10,
-  	0,77,80,3,4,2,0,78,80,3,8,4,0,79,72,1,0,0,0,79,73,1,0,0,0,79,74,1,0,0,
-  	0,79,75,1,0,0,0,79,76,1,0,0,0,79,77,1,0,0,0,79,78,1,0,0,0,80,81,1,0,0,
-  	0,81,79,1,0,0,0,81,82,1,0,0,0,82,83,1,0,0,0,83,84,5,0,0,1,84,1,1,0,0,
-  	0,85,86,5,31,0,0,86,87,5,29,0,0,87,3,1,0,0,0,88,89,5,32,0,0,89,92,5,50,
-  	0,0,90,91,5,73,0,0,91,93,3,10,5,0,92,90,1,0,0,0,92,93,1,0,0,0,93,94,1,
-  	0,0,0,94,95,5,56,0,0,95,96,3,6,3,0,96,5,1,0,0,0,97,99,5,78,0,0,98,97,
-  	1,0,0,0,98,99,1,0,0,0,99,105,1,0,0,0,100,106,5,54,0,0,101,106,5,53,0,
-  	0,102,103,5,54,0,0,103,104,5,76,0,0,104,106,5,54,0,0,105,100,1,0,0,0,
-  	105,101,1,0,0,0,105,102,1,0,0,0,106,7,1,0,0,0,107,108,5,33,0,0,108,111,
-  	5,50,0,0,109,110,5,73,0,0,110,112,3,10,5,0,111,109,1,0,0,0,111,112,1,
-  	0,0,0,112,113,1,0,0,0,113,114,5,56,0,0,114,115,3,6,3,0,115,9,1,0,0,0,
-  	116,117,7,0,0,0,117,11,1,0,0,0,118,119,7,1,0,0,119,13,1,0,0,0,120,121,
-  	7,2,0,0,121,122,7,3,0,0,122,15,1,0,0,0,123,124,5,12,0,0,124,125,3,38,
-  	19,0,125,126,5,13,0,0,126,131,5,50,0,0,127,128,5,1,0,0,128,129,3,12,6,
-  	0,129,130,5,2,0,0,130,132,1,0,0,0,131,127,1,0,0,0,131,132,1,0,0,0,132,
-  	133,1,0,0,0,133,134,5,14,0,0,134,137,3,58,29,0,135,136,5,17,0,0,136,138,
-  	5,52,0,0,137,135,1,0,0,0,137,138,1,0,0,0,138,140,1,0,0,0,139,141,3,30,
-  	15,0,140,139,1,0,0,0,140,141,1,0,0,0,141,143,1,0,0,0,142,144,7,4,0,0,
-  	143,142,1,0,0,0,143,144,1,0,0,0,144,147,1,0,0,0,145,146,5,21,0,0,146,
-  	148,7,5,0,0,147,145,1,0,0,0,147,148,1,0,0,0,148,17,1,0,0,0,149,150,5,
-  	15,0,0,150,155,3,34,17,0,151,152,5,71,0,0,152,154,3,34,17,0,153,151,1,
-  	0,0,0,154,157,1,0,0,0,155,153,1,0,0,0,155,156,1,0,0,0,156,158,1,0,0,0,
-  	157,155,1,0,0,0,158,159,5,13,0,0,159,160,5,50,0,0,160,161,5,71,0,0,161,
-  	162,3,28,14,0,162,163,7,6,0,0,163,169,5,52,0,0,164,166,5,28,0,0,165,167,
-  	5,78,0,0,166,165,1,0,0,0,166,167,1,0,0,0,167,168,1,0,0,0,168,170,3,28,
-  	14,0,169,164,1,0,0,0,169,170,1,0,0,0,170,172,1,0,0,0,171,173,5,25,0,0,
-  	172,171,1,0,0,0,172,173,1,0,0,0,173,175,1,0,0,0,174,176,5,26,0,0,175,
-  	174,1,0,0,0,175,176,1,0,0,0,176,178,1,0,0,0,177,179,5,27,0,0,178,177,
-  	1,0,0,0,178,179,1,0,0,0,179,19,1,0,0,0,180,181,5,24,0,0,181,182,5,50,
-  	0,0,182,183,5,34,0,0,183,184,5,50,0,0,184,185,5,35,0,0,185,186,3,48,24,
-  	0,186,190,5,39,0,0,187,191,3,22,11,0,188,191,3,24,12,0,189,191,3,26,13,
-  	0,190,187,1,0,0,0,190,188,1,0,0,0,190,189,1,0,0,0,191,21,1,0,0,0,192,
-  	194,5,36,0,0,193,195,5,78,0,0,194,193,1,0,0,0,194,195,1,0,0,0,195,196,
-  	1,0,0,0,196,197,3,12,6,0,197,199,5,40,0,0,198,200,5,78,0,0,199,198,1,
-  	0,0,0,199,200,1,0,0,0,200,201,1,0,0,0,201,204,3,12,6,0,202,203,5,16,0,
-  	0,203,205,3,12,6,0,204,202,1,0,0,0,204,205,1,0,0,0,205,23,1,0,0,0,206,
-  	207,5,37,0,0,207,208,5,52,0,0,208,25,1,0,0,0,209,210,5,38,0,0,210,211,
-  	5,51,0,0,211,212,5,56,0,0,212,213,3,54,27,0,213,27,1,0,0,0,214,219,3,
-  	32,16,0,215,219,5,53,0,0,216,219,5,54,0,0,217,219,5,51,0,0,218,214,1,
-  	0,0,0,218,215,1,0,0,0,218,216,1,0,0,0,218,217,1,0,0,0,219,29,1,0,0,0,
-  	220,221,5,16,0,0,221,223,3,12,6,0,222,224,3,12,6,0,223,222,1,0,0,0,223,
-  	224,1,0,0,0,224,31,1,0,0,0,225,226,5,54,0,0,226,227,5,76,0,0,227,228,
-  	5,54,0,0,228,33,1,0,0,0,229,230,5,50,0,0,230,235,3,36,18,0,231,232,5,
-  	1,0,0,232,233,3,12,6,0,233,234,5,2,0,0,234,236,1,0,0,0,235,231,1,0,0,
-  	0,235,236,1,0,0,0,236,35,1,0,0,0,237,244,5,5,0,0,238,244,5,8,0,0,239,
-  	244,5,7,0,0,240,244,5,9,0,0,241,244,5,10,0,0,242,244,5,6,0,0,243,237,
-  	1,0,0,0,243,238,1,0,0,0,243,239,1,0,0,0,243,240,1,0,0,0,243,241,1,0,0,
-  	0,243,242,1,0,0,0,244,37,1,0,0,0,245,255,3,44,22,0,246,251,3,46,23,0,
-  	247,248,5,71,0,0,248,250,3,46,23,0,249,247,1,0,0,0,250,253,1,0,0,0,251,
-  	249,1,0,0,0,251,252,1,0,0,0,252,255,1,0,0,0,253,251,1,0,0,0,254,245,1,
-  	0,0,0,254,246,1,0,0,0,255,39,1,0,0,0,256,275,5,50,0,0,257,258,5,50,0,
-  	0,258,259,5,1,0,0,259,260,5,65,0,0,260,275,5,2,0,0,261,262,5,50,0,0,262,
-  	263,5,64,0,0,263,275,5,50,0,0,264,265,5,50,0,0,265,266,5,1,0,0,266,267,
-  	3,12,6,0,267,268,5,2,0,0,268,275,1,0,0,0,269,270,5,50,0,0,270,271,5,1,
-  	0,0,271,272,3,62,31,0,272,273,5,2,0,0,273,275,1,0,0,0,274,256,1,0,0,0,
-  	274,257,1,0,0,0,274,261,1,0,0,0,274,264,1,0,0,0,274,269,1,0,0,0,275,41,
-  	1,0,0,0,276,277,5,79,0,0,277,281,3,56,28,0,278,279,7,7,0,0,279,281,3,
-  	56,28,0,280,276,1,0,0,0,280,278,1,0,0,0,281,43,1,0,0,0,282,283,5,50,0,
-  	0,283,285,5,64,0,0,284,282,1,0,0,0,284,285,1,0,0,0,285,286,1,0,0,0,286,
-  	287,5,75,0,0,287,45,1,0,0,0,288,289,3,54,27,0,289,47,1,0,0,0,290,291,
-  	3,50,25,0,291,49,1,0,0,0,292,293,6,25,-1,0,293,294,3,52,26,0,294,303,
-  	1,0,0,0,295,296,10,3,0,0,296,297,5,41,0,0,297,302,3,50,25,4,298,299,10,
-  	2,0,0,299,300,5,42,0,0,300,302,3,50,25,3,301,295,1,0,0,0,301,298,1,0,
-  	0,0,302,305,1,0,0,0,303,301,1,0,0,0,303,304,1,0,0,0,304,51,1,0,0,0,305,
-  	303,1,0,0,0,306,307,6,26,-1,0,307,308,3,54,27,0,308,329,1,0,0,0,309,310,
-  	10,7,0,0,310,311,5,56,0,0,311,328,3,52,26,8,312,313,10,6,0,0,313,314,
-  	5,57,0,0,314,328,3,52,26,7,315,316,10,5,0,0,316,317,5,58,0,0,317,328,
-  	3,52,26,6,318,319,10,4,0,0,319,320,5,59,0,0,320,328,3,52,26,5,321,322,
-  	10,3,0,0,322,323,5,60,0,0,323,328,3,52,26,4,324,325,10,2,0,0,325,326,
-  	5,61,0,0,326,328,3,52,26,3,327,309,1,0,0,0,327,312,1,0,0,0,327,315,1,
-  	0,0,0,327,318,1,0,0,0,327,321,1,0,0,0,327,324,1,0,0,0,328,331,1,0,0,0,
-  	329,327,1,0,0,0,329,330,1,0,0,0,330,53,1,0,0,0,331,329,1,0,0,0,332,333,
-  	6,27,-1,0,333,334,3,56,28,0,334,340,1,0,0,0,335,336,10,2,0,0,336,337,
-  	7,7,0,0,337,339,3,54,27,3,338,335,1,0,0,0,339,342,1,0,0,0,340,338,1,0,
-  	0,0,340,341,1,0,0,0,341,55,1,0,0,0,342,340,1,0,0,0,343,344,6,28,-1,0,
-  	344,345,5,3,0,0,345,346,3,54,27,0,346,347,5,4,0,0,347,370,1,0,0,0,348,
-  	350,5,78,0,0,349,348,1,0,0,0,349,350,1,0,0,0,350,351,1,0,0,0,351,370,
-  	5,53,0,0,352,354,5,78,0,0,353,352,1,0,0,0,353,354,1,0,0,0,354,355,1,0,
-  	0,0,355,370,5,54,0,0,356,358,5,78,0,0,357,356,1,0,0,0,357,358,1,0,0,0,
-  	358,359,1,0,0,0,359,370,5,51,0,0,360,370,5,52,0,0,361,370,3,42,21,0,362,
-  	370,3,40,20,0,363,370,3,68,34,0,364,370,3,64,32,0,365,370,5,70,0,0,366,
-  	370,3,70,35,0,367,368,5,43,0,0,368,370,3,56,28,1,369,343,1,0,0,0,369,
-  	349,1,0,0,0,369,353,1,0,0,0,369,357,1,0,0,0,369,360,1,0,0,0,369,361,1,
-  	0,0,0,369,362,1,0,0,0,369,363,1,0,0,0,369,364,1,0,0,0,369,365,1,0,0,0,
-  	369,366,1,0,0,0,369,367,1,0,0,0,370,379,1,0,0,0,371,372,10,14,0,0,372,
-  	373,5,81,0,0,373,378,3,56,28,14,374,375,10,13,0,0,375,376,7,8,0,0,376,
-  	378,3,56,28,14,377,371,1,0,0,0,377,374,1,0,0,0,378,381,1,0,0,0,379,377,
-  	1,0,0,0,379,380,1,0,0,0,380,57,1,0,0,0,381,379,1,0,0,0,382,383,6,29,-1,
-  	0,383,384,3,60,30,0,384,419,1,0,0,0,385,386,10,3,0,0,386,387,5,67,0,0,
-  	387,418,3,58,29,4,388,389,10,2,0,0,389,390,5,77,0,0,390,418,3,58,29,3,
-  	391,392,10,9,0,0,392,393,5,66,0,0,393,394,5,3,0,0,394,395,3,12,6,0,395,
-  	397,5,71,0,0,396,398,5,78,0,0,397,396,1,0,0,0,397,398,1,0,0,0,398,399,
-  	1,0,0,0,399,400,3,12,6,0,400,401,5,4,0,0,401,418,1,0,0,0,402,403,10,8,
-  	0,0,403,404,5,68,0,0,404,418,3,28,14,0,405,406,10,7,0,0,406,407,5,69,
-  	0,0,407,418,3,28,14,0,408,409,10,6,0,0,409,410,5,58,0,0,410,418,3,12,
-  	6,0,411,412,10,5,0,0,412,413,5,78,0,0,413,418,3,28,14,0,414,415,10,4,
-  	0,0,415,416,5,64,0,0,416,418,3,64,32,0,417,385,1,0,0,0,417,388,1,0,0,
-  	0,417,391,1,0,0,0,417,402,1,0,0,0,417,405,1,0,0,0,417,408,1,0,0,0,417,
-  	411,1,0,0,0,417,414,1,0,0,0,418,421,1,0,0,0,419,417,1,0,0,0,419,420,1,
-  	0,0,0,420,59,1,0,0,0,421,419,1,0,0,0,422,434,5,50,0,0,423,424,5,50,0,
-  	0,424,425,5,1,0,0,425,426,3,62,31,0,426,427,5,2,0,0,427,434,1,0,0,0,428,
-  	429,5,3,0,0,429,430,3,58,29,0,430,431,5,4,0,0,431,434,1,0,0,0,432,434,
-  	3,66,33,0,433,422,1,0,0,0,433,423,1,0,0,0,433,428,1,0,0,0,433,432,1,0,
-  	0,0,434,61,1,0,0,0,435,436,6,31,-1,0,436,437,5,3,0,0,437,438,3,62,31,
-  	0,438,439,5,4,0,0,439,444,1,0,0,0,440,444,5,70,0,0,441,444,5,54,0,0,442,
-  	444,5,51,0,0,443,435,1,0,0,0,443,440,1,0,0,0,443,441,1,0,0,0,443,442,
-  	1,0,0,0,444,453,1,0,0,0,445,446,10,6,0,0,446,447,5,75,0,0,447,452,3,62,
-  	31,7,448,449,10,5,0,0,449,450,7,7,0,0,450,452,3,62,31,6,451,445,1,0,0,
-  	0,451,448,1,0,0,0,452,455,1,0,0,0,453,451,1,0,0,0,453,454,1,0,0,0,454,
-  	63,1,0,0,0,455,453,1,0,0,0,456,461,5,44,0,0,457,461,5,45,0,0,458,461,
-  	5,46,0,0,459,461,5,47,0,0,460,456,1,0,0,0,460,457,1,0,0,0,460,458,1,0,
-  	0,0,460,459,1,0,0,0,461,65,1,0,0,0,462,463,7,9,0,0,463,464,5,3,0,0,464,
-  	465,3,58,29,0,465,466,5,4,0,0,466,67,1,0,0,0,467,468,7,9,0,0,468,469,
-  	5,3,0,0,469,470,3,54,27,0,470,471,5,73,0,0,471,472,3,12,6,0,472,473,5,
-  	4,0,0,473,69,1,0,0,0,474,475,5,50,0,0,475,476,5,3,0,0,476,477,3,54,27,
-  	0,477,478,5,4,0,0,478,487,1,0,0,0,479,480,5,50,0,0,480,481,5,3,0,0,481,
-  	482,3,54,27,0,482,483,5,73,0,0,483,484,3,12,6,0,484,485,5,4,0,0,485,487,
-  	1,0,0,0,486,474,1,0,0,0,486,479,1,0,0,0,487,71,1,0,0,0,50,79,81,92,98,
-  	105,111,131,137,140,143,147,155,166,169,172,175,178,190,194,199,204,218,
-  	223,235,243,251,254,274,280,284,301,303,327,329,340,349,353,357,369,377,
-  	379,397,417,419,433,443,451,453,460,486
+  	25,12,25,305,9,25,1,26,1,26,1,26,3,26,310,8,26,1,27,1,27,1,27,1,27,1,
+  	27,1,27,5,27,318,8,27,10,27,12,27,321,9,27,1,28,1,28,1,28,1,28,1,28,1,
+  	28,3,28,329,8,28,1,28,1,28,3,28,333,8,28,1,28,1,28,3,28,337,8,28,1,28,
+  	1,28,1,28,1,28,1,28,1,28,1,28,1,28,1,28,1,28,3,28,349,8,28,1,28,1,28,
+  	1,28,1,28,1,28,1,28,5,28,357,8,28,10,28,12,28,360,9,28,1,29,1,29,1,29,
+  	1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,3,29,377,
+  	8,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,1,29,
+  	1,29,1,29,1,29,1,29,1,29,5,29,397,8,29,10,29,12,29,400,9,29,1,30,1,30,
+  	1,30,1,30,1,30,1,30,1,30,1,30,1,30,1,30,1,30,3,30,413,8,30,1,31,1,31,
+  	1,31,1,31,1,31,1,31,1,31,1,31,3,31,423,8,31,1,31,1,31,1,31,1,31,1,31,
+  	1,31,5,31,431,8,31,10,31,12,31,434,9,31,1,32,1,32,1,32,1,32,3,32,440,
+  	8,32,1,33,1,33,1,33,1,33,1,33,1,34,1,34,1,34,1,34,1,34,1,34,1,34,1,35,
+  	1,35,1,35,1,35,1,35,1,35,1,35,1,35,1,35,1,35,1,35,1,35,3,35,466,8,35,
+  	1,35,0,5,50,54,56,58,62,36,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,
+  	32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,0,11,1,0,
+  	7,11,2,0,51,51,54,54,1,0,21,23,2,0,49,49,52,52,1,0,29,30,4,0,18,20,31,
+  	31,48,48,50,50,1,0,17,20,1,0,77,78,1,0,56,61,1,0,75,76,1,0,44,47,518,
+  	0,79,1,0,0,0,2,85,1,0,0,0,4,88,1,0,0,0,6,98,1,0,0,0,8,107,1,0,0,0,10,
+  	116,1,0,0,0,12,118,1,0,0,0,14,120,1,0,0,0,16,123,1,0,0,0,18,149,1,0,0,
+  	0,20,180,1,0,0,0,22,192,1,0,0,0,24,206,1,0,0,0,26,209,1,0,0,0,28,218,
+  	1,0,0,0,30,220,1,0,0,0,32,225,1,0,0,0,34,229,1,0,0,0,36,243,1,0,0,0,38,
+  	254,1,0,0,0,40,274,1,0,0,0,42,280,1,0,0,0,44,284,1,0,0,0,46,288,1,0,0,
+  	0,48,290,1,0,0,0,50,292,1,0,0,0,52,306,1,0,0,0,54,311,1,0,0,0,56,348,
+  	1,0,0,0,58,361,1,0,0,0,60,412,1,0,0,0,62,422,1,0,0,0,64,439,1,0,0,0,66,
+  	441,1,0,0,0,68,446,1,0,0,0,70,465,1,0,0,0,72,80,3,16,8,0,73,80,3,18,9,
+  	0,74,80,3,14,7,0,75,80,3,2,1,0,76,80,3,20,10,0,77,80,3,4,2,0,78,80,3,
+  	8,4,0,79,72,1,0,0,0,79,73,1,0,0,0,79,74,1,0,0,0,79,75,1,0,0,0,79,76,1,
+  	0,0,0,79,77,1,0,0,0,79,78,1,0,0,0,80,81,1,0,0,0,81,79,1,0,0,0,81,82,1,
+  	0,0,0,82,83,1,0,0,0,83,84,5,0,0,1,84,1,1,0,0,0,85,86,5,31,0,0,86,87,5,
+  	29,0,0,87,3,1,0,0,0,88,89,5,32,0,0,89,92,5,50,0,0,90,91,5,73,0,0,91,93,
+  	3,10,5,0,92,90,1,0,0,0,92,93,1,0,0,0,93,94,1,0,0,0,94,95,5,56,0,0,95,
+  	96,3,6,3,0,96,5,1,0,0,0,97,99,5,78,0,0,98,97,1,0,0,0,98,99,1,0,0,0,99,
+  	105,1,0,0,0,100,106,5,54,0,0,101,106,5,53,0,0,102,103,5,54,0,0,103,104,
+  	5,76,0,0,104,106,5,54,0,0,105,100,1,0,0,0,105,101,1,0,0,0,105,102,1,0,
+  	0,0,106,7,1,0,0,0,107,108,5,33,0,0,108,111,5,50,0,0,109,110,5,73,0,0,
+  	110,112,3,10,5,0,111,109,1,0,0,0,111,112,1,0,0,0,112,113,1,0,0,0,113,
+  	114,5,56,0,0,114,115,3,6,3,0,115,9,1,0,0,0,116,117,7,0,0,0,117,11,1,0,
+  	0,0,118,119,7,1,0,0,119,13,1,0,0,0,120,121,7,2,0,0,121,122,7,3,0,0,122,
+  	15,1,0,0,0,123,124,5,12,0,0,124,125,3,38,19,0,125,126,5,13,0,0,126,131,
+  	5,50,0,0,127,128,5,1,0,0,128,129,3,12,6,0,129,130,5,2,0,0,130,132,1,0,
+  	0,0,131,127,1,0,0,0,131,132,1,0,0,0,132,133,1,0,0,0,133,134,5,14,0,0,
+  	134,137,3,58,29,0,135,136,5,17,0,0,136,138,5,52,0,0,137,135,1,0,0,0,137,
+  	138,1,0,0,0,138,140,1,0,0,0,139,141,3,30,15,0,140,139,1,0,0,0,140,141,
+  	1,0,0,0,141,143,1,0,0,0,142,144,7,4,0,0,143,142,1,0,0,0,143,144,1,0,0,
+  	0,144,147,1,0,0,0,145,146,5,21,0,0,146,148,7,5,0,0,147,145,1,0,0,0,147,
+  	148,1,0,0,0,148,17,1,0,0,0,149,150,5,15,0,0,150,155,3,34,17,0,151,152,
+  	5,71,0,0,152,154,3,34,17,0,153,151,1,0,0,0,154,157,1,0,0,0,155,153,1,
+  	0,0,0,155,156,1,0,0,0,156,158,1,0,0,0,157,155,1,0,0,0,158,159,5,13,0,
+  	0,159,160,5,50,0,0,160,161,5,71,0,0,161,162,3,28,14,0,162,163,7,6,0,0,
+  	163,169,5,52,0,0,164,166,5,28,0,0,165,167,5,78,0,0,166,165,1,0,0,0,166,
+  	167,1,0,0,0,167,168,1,0,0,0,168,170,3,28,14,0,169,164,1,0,0,0,169,170,
+  	1,0,0,0,170,172,1,0,0,0,171,173,5,25,0,0,172,171,1,0,0,0,172,173,1,0,
+  	0,0,173,175,1,0,0,0,174,176,5,26,0,0,175,174,1,0,0,0,175,176,1,0,0,0,
+  	176,178,1,0,0,0,177,179,5,27,0,0,178,177,1,0,0,0,178,179,1,0,0,0,179,
+  	19,1,0,0,0,180,181,5,24,0,0,181,182,5,50,0,0,182,183,5,34,0,0,183,184,
+  	5,50,0,0,184,185,5,35,0,0,185,186,3,48,24,0,186,190,5,39,0,0,187,191,
+  	3,22,11,0,188,191,3,24,12,0,189,191,3,26,13,0,190,187,1,0,0,0,190,188,
+  	1,0,0,0,190,189,1,0,0,0,191,21,1,0,0,0,192,194,5,36,0,0,193,195,5,78,
+  	0,0,194,193,1,0,0,0,194,195,1,0,0,0,195,196,1,0,0,0,196,197,3,12,6,0,
+  	197,199,5,40,0,0,198,200,5,78,0,0,199,198,1,0,0,0,199,200,1,0,0,0,200,
+  	201,1,0,0,0,201,204,3,12,6,0,202,203,5,16,0,0,203,205,3,12,6,0,204,202,
+  	1,0,0,0,204,205,1,0,0,0,205,23,1,0,0,0,206,207,5,37,0,0,207,208,5,52,
+  	0,0,208,25,1,0,0,0,209,210,5,38,0,0,210,211,5,51,0,0,211,212,5,56,0,0,
+  	212,213,3,54,27,0,213,27,1,0,0,0,214,219,3,32,16,0,215,219,5,53,0,0,216,
+  	219,5,54,0,0,217,219,5,51,0,0,218,214,1,0,0,0,218,215,1,0,0,0,218,216,
+  	1,0,0,0,218,217,1,0,0,0,219,29,1,0,0,0,220,221,5,16,0,0,221,223,3,12,
+  	6,0,222,224,3,12,6,0,223,222,1,0,0,0,223,224,1,0,0,0,224,31,1,0,0,0,225,
+  	226,5,54,0,0,226,227,5,76,0,0,227,228,5,54,0,0,228,33,1,0,0,0,229,230,
+  	5,50,0,0,230,235,3,36,18,0,231,232,5,1,0,0,232,233,3,12,6,0,233,234,5,
+  	2,0,0,234,236,1,0,0,0,235,231,1,0,0,0,235,236,1,0,0,0,236,35,1,0,0,0,
+  	237,244,5,5,0,0,238,244,5,8,0,0,239,244,5,7,0,0,240,244,5,9,0,0,241,244,
+  	5,10,0,0,242,244,5,6,0,0,243,237,1,0,0,0,243,238,1,0,0,0,243,239,1,0,
+  	0,0,243,240,1,0,0,0,243,241,1,0,0,0,243,242,1,0,0,0,244,37,1,0,0,0,245,
+  	255,3,44,22,0,246,251,3,46,23,0,247,248,5,71,0,0,248,250,3,46,23,0,249,
+  	247,1,0,0,0,250,253,1,0,0,0,251,249,1,0,0,0,251,252,1,0,0,0,252,255,1,
+  	0,0,0,253,251,1,0,0,0,254,245,1,0,0,0,254,246,1,0,0,0,255,39,1,0,0,0,
+  	256,275,5,50,0,0,257,258,5,50,0,0,258,259,5,1,0,0,259,260,5,65,0,0,260,
+  	275,5,2,0,0,261,262,5,50,0,0,262,263,5,64,0,0,263,275,5,50,0,0,264,265,
+  	5,50,0,0,265,266,5,1,0,0,266,267,3,12,6,0,267,268,5,2,0,0,268,275,1,0,
+  	0,0,269,270,5,50,0,0,270,271,5,1,0,0,271,272,3,62,31,0,272,273,5,2,0,
+  	0,273,275,1,0,0,0,274,256,1,0,0,0,274,257,1,0,0,0,274,261,1,0,0,0,274,
+  	264,1,0,0,0,274,269,1,0,0,0,275,41,1,0,0,0,276,277,5,79,0,0,277,281,3,
+  	56,28,0,278,279,7,7,0,0,279,281,3,56,28,0,280,276,1,0,0,0,280,278,1,0,
+  	0,0,281,43,1,0,0,0,282,283,5,50,0,0,283,285,5,64,0,0,284,282,1,0,0,0,
+  	284,285,1,0,0,0,285,286,1,0,0,0,286,287,5,75,0,0,287,45,1,0,0,0,288,289,
+  	3,54,27,0,289,47,1,0,0,0,290,291,3,50,25,0,291,49,1,0,0,0,292,293,6,25,
+  	-1,0,293,294,3,52,26,0,294,303,1,0,0,0,295,296,10,3,0,0,296,297,5,41,
+  	0,0,297,302,3,50,25,4,298,299,10,2,0,0,299,300,5,42,0,0,300,302,3,50,
+  	25,3,301,295,1,0,0,0,301,298,1,0,0,0,302,305,1,0,0,0,303,301,1,0,0,0,
+  	303,304,1,0,0,0,304,51,1,0,0,0,305,303,1,0,0,0,306,309,3,54,27,0,307,
+  	308,7,8,0,0,308,310,3,54,27,0,309,307,1,0,0,0,309,310,1,0,0,0,310,53,
+  	1,0,0,0,311,312,6,27,-1,0,312,313,3,56,28,0,313,319,1,0,0,0,314,315,10,
+  	2,0,0,315,316,7,7,0,0,316,318,3,54,27,3,317,314,1,0,0,0,318,321,1,0,0,
+  	0,319,317,1,0,0,0,319,320,1,0,0,0,320,55,1,0,0,0,321,319,1,0,0,0,322,
+  	323,6,28,-1,0,323,324,5,3,0,0,324,325,3,54,27,0,325,326,5,4,0,0,326,349,
+  	1,0,0,0,327,329,5,78,0,0,328,327,1,0,0,0,328,329,1,0,0,0,329,330,1,0,
+  	0,0,330,349,5,53,0,0,331,333,5,78,0,0,332,331,1,0,0,0,332,333,1,0,0,0,
+  	333,334,1,0,0,0,334,349,5,54,0,0,335,337,5,78,0,0,336,335,1,0,0,0,336,
+  	337,1,0,0,0,337,338,1,0,0,0,338,349,5,51,0,0,339,349,5,52,0,0,340,349,
+  	3,42,21,0,341,349,3,40,20,0,342,349,3,68,34,0,343,349,3,64,32,0,344,349,
+  	5,70,0,0,345,349,3,70,35,0,346,347,5,43,0,0,347,349,3,56,28,1,348,322,
+  	1,0,0,0,348,328,1,0,0,0,348,332,1,0,0,0,348,336,1,0,0,0,348,339,1,0,0,
+  	0,348,340,1,0,0,0,348,341,1,0,0,0,348,342,1,0,0,0,348,343,1,0,0,0,348,
+  	344,1,0,0,0,348,345,1,0,0,0,348,346,1,0,0,0,349,358,1,0,0,0,350,351,10,
+  	14,0,0,351,352,5,81,0,0,352,357,3,56,28,14,353,354,10,13,0,0,354,355,
+  	7,9,0,0,355,357,3,56,28,14,356,350,1,0,0,0,356,353,1,0,0,0,357,360,1,
+  	0,0,0,358,356,1,0,0,0,358,359,1,0,0,0,359,57,1,0,0,0,360,358,1,0,0,0,
+  	361,362,6,29,-1,0,362,363,3,60,30,0,363,398,1,0,0,0,364,365,10,3,0,0,
+  	365,366,5,67,0,0,366,397,3,58,29,4,367,368,10,2,0,0,368,369,5,77,0,0,
+  	369,397,3,58,29,3,370,371,10,9,0,0,371,372,5,66,0,0,372,373,5,3,0,0,373,
+  	374,3,12,6,0,374,376,5,71,0,0,375,377,5,78,0,0,376,375,1,0,0,0,376,377,
+  	1,0,0,0,377,378,1,0,0,0,378,379,3,12,6,0,379,380,5,4,0,0,380,397,1,0,
+  	0,0,381,382,10,8,0,0,382,383,5,68,0,0,383,397,3,28,14,0,384,385,10,7,
+  	0,0,385,386,5,69,0,0,386,397,3,28,14,0,387,388,10,6,0,0,388,389,5,58,
+  	0,0,389,397,3,12,6,0,390,391,10,5,0,0,391,392,5,78,0,0,392,397,3,28,14,
+  	0,393,394,10,4,0,0,394,395,5,64,0,0,395,397,3,64,32,0,396,364,1,0,0,0,
+  	396,367,1,0,0,0,396,370,1,0,0,0,396,381,1,0,0,0,396,384,1,0,0,0,396,387,
+  	1,0,0,0,396,390,1,0,0,0,396,393,1,0,0,0,397,400,1,0,0,0,398,396,1,0,0,
+  	0,398,399,1,0,0,0,399,59,1,0,0,0,400,398,1,0,0,0,401,413,5,50,0,0,402,
+  	403,5,50,0,0,403,404,5,1,0,0,404,405,3,62,31,0,405,406,5,2,0,0,406,413,
+  	1,0,0,0,407,408,5,3,0,0,408,409,3,58,29,0,409,410,5,4,0,0,410,413,1,0,
+  	0,0,411,413,3,66,33,0,412,401,1,0,0,0,412,402,1,0,0,0,412,407,1,0,0,0,
+  	412,411,1,0,0,0,413,61,1,0,0,0,414,415,6,31,-1,0,415,416,5,3,0,0,416,
+  	417,3,62,31,0,417,418,5,4,0,0,418,423,1,0,0,0,419,423,5,70,0,0,420,423,
+  	5,54,0,0,421,423,5,51,0,0,422,414,1,0,0,0,422,419,1,0,0,0,422,420,1,0,
+  	0,0,422,421,1,0,0,0,423,432,1,0,0,0,424,425,10,6,0,0,425,426,5,75,0,0,
+  	426,431,3,62,31,7,427,428,10,5,0,0,428,429,7,7,0,0,429,431,3,62,31,6,
+  	430,424,1,0,0,0,430,427,1,0,0,0,431,434,1,0,0,0,432,430,1,0,0,0,432,433,
+  	1,0,0,0,433,63,1,0,0,0,434,432,1,0,0,0,435,440,5,44,0,0,436,440,5,45,
+  	0,0,437,440,5,46,0,0,438,440,5,47,0,0,439,435,1,0,0,0,439,436,1,0,0,0,
+  	439,437,1,0,0,0,439,438,1,0,0,0,440,65,1,0,0,0,441,442,7,10,0,0,442,443,
+  	5,3,0,0,443,444,3,58,29,0,444,445,5,4,0,0,445,67,1,0,0,0,446,447,7,10,
+  	0,0,447,448,5,3,0,0,448,449,3,54,27,0,449,450,5,73,0,0,450,451,3,12,6,
+  	0,451,452,5,4,0,0,452,69,1,0,0,0,453,454,5,50,0,0,454,455,5,3,0,0,455,
+  	456,3,54,27,0,456,457,5,4,0,0,457,466,1,0,0,0,458,459,5,50,0,0,459,460,
+  	5,3,0,0,460,461,3,54,27,0,461,462,5,73,0,0,462,463,3,12,6,0,463,464,5,
+  	4,0,0,464,466,1,0,0,0,465,453,1,0,0,0,465,458,1,0,0,0,466,71,1,0,0,0,
+  	49,79,81,92,98,105,111,131,137,140,143,147,155,166,169,172,175,178,190,
+  	194,199,204,218,223,235,243,251,254,274,280,284,301,303,309,319,328,332,
+  	336,348,356,358,376,396,398,412,422,430,432,439,465
   };
   staticData->serializedATN = antlr4::atn::SerializedATNView(serializedATNSegment, sizeof(serializedATNSegment) / sizeof(serializedATNSegment[0]));
 
@@ -3198,7 +3190,7 @@ RQLParser::Expression_logicContext* RQLParser::expression_logic(int precedence) 
     previousContext = _localctx;
 
     setState(293);
-    term_logic(0);
+    term_logic();
     _ctx->stop = _input->LT(-1);
     setState(303);
     _errHandler->sync(this);
@@ -3262,331 +3254,103 @@ RQLParser::Term_logicContext::Term_logicContext(ParserRuleContext *parent, size_
   : ParserRuleContext(parent, invokingState) {
 }
 
+std::vector<RQLParser::Expression_factorContext *> RQLParser::Term_logicContext::expression_factor() {
+  return getRuleContexts<RQLParser::Expression_factorContext>();
+}
+
+RQLParser::Expression_factorContext* RQLParser::Term_logicContext::expression_factor(size_t i) {
+  return getRuleContext<RQLParser::Expression_factorContext>(i);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_EQ() {
+  return getToken(RQLParser::IS_EQ, 0);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_NQ() {
+  return getToken(RQLParser::IS_NQ, 0);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_GR() {
+  return getToken(RQLParser::IS_GR, 0);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_LS() {
+  return getToken(RQLParser::IS_LS, 0);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_GE() {
+  return getToken(RQLParser::IS_GE, 0);
+}
+
+tree::TerminalNode* RQLParser::Term_logicContext::IS_LE() {
+  return getToken(RQLParser::IS_LE, 0);
+}
+
 
 size_t RQLParser::Term_logicContext::getRuleIndex() const {
   return RQLParser::RuleTerm_logic;
 }
 
-void RQLParser::Term_logicContext::copyFrom(Term_logicContext *ctx) {
-  ParserRuleContext::copyFrom(ctx);
-}
-
-//----------------- ExpLsContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpLsContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpLsContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpLsContext::IS_LS() {
-  return getToken(RQLParser::IS_LS, 0);
-}
-
-RQLParser::ExpLsContext::ExpLsContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpLsContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::Term_logicContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterExpLs(this);
+    parserListener->enterTerm_logic(this);
 }
-void RQLParser::ExpLsContext::exitRule(tree::ParseTreeListener *listener) {
+
+void RQLParser::Term_logicContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitExpLs(this);
-}
-//----------------- ExpLeContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpLeContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpLeContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpLeContext::IS_LE() {
-  return getToken(RQLParser::IS_LE, 0);
-}
-
-RQLParser::ExpLeContext::ExpLeContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpLeContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpLe(this);
-}
-void RQLParser::ExpLeContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpLe(this);
-}
-//----------------- ExpNqContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpNqContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpNqContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpNqContext::IS_NQ() {
-  return getToken(RQLParser::IS_NQ, 0);
-}
-
-RQLParser::ExpNqContext::ExpNqContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpNqContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpNq(this);
-}
-void RQLParser::ExpNqContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpNq(this);
-}
-//----------------- ExpGrContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpGrContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpGrContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpGrContext::IS_GR() {
-  return getToken(RQLParser::IS_GR, 0);
-}
-
-RQLParser::ExpGrContext::ExpGrContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpGrContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpGr(this);
-}
-void RQLParser::ExpGrContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpGr(this);
-}
-//----------------- ExpFactorContext ------------------------------------------------------------------
-
-RQLParser::Expression_factorContext* RQLParser::ExpFactorContext::expression_factor() {
-  return getRuleContext<RQLParser::Expression_factorContext>(0);
-}
-
-RQLParser::ExpFactorContext::ExpFactorContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpFactorContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpFactor(this);
-}
-void RQLParser::ExpFactorContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpFactor(this);
-}
-//----------------- ExpEqContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpEqContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpEqContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpEqContext::IS_EQ() {
-  return getToken(RQLParser::IS_EQ, 0);
-}
-
-RQLParser::ExpEqContext::ExpEqContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpEqContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpEq(this);
-}
-void RQLParser::ExpEqContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpEq(this);
-}
-//----------------- ExpGeContext ------------------------------------------------------------------
-
-std::vector<RQLParser::Term_logicContext *> RQLParser::ExpGeContext::term_logic() {
-  return getRuleContexts<RQLParser::Term_logicContext>();
-}
-
-RQLParser::Term_logicContext* RQLParser::ExpGeContext::term_logic(size_t i) {
-  return getRuleContext<RQLParser::Term_logicContext>(i);
-}
-
-tree::TerminalNode* RQLParser::ExpGeContext::IS_GE() {
-  return getToken(RQLParser::IS_GE, 0);
-}
-
-RQLParser::ExpGeContext::ExpGeContext(Term_logicContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::ExpGeContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterExpGe(this);
-}
-void RQLParser::ExpGeContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitExpGe(this);
+    parserListener->exitTerm_logic(this);
 }
 
 RQLParser::Term_logicContext* RQLParser::term_logic() {
-   return term_logic(0);
-}
-
-RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
-  ParserRuleContext *parentContext = _ctx;
-  size_t parentState = getState();
-  RQLParser::Term_logicContext *_localctx = _tracker.createInstance<Term_logicContext>(_ctx, parentState);
-  RQLParser::Term_logicContext *previousContext = _localctx;
-  (void)previousContext; // Silence compiler, in case the context is not used by generated code.
-  size_t startState = 52;
-  enterRecursionRule(_localctx, 52, RQLParser::RuleTerm_logic, precedence);
-
-    
+  Term_logicContext *_localctx = _tracker.createInstance<Term_logicContext>(_ctx, getState());
+  enterRule(_localctx, 52, RQLParser::RuleTerm_logic);
+  size_t _la = 0;
 
 #if __cplusplus > 201703L
   auto onExit = finally([=, this] {
 #else
   auto onExit = finally([=] {
 #endif
-    unrollRecursionContexts(parentContext);
+    exitRule();
   });
   try {
-    size_t alt;
     enterOuterAlt(_localctx, 1);
-    _localctx = _tracker.createInstance<ExpFactorContext>(_localctx);
-    _ctx = _localctx;
-    previousContext = _localctx;
-
-    setState(307);
+    setState(306);
     expression_factor(0);
-    _ctx->stop = _input->LT(-1);
-    setState(329);
+    setState(309);
     _errHandler->sync(this);
-    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 33, _ctx);
-    while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
-      if (alt == 1) {
-        if (!_parseListeners.empty())
-          triggerExitRuleEvent();
-        previousContext = _localctx;
-        setState(327);
-        _errHandler->sync(this);
-        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 32, _ctx)) {
-        case 1: {
-          auto newContext = _tracker.createInstance<ExpEqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(309);
 
-          if (!(precpred(_ctx, 7))) throw FailedPredicateException(this, "precpred(_ctx, 7)");
-          setState(310);
-          match(RQLParser::IS_EQ);
-          setState(311);
-          term_logic(8);
-          break;
-        }
-
-        case 2: {
-          auto newContext = _tracker.createInstance<ExpNqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(312);
-
-          if (!(precpred(_ctx, 6))) throw FailedPredicateException(this, "precpred(_ctx, 6)");
-          setState(313);
-          match(RQLParser::IS_NQ);
-          setState(314);
-          term_logic(7);
-          break;
-        }
-
-        case 3: {
-          auto newContext = _tracker.createInstance<ExpGrContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(315);
-
-          if (!(precpred(_ctx, 5))) throw FailedPredicateException(this, "precpred(_ctx, 5)");
-          setState(316);
-          match(RQLParser::IS_GR);
-          setState(317);
-          term_logic(6);
-          break;
-        }
-
-        case 4: {
-          auto newContext = _tracker.createInstance<ExpLsContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(318);
-
-          if (!(precpred(_ctx, 4))) throw FailedPredicateException(this, "precpred(_ctx, 4)");
-          setState(319);
-          match(RQLParser::IS_LS);
-          setState(320);
-          term_logic(5);
-          break;
-        }
-
-        case 5: {
-          auto newContext = _tracker.createInstance<ExpGeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(321);
-
-          if (!(precpred(_ctx, 3))) throw FailedPredicateException(this, "precpred(_ctx, 3)");
-          setState(322);
-          match(RQLParser::IS_GE);
-          setState(323);
-          term_logic(4);
-          break;
-        }
-
-        case 6: {
-          auto newContext = _tracker.createInstance<ExpLeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
-          _localctx = newContext;
-          pushNewRecursionContext(newContext, startState, RuleTerm_logic);
-          setState(324);
-
-          if (!(precpred(_ctx, 2))) throw FailedPredicateException(this, "precpred(_ctx, 2)");
-          setState(325);
-          match(RQLParser::IS_LE);
-          setState(326);
-          term_logic(3);
-          break;
-        }
-
-        default:
-          break;
-        } 
+    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 32, _ctx)) {
+    case 1: {
+      setState(307);
+      antlrcpp::downCast<Term_logicContext *>(_localctx)->op = _input->LT(1);
+      _la = _input->LA(1);
+      if (!((((_la & ~ 0x3fULL) == 0) &&
+        ((1ULL << _la) & 4539628424389459968) != 0))) {
+        antlrcpp::downCast<Term_logicContext *>(_localctx)->op = _errHandler->recoverInline(this);
       }
-      setState(331);
-      _errHandler->sync(this);
-      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 33, _ctx);
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(308);
+      expression_factor(0);
+      break;
     }
+
+    default:
+      break;
+    }
+   
   }
   catch (RecognitionException &e) {
     _errHandler->reportError(this, e);
     _localctx->exception = std::current_exception();
     _errHandler->recover(this, _localctx->exception);
   }
+
   return _localctx;
 }
 
@@ -3683,12 +3447,12 @@ RQLParser::Expression_factorContext* RQLParser::expression_factor(int precedence
     _ctx = _localctx;
     previousContext = _localctx;
 
-    setState(333);
+    setState(312);
     term(0);
     _ctx->stop = _input->LT(-1);
-    setState(340);
+    setState(319);
     _errHandler->sync(this);
-    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 34, _ctx);
+    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 33, _ctx);
     while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
       if (alt == 1) {
         if (!_parseListeners.empty())
@@ -3697,10 +3461,10 @@ RQLParser::Expression_factorContext* RQLParser::expression_factor(int precedence
         auto newContext = _tracker.createInstance<ExpAddSubContext>(_tracker.createInstance<Expression_factorContext>(parentContext, parentState));
         _localctx = newContext;
         pushNewRecursionContext(newContext, startState, RuleExpression_factor);
-        setState(335);
+        setState(314);
 
         if (!(precpred(_ctx, 2))) throw FailedPredicateException(this, "precpred(_ctx, 2)");
-        setState(336);
+        setState(315);
         antlrcpp::downCast<ExpAddSubContext *>(_localctx)->op = _input->LT(1);
         _la = _input->LA(1);
         if (!(_la == RQLParser::PLUS
@@ -3712,12 +3476,12 @@ RQLParser::Expression_factorContext* RQLParser::expression_factor(int precedence
           _errHandler->reportMatch(this);
           consume();
         }
-        setState(337);
+        setState(316);
         expression_factor(3); 
       }
-      setState(342);
+      setState(321);
       _errHandler->sync(this);
-      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 34, _ctx);
+      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 33, _ctx);
     }
   }
   catch (RecognitionException &e) {
@@ -4057,19 +3821,19 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
   try {
     size_t alt;
     enterOuterAlt(_localctx, 1);
-    setState(369);
+    setState(348);
     _errHandler->sync(this);
-    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 38, _ctx)) {
+    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 37, _ctx)) {
     case 1: {
       _localctx = _tracker.createInstance<ExpInContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
 
-      setState(344);
+      setState(323);
       match(RQLParser::T__2);
-      setState(345);
+      setState(324);
       expression_factor(0);
-      setState(346);
+      setState(325);
       match(RQLParser::T__3);
       break;
     }
@@ -4078,15 +3842,15 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpFloatContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(349);
+      setState(328);
       _errHandler->sync(this);
 
       _la = _input->LA(1);
       if (_la == RQLParser::MINUS) {
-        setState(348);
+        setState(327);
         match(RQLParser::MINUS);
       }
-      setState(351);
+      setState(330);
       match(RQLParser::FLOAT);
       break;
     }
@@ -4095,15 +3859,15 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpDecContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(353);
+      setState(332);
       _errHandler->sync(this);
 
       _la = _input->LA(1);
       if (_la == RQLParser::MINUS) {
-        setState(352);
+        setState(331);
         match(RQLParser::MINUS);
       }
-      setState(355);
+      setState(334);
       match(RQLParser::DECIMAL);
       break;
     }
@@ -4112,15 +3876,15 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpConstContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(357);
+      setState(336);
       _errHandler->sync(this);
 
       _la = _input->LA(1);
       if (_la == RQLParser::MINUS) {
-        setState(356);
+        setState(335);
         match(RQLParser::MINUS);
       }
-      setState(359);
+      setState(338);
       match(RQLParser::CONST_REF);
       break;
     }
@@ -4129,7 +3893,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpStringContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(360);
+      setState(339);
       match(RQLParser::STRING);
       break;
     }
@@ -4138,7 +3902,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpUnaryContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(361);
+      setState(340);
       unary_op_expression();
       break;
     }
@@ -4147,7 +3911,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpFieldContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(362);
+      setState(341);
       field_id();
       break;
     }
@@ -4156,7 +3920,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpWindowAggContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(363);
+      setState(342);
       window_agg();
       break;
     }
@@ -4165,7 +3929,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpAggContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(364);
+      setState(343);
       agregator();
       break;
     }
@@ -4174,7 +3938,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpGenIndexContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(365);
+      setState(344);
       match(RQLParser::DOLLAR);
       break;
     }
@@ -4183,7 +3947,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpFnCallContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(366);
+      setState(345);
       function_call();
       break;
     }
@@ -4192,9 +3956,9 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       _localctx = _tracker.createInstance<ExpNotContext>(_localctx);
       _ctx = _localctx;
       previousContext = _localctx;
-      setState(367);
+      setState(346);
       match(RQLParser::NOT_C);
-      setState(368);
+      setState(347);
       term(1);
       break;
     }
@@ -4203,27 +3967,27 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       break;
     }
     _ctx->stop = _input->LT(-1);
-    setState(379);
+    setState(358);
     _errHandler->sync(this);
-    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 40, _ctx);
+    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 39, _ctx);
     while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
       if (alt == 1) {
         if (!_parseListeners.empty())
           triggerExitRuleEvent();
         previousContext = _localctx;
-        setState(377);
+        setState(356);
         _errHandler->sync(this);
-        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 39, _ctx)) {
+        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 38, _ctx)) {
         case 1: {
           auto newContext = _tracker.createInstance<ExpPowContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm);
-          setState(371);
+          setState(350);
 
           if (!(precpred(_ctx, 14))) throw FailedPredicateException(this, "precpred(_ctx, 14)");
-          setState(372);
+          setState(351);
           match(RQLParser::BIT_XOR);
-          setState(373);
+          setState(352);
           term(14);
           break;
         }
@@ -4232,10 +3996,10 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
           auto newContext = _tracker.createInstance<ExpMulDivContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm);
-          setState(374);
+          setState(353);
 
           if (!(precpred(_ctx, 13))) throw FailedPredicateException(this, "precpred(_ctx, 13)");
-          setState(375);
+          setState(354);
           antlrcpp::downCast<ExpMulDivContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == RQLParser::STAR
@@ -4247,7 +4011,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(376);
+          setState(355);
           term(14);
           break;
         }
@@ -4256,9 +4020,9 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
           break;
         } 
       }
-      setState(381);
+      setState(360);
       _errHandler->sync(this);
-      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 40, _ctx);
+      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 39, _ctx);
     }
   }
   catch (RecognitionException &e) {
@@ -4552,30 +4316,30 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
     _ctx = _localctx;
     previousContext = _localctx;
 
-    setState(383);
+    setState(362);
     stream_factor();
     _ctx->stop = _input->LT(-1);
-    setState(419);
+    setState(398);
     _errHandler->sync(this);
-    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 43, _ctx);
+    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 42, _ctx);
     while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
       if (alt == 1) {
         if (!_parseListeners.empty())
           triggerExitRuleEvent();
         previousContext = _localctx;
-        setState(417);
+        setState(396);
         _errHandler->sync(this);
-        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 42, _ctx)) {
+        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 41, _ctx)) {
         case 1: {
           auto newContext = _tracker.createInstance<SExpHashContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(385);
+          setState(364);
 
           if (!(precpred(_ctx, 3))) throw FailedPredicateException(this, "precpred(_ctx, 3)");
-          setState(386);
+          setState(365);
           match(RQLParser::SHARP);
-          setState(387);
+          setState(366);
           stream_expression(4);
           break;
         }
@@ -4584,12 +4348,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpPlusContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(388);
+          setState(367);
 
           if (!(precpred(_ctx, 2))) throw FailedPredicateException(this, "precpred(_ctx, 2)");
-          setState(389);
+          setState(368);
           match(RQLParser::PLUS);
-          setState(390);
+          setState(369);
           stream_expression(3);
           break;
         }
@@ -4598,28 +4362,28 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpAgseContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(391);
+          setState(370);
 
           if (!(precpred(_ctx, 9))) throw FailedPredicateException(this, "precpred(_ctx, 9)");
-          setState(392);
+          setState(371);
           match(RQLParser::AT);
-          setState(393);
+          setState(372);
           match(RQLParser::T__2);
-          setState(394);
+          setState(373);
           antlrcpp::downCast<SExpAgseContext *>(_localctx)->step = int_const();
-          setState(395);
+          setState(374);
           match(RQLParser::COMMA);
-          setState(397);
+          setState(376);
           _errHandler->sync(this);
 
           _la = _input->LA(1);
           if (_la == RQLParser::MINUS) {
-            setState(396);
+            setState(375);
             match(RQLParser::MINUS);
           }
-          setState(399);
+          setState(378);
           antlrcpp::downCast<SExpAgseContext *>(_localctx)->window = int_const();
-          setState(400);
+          setState(379);
           match(RQLParser::T__3);
           break;
         }
@@ -4628,12 +4392,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpAndContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(402);
+          setState(381);
 
           if (!(precpred(_ctx, 8))) throw FailedPredicateException(this, "precpred(_ctx, 8)");
-          setState(403);
+          setState(382);
           match(RQLParser::AND);
-          setState(404);
+          setState(383);
           rational_se();
           break;
         }
@@ -4642,12 +4406,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpModContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(405);
+          setState(384);
 
           if (!(precpred(_ctx, 7))) throw FailedPredicateException(this, "precpred(_ctx, 7)");
-          setState(406);
+          setState(385);
           match(RQLParser::MOD);
-          setState(407);
+          setState(386);
           rational_se();
           break;
         }
@@ -4656,12 +4420,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpTimeMoveContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(408);
+          setState(387);
 
           if (!(precpred(_ctx, 6))) throw FailedPredicateException(this, "precpred(_ctx, 6)");
-          setState(409);
+          setState(388);
           match(RQLParser::IS_GR);
-          setState(410);
+          setState(389);
           int_const();
           break;
         }
@@ -4670,12 +4434,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpMinusContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(411);
+          setState(390);
 
           if (!(precpred(_ctx, 5))) throw FailedPredicateException(this, "precpred(_ctx, 5)");
-          setState(412);
+          setState(391);
           match(RQLParser::MINUS);
-          setState(413);
+          setState(392);
           rational_se();
           break;
         }
@@ -4684,12 +4448,12 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           auto newContext = _tracker.createInstance<SExpAgregate_proformaContext>(_tracker.createInstance<Stream_expressionContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleStream_expression);
-          setState(414);
+          setState(393);
 
           if (!(precpred(_ctx, 4))) throw FailedPredicateException(this, "precpred(_ctx, 4)");
-          setState(415);
+          setState(394);
           match(RQLParser::DOT);
-          setState(416);
+          setState(395);
           agregator();
           break;
         }
@@ -4698,9 +4462,9 @@ RQLParser::Stream_expressionContext* RQLParser::stream_expression(int precedence
           break;
         } 
       }
-      setState(421);
+      setState(400);
       _errHandler->sync(this);
-      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 43, _ctx);
+      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 42, _ctx);
     }
   }
   catch (RecognitionException &e) {
@@ -4762,43 +4526,43 @@ RQLParser::Stream_factorContext* RQLParser::stream_factor() {
     exitRule();
   });
   try {
-    setState(433);
+    setState(412);
     _errHandler->sync(this);
-    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 44, _ctx)) {
+    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 43, _ctx)) {
     case 1: {
       enterOuterAlt(_localctx, 1);
-      setState(422);
+      setState(401);
       match(RQLParser::ID);
       break;
     }
 
     case 2: {
       enterOuterAlt(_localctx, 2);
-      setState(423);
+      setState(402);
       match(RQLParser::ID);
-      setState(424);
+      setState(403);
       match(RQLParser::T__0);
-      setState(425);
+      setState(404);
       gen_index(0);
-      setState(426);
+      setState(405);
       match(RQLParser::T__1);
       break;
     }
 
     case 3: {
       enterOuterAlt(_localctx, 3);
-      setState(428);
+      setState(407);
       match(RQLParser::T__2);
-      setState(429);
+      setState(408);
       stream_expression(0);
-      setState(430);
+      setState(409);
       match(RQLParser::T__3);
       break;
     }
 
     case 4: {
       enterOuterAlt(_localctx, 4);
-      setState(432);
+      setState(411);
       stream_fn_call();
       break;
     }
@@ -4898,33 +4662,33 @@ RQLParser::Gen_indexContext* RQLParser::gen_index(int precedence) {
   try {
     size_t alt;
     enterOuterAlt(_localctx, 1);
-    setState(443);
+    setState(422);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
       case RQLParser::T__2: {
-        setState(436);
+        setState(415);
         match(RQLParser::T__2);
-        setState(437);
+        setState(416);
         gen_index(0);
-        setState(438);
+        setState(417);
         match(RQLParser::T__3);
         break;
       }
 
       case RQLParser::DOLLAR: {
-        setState(440);
+        setState(419);
         match(RQLParser::DOLLAR);
         break;
       }
 
       case RQLParser::DECIMAL: {
-        setState(441);
+        setState(420);
         match(RQLParser::DECIMAL);
         break;
       }
 
       case RQLParser::CONST_REF: {
-        setState(442);
+        setState(421);
         match(RQLParser::CONST_REF);
         break;
       }
@@ -4933,26 +4697,26 @@ RQLParser::Gen_indexContext* RQLParser::gen_index(int precedence) {
       throw NoViableAltException(this);
     }
     _ctx->stop = _input->LT(-1);
-    setState(453);
+    setState(432);
     _errHandler->sync(this);
-    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 47, _ctx);
+    alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 46, _ctx);
     while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
       if (alt == 1) {
         if (!_parseListeners.empty())
           triggerExitRuleEvent();
         previousContext = _localctx;
-        setState(451);
+        setState(430);
         _errHandler->sync(this);
-        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 46, _ctx)) {
+        switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 45, _ctx)) {
         case 1: {
           _localctx = _tracker.createInstance<Gen_indexContext>(parentContext, parentState);
           pushNewRecursionContext(_localctx, startState, RuleGen_index);
-          setState(445);
+          setState(424);
 
           if (!(precpred(_ctx, 6))) throw FailedPredicateException(this, "precpred(_ctx, 6)");
-          setState(446);
+          setState(425);
           match(RQLParser::STAR);
-          setState(447);
+          setState(426);
           gen_index(7);
           break;
         }
@@ -4960,10 +4724,10 @@ RQLParser::Gen_indexContext* RQLParser::gen_index(int precedence) {
         case 2: {
           _localctx = _tracker.createInstance<Gen_indexContext>(parentContext, parentState);
           pushNewRecursionContext(_localctx, startState, RuleGen_index);
-          setState(448);
+          setState(427);
 
           if (!(precpred(_ctx, 5))) throw FailedPredicateException(this, "precpred(_ctx, 5)");
-          setState(449);
+          setState(428);
           _la = _input->LA(1);
           if (!(_la == RQLParser::PLUS
 
@@ -4974,7 +4738,7 @@ RQLParser::Gen_indexContext* RQLParser::gen_index(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(450);
+          setState(429);
           gen_index(6);
           break;
         }
@@ -4983,9 +4747,9 @@ RQLParser::Gen_indexContext* RQLParser::gen_index(int precedence) {
           break;
         } 
       }
-      setState(455);
+      setState(434);
       _errHandler->sync(this);
-      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 47, _ctx);
+      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 46, _ctx);
     }
   }
   catch (RecognitionException &e) {
@@ -5095,13 +4859,13 @@ RQLParser::AgregatorContext* RQLParser::agregator() {
     exitRule();
   });
   try {
-    setState(460);
+    setState(439);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
       case RQLParser::MIN: {
         _localctx = _tracker.createInstance<RQLParser::StreamMinContext>(_localctx);
         enterOuterAlt(_localctx, 1);
-        setState(456);
+        setState(435);
         match(RQLParser::MIN);
         break;
       }
@@ -5109,7 +4873,7 @@ RQLParser::AgregatorContext* RQLParser::agregator() {
       case RQLParser::MAX: {
         _localctx = _tracker.createInstance<RQLParser::StreamMaxContext>(_localctx);
         enterOuterAlt(_localctx, 2);
-        setState(457);
+        setState(436);
         match(RQLParser::MAX);
         break;
       }
@@ -5117,7 +4881,7 @@ RQLParser::AgregatorContext* RQLParser::agregator() {
       case RQLParser::AVG: {
         _localctx = _tracker.createInstance<RQLParser::StreamAvgContext>(_localctx);
         enterOuterAlt(_localctx, 3);
-        setState(458);
+        setState(437);
         match(RQLParser::AVG);
         break;
       }
@@ -5125,7 +4889,7 @@ RQLParser::AgregatorContext* RQLParser::agregator() {
       case RQLParser::SUMC: {
         _localctx = _tracker.createInstance<RQLParser::StreamSumContext>(_localctx);
         enterOuterAlt(_localctx, 4);
-        setState(459);
+        setState(438);
         match(RQLParser::SUMC);
         break;
       }
@@ -5201,7 +4965,7 @@ RQLParser::Stream_fn_callContext* RQLParser::stream_fn_call() {
   });
   try {
     enterOuterAlt(_localctx, 1);
-    setState(462);
+    setState(441);
     _la = _input->LA(1);
     if (!((((_la & ~ 0x3fULL) == 0) &&
       ((1ULL << _la) & 263882790666240) != 0))) {
@@ -5211,11 +4975,11 @@ RQLParser::Stream_fn_callContext* RQLParser::stream_fn_call() {
       _errHandler->reportMatch(this);
       consume();
     }
-    setState(463);
+    setState(442);
     match(RQLParser::T__2);
-    setState(464);
+    setState(443);
     stream_expression(0);
-    setState(465);
+    setState(444);
     match(RQLParser::T__3);
    
   }
@@ -5293,7 +5057,7 @@ RQLParser::Window_aggContext* RQLParser::window_agg() {
   });
   try {
     enterOuterAlt(_localctx, 1);
-    setState(467);
+    setState(446);
     _la = _input->LA(1);
     if (!((((_la & ~ 0x3fULL) == 0) &&
       ((1ULL << _la) & 263882790666240) != 0))) {
@@ -5303,15 +5067,15 @@ RQLParser::Window_aggContext* RQLParser::window_agg() {
       _errHandler->reportMatch(this);
       consume();
     }
-    setState(468);
+    setState(447);
     match(RQLParser::T__2);
-    setState(469);
+    setState(448);
     expression_factor(0);
-    setState(470);
+    setState(449);
     match(RQLParser::COLON);
-    setState(471);
+    setState(450);
     antlrcpp::downCast<Window_aggContext *>(_localctx)->width = int_const();
-    setState(472);
+    setState(451);
     match(RQLParser::T__3);
    
   }
@@ -5375,35 +5139,35 @@ RQLParser::Function_callContext* RQLParser::function_call() {
     exitRule();
   });
   try {
-    setState(486);
+    setState(465);
     _errHandler->sync(this);
-    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 49, _ctx)) {
+    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 48, _ctx)) {
     case 1: {
       enterOuterAlt(_localctx, 1);
-      setState(474);
+      setState(453);
       antlrcpp::downCast<Function_callContext *>(_localctx)->fn = match(RQLParser::ID);
-      setState(475);
+      setState(454);
       match(RQLParser::T__2);
-      setState(476);
+      setState(455);
       expression_factor(0);
-      setState(477);
+      setState(456);
       match(RQLParser::T__3);
       break;
     }
 
     case 2: {
       enterOuterAlt(_localctx, 2);
-      setState(479);
+      setState(458);
       antlrcpp::downCast<Function_callContext *>(_localctx)->fn = match(RQLParser::ID);
-      setState(480);
+      setState(459);
       match(RQLParser::T__2);
-      setState(481);
+      setState(460);
       expression_factor(0);
-      setState(482);
+      setState(461);
       match(RQLParser::COLON);
-      setState(483);
+      setState(462);
       antlrcpp::downCast<Function_callContext *>(_localctx)->width = int_const();
-      setState(484);
+      setState(463);
       match(RQLParser::T__3);
       break;
     }
@@ -5425,7 +5189,6 @@ RQLParser::Function_callContext* RQLParser::function_call() {
 bool RQLParser::sempred(RuleContext *context, size_t ruleIndex, size_t predicateIndex) {
   switch (ruleIndex) {
     case 25: return expression_logicSempred(antlrcpp::downCast<Expression_logicContext *>(context), predicateIndex);
-    case 26: return term_logicSempred(antlrcpp::downCast<Term_logicContext *>(context), predicateIndex);
     case 27: return expression_factorSempred(antlrcpp::downCast<Expression_factorContext *>(context), predicateIndex);
     case 28: return termSempred(antlrcpp::downCast<TermContext *>(context), predicateIndex);
     case 29: return stream_expressionSempred(antlrcpp::downCast<Stream_expressionContext *>(context), predicateIndex);
@@ -5448,24 +5211,9 @@ bool RQLParser::expression_logicSempred(Expression_logicContext *_localctx, size
   return true;
 }
 
-bool RQLParser::term_logicSempred(Term_logicContext *_localctx, size_t predicateIndex) {
-  switch (predicateIndex) {
-    case 2: return precpred(_ctx, 7);
-    case 3: return precpred(_ctx, 6);
-    case 4: return precpred(_ctx, 5);
-    case 5: return precpred(_ctx, 4);
-    case 6: return precpred(_ctx, 3);
-    case 7: return precpred(_ctx, 2);
-
-  default:
-    break;
-  }
-  return true;
-}
-
 bool RQLParser::expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex) {
   switch (predicateIndex) {
-    case 8: return precpred(_ctx, 2);
+    case 2: return precpred(_ctx, 2);
 
   default:
     break;
@@ -5475,8 +5223,8 @@ bool RQLParser::expression_factorSempred(Expression_factorContext *_localctx, si
 
 bool RQLParser::termSempred(TermContext *_localctx, size_t predicateIndex) {
   switch (predicateIndex) {
-    case 9: return precpred(_ctx, 14);
-    case 10: return precpred(_ctx, 13);
+    case 3: return precpred(_ctx, 14);
+    case 4: return precpred(_ctx, 13);
 
   default:
     break;
@@ -5486,14 +5234,14 @@ bool RQLParser::termSempred(TermContext *_localctx, size_t predicateIndex) {
 
 bool RQLParser::stream_expressionSempred(Stream_expressionContext *_localctx, size_t predicateIndex) {
   switch (predicateIndex) {
-    case 11: return precpred(_ctx, 3);
-    case 12: return precpred(_ctx, 2);
-    case 13: return precpred(_ctx, 9);
-    case 14: return precpred(_ctx, 8);
-    case 15: return precpred(_ctx, 7);
-    case 16: return precpred(_ctx, 6);
-    case 17: return precpred(_ctx, 5);
-    case 18: return precpred(_ctx, 4);
+    case 5: return precpred(_ctx, 3);
+    case 6: return precpred(_ctx, 2);
+    case 7: return precpred(_ctx, 9);
+    case 8: return precpred(_ctx, 8);
+    case 9: return precpred(_ctx, 7);
+    case 10: return precpred(_ctx, 6);
+    case 11: return precpred(_ctx, 5);
+    case 12: return precpred(_ctx, 4);
 
   default:
     break;
@@ -5503,8 +5251,8 @@ bool RQLParser::stream_expressionSempred(Stream_expressionContext *_localctx, si
 
 bool RQLParser::gen_indexSempred(Gen_indexContext *_localctx, size_t predicateIndex) {
   switch (predicateIndex) {
-    case 19: return precpred(_ctx, 6);
-    case 20: return precpred(_ctx, 5);
+    case 13: return precpred(_ctx, 6);
+    case 14: return precpred(_ctx, 5);
 
   default:
     break;
