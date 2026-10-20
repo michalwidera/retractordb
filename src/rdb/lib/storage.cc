@@ -448,6 +448,20 @@ Result<rdb::ReadStatus> storage::revRead(const size_t recordIndexFromBack, uint8
   return ReadStatus::Ok;
 }
 
+// Warunek to dokladnie ostatnia galaz revRead() dla zrodla deklarowanego: nie hold, nie odczyt
+// biezacy w stanie flux, rekord w historii bufora (a wiec i ponizej jego pojemnosci). Pominiete
+// jest tylko porownanie recordsCount_ z accessor_->count(), ktore niczego nie zmienia, a tylko
+// loguje - wykona je revRead(0), ktorym wolajacy zamyka petle okna.
+Result<const payload *> storage::revPeek(const size_t recordIndexFromBack) {
+  if (isDeclared() && !isHold_ && recordIndexFromBack < buffer_.size() &&
+      !(recordIndexFromBack == 0 && bufferState == sourceState::flux))
+    return &buffer_.history(recordIndexFromBack);
+
+  RDB_TRY_ASSIGN(const auto status, revRead(recordIndexFromBack));
+  if (status != ReadStatus::Ok) return nullptr;
+  return storagePayload_.get();
+}
+
 void storage::setCapacity(const int capacity) {
   if (isDeclared()) buffer_.setCapacity(capacity);
 }

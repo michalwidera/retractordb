@@ -35,32 +35,58 @@ namespace {
 constexpr int kHexByteWidth = 2;
 constexpr int kHexWordWidth = 8;
 
+[[noreturn, gnu::cold, gnu::noinline]] void flatPositionOutOfRange(const int positionFlat, const int flatCount,
+                                                                   const char *context) {
+  SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
+  if (std::string_view(context) == "Read") {
+#if RDB_HAS_ADDR2LINE
+    std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << '\n';
+#else
+    std::cerr << "Collecting stack trace." << '\n';
+#endif
+    const std::string trace = rdb::currentStackTrace();
+    SPDLOG_ERROR("Stack: {}", trace);
+    std::cerr << trace << '\n';
+  }
+  // Pozycja plaska pochodzi z kompilatora planu albo ze strazy wiazania Pythona (IndexError
+  // przed wywolaniem) - spoza zakresu znaczy blad w kodzie, a zapis dalej bylby zapisem poza
+  // rekordem. Stad zatrzymanie, nie blad zwracany.
+  rdb::fatal(fmt::format("payload: {} flat position {} out of range [0,{})", context, positionFlat, flatCount));
+}
+
+/// Wpis deskryptora dla pozycji plaskiej. Woła go kazdy getItemVT/setItemVT, wiec obsluga bledu
+/// siedzi w zimnej funkcji obok: z nia w srodku ta funkcja nie wchodzila w miejsce wywolania.
+/// Pozycja w zakresie ma wpis zawsze - rebuildFieldMappings() buduje mape wylacznie z wpisow
+/// deskryptora - wiec po sprawdzeniu zakresu nie ma juz czego sprawdzac.
 int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFlat, const char *context) {
   const auto flatCount = descriptor.flatElementCount();
-  if (positionFlat < 0 || positionFlat > flatCount - 1) {
-    SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
-    if (std::string_view(context) == "Read") {
-#if RDB_HAS_ADDR2LINE
-      std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << '\n';
-#else
-      std::cerr << "Collecting stack trace." << '\n';
-#endif
-      const std::string trace = rdb::currentStackTrace();
-      SPDLOG_ERROR("Stack: {}", trace);
-      std::cerr << trace << '\n';
-    }
-    // Pozycja plaska pochodzi z kompilatora planu albo ze strazy wiazania Pythona (IndexError
-    // przed wywolaniem) - spoza zakresu znaczy blad w kodzie, a zapis dalej bylby zapisem poza
-    // rekordem. Stad zatrzymanie, nie blad zwracany.
-    rdb::fatal(fmt::format("payload: {} flat position {} out of range [0,{})", context, positionFlat, flatCount));
-  }
+  if (positionFlat < 0 || positionFlat >= flatCount) [[unlikely]]
+    flatPositionOutOfRange(positionFlat, flatCount, context);
+  return descriptor.flatIndexToDescriptorPosition(positionFlat)->first;
+}
 
-  auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
-  RDB_ASSERT(positionOpt.has_value(), "payload: {} conversion failed for flat position {}", context, positionFlat);
-  const auto position = positionOpt->first;
-  RDB_ASSERT(position >= 0 && std::cmp_less(position, descriptor.size()),
-             "payload: {} converted index {} out of descriptor bounds", context, position);
-  return position;
+/// Czy wartosc juz jest alternatywa, ktora przechowuje pole typu `type`. Dla takiej pary
+/// cast<descFldVT> jest tozsamoscia (narrowIntegralTo/narrowFloatTo w zakresie, RATIONAL i STRING
+/// przepisywane wprost), wiec setItemVT moze go pominac.
+bool holdsFieldType(const rdb::descFldVT &value, const rdb::descFld type) {
+  switch (type) {
+    case rdb::BYTE:
+      return std::holds_alternative<uint8_t>(value);
+    case rdb::INTEGER:
+      return std::holds_alternative<int>(value);
+    case rdb::UINT:
+      return std::holds_alternative<unsigned>(value);
+    case rdb::RATIONAL:
+      return std::holds_alternative<boost::rational<int>>(value);
+    case rdb::FLOAT:
+      return std::holds_alternative<float>(value);
+    case rdb::DOUBLE:
+      return std::holds_alternative<double>(value);
+    case rdb::STRING:
+      return std::holds_alternative<std::string>(value);
+    default:
+      return false;
+  }
 }
 
 /// Wartosc std::any jako T. Typ niesiony przez any wynika z typu pola, ktory zna wolajacy, wiec
@@ -622,6 +648,9 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
   if (!valueParam.has_value()) {
     nullBitset_[position] = true;
     value                 = nullFallbackValue(requestedType);
+  } else if (holdsFieldType(*valueParam, requestedType)) {
+    nullBitset_[position] = false;
+    value                 = std::move(*valueParam);
   } else {
     nullBitset_[position] = false;
     cast<rdb::descFldVT> castVT;

@@ -68,7 +68,8 @@ void Descriptor::rebuildFieldMappings() const {
 
     const int flatCount = rdb::flatElementCount(field);
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
-      flatToDescriptorIndexMap_.emplace_back(static_cast<int>(descriptorFieldIdx), arrayIndex);
+      flatToDescriptorIndexMap_.push_back(
+          {{static_cast<int>(descriptorFieldIdx), arrayIndex}, flatSlotSize(field), field.rtype});
       fieldByteOffsets_.push_back(offset);
       offset += (field.rtype == rdb::STRING) ? fieldSize(field) : field.rlen;
       ++flattenedFieldCount_;
@@ -129,18 +130,16 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
 //
 // Dla deskryptora BEZ numerycznego pola tablicowego wynik jest identyczny jak poprzednio:
 // pole nietablicowe zajmuje dokladnie jeden slot o szerokosci fieldSize().
+//
+// Szerokosc i typ slotu czyta wprost z mapy slotow plaskich (rebuildFieldMappings) - to te same
+// wartosci, ktore daje wpis deskryptora przez flatSlotSize(), policzone raz na uklad.
 bool Descriptor::operator==(const Descriptor &rhs) const {
   if (flatElementCount() != rhs.flatElementCount()) return false;
 
-  const int slots = flatElementCount();
-  for (int slot = 0; slot < slots; ++slot) {
-    const auto lhsPosition = flatIndexToDescriptorPosition(slot);
-    const auto rhsPosition = rhs.flatIndexToDescriptorPosition(slot);
-    if (!lhsPosition || !rhsPosition) return false;
-    const auto &lhsField = (*this)[lhsPosition->first];
-    const auto &rhsField = rhs[rhsPosition->first];
-
-    if (flatSlotSize(lhsField) < flatSlotSize(rhsField) || lhsField.rtype < rhsField.rtype) return false;
+  const auto &lhsSlots = flatToDescriptorIndexMap_;
+  const auto &rhsSlots = rhs.flatToDescriptorIndexMap_;
+  for (size_t slot = 0; slot < lhsSlots.size(); ++slot) {
+    if (lhsSlots[slot].slotSize < rhsSlots[slot].slotSize || lhsSlots[slot].rtype < rhsSlots[slot].rtype) return false;
   }
   return true;
 }

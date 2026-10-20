@@ -81,7 +81,7 @@ class expressionEvaluator {
   /// @param variables wartosci zmiennych VAR planu w tym takcie, indeksowane jak qTree::variables
   ///        (#531). Trzyma je dataModel. nullptr znaczy: brak zmiennych - PUSH_VAR jest wtedy
   ///        bledem programu, wiec zwijanie stalych (exprSimplify, bez tablicy) nie moze go policzyc.
-  [[nodiscard]] rdb::Result<rdb::descFldVT> eval(const std::list<token> &program, rdb::payload *payload = nullptr,
+  [[nodiscard]] rdb::Result<rdb::descFldVT> eval(const std::list<token> &program, const rdb::payload *payload = nullptr,
                                                  const std::vector<windowStats> *windowValues = nullptr,
                                                  const std::vector<rdb::descFldVT> *variables = nullptr);
 };

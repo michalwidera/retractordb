@@ -185,6 +185,12 @@ class storage {
   [[nodiscard]] Result<WriteStatus> write(size_t recordIndex = std::numeric_limits<size_t>::max());
 
   [[nodiscard]] Result<ReadStatus> revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  /// @brief Rekord, ktory revRead(recordIndexFromBack) wpisalby do payloadu magazynu, bez tej kopii.
+  ///
+  /// Rekord z historii zrodla deklarowanego jest zwracany wprost z bufora; kazdy inny przypadek
+  /// (magazyn plikowy, hold, odczyt biezacy w stanie flux, brak rekordu) idzie przez revRead().
+  /// nullptr = status inny niz Ok. Wskaznik wazny do nastepnego odczytu z tego magazynu.
+  [[nodiscard]] Result<const payload *> revPeek(size_t recordIndexFromBack);
   /// Errc::Config dla zrodla deklarowanego (czyta sie je przez revRead), Errc::IO dla nieudanego odczytu.
   [[nodiscard]] Result<ReadStatus> read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();

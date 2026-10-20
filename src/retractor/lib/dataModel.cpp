@@ -700,8 +700,8 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
       const int windowIndex     = logicalIndex();
       const int sourceIndexBase = logicalIndexBase(nameSrc);
-      RDB_TRY_ASSIGN(*runtime.inputPayload,
-                     streamRuntime(nameSrc).constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase));
+      RDB_TRY_ASSIGN(const auto window, streamRuntime(nameSrc).agseWindow(length, step, nameSrc, windowIndex, sourceIndexBase));
+      *runtime.inputPayload = *window;
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
