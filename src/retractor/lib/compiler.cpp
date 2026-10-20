@@ -3263,11 +3263,18 @@ std::string compiler::checkRuleConditionShapes() {
       if (!value.resolved())
         return std::format("{} - the type of the expression cannot be determined; variable ?{} is {}", where, variable.name,
                            rdb::GetStringdescFld(expected));
-      if (value.shape.rtype != expected || value.shape.rarray != 1)
+      if (value.shape.rtype != expected || value.shape.rarray != 1) {
+        // H4 (#546): typ wyrazenia, ktory zmienna moze miec, podpowiada jawna adnotacje deklaracji.
+        const rdb::descFld actual = value.shape.rtype;
+        const bool declarable =
+            value.shape.rarray == 1 && (actual == rdb::INTEGER || actual == rdb::UINT || actual == rdb::FLOAT ||
+                                        actual == rdb::DOUBLE || actual == rdb::RATIONAL);
         return std::format(
             "{} - expression is {}, but variable ?{} is {} (declared by VAR); no implicit conversion, use an "
-            "explicit conversion function",
-            where, rdb::GetStringdescFld(value.shape.rtype), variable.name, rdb::GetStringdescFld(expected));
+            "explicit conversion function{}",
+            where, rdb::GetStringdescFld(actual), variable.name, rdb::GetStringdescFld(expected),
+            declarable ? std::format(" or declare VAR {} : {} = ...", variable.name, rdb::GetStringdescFld(actual)) : "");
+      }
     }
   }
 

@@ -13,33 +13,33 @@ class  RQLParser : public antlr4::Parser {
 public:
   enum {
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, BYTE_T = 5, STRING_T = 6, UNSIGNED_T = 7, 
-    INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, STREAM = 12, 
-    FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, BINFILE = 17, TEXTFILE = 18, 
-    DEVICE = 19, STORAGE = 20, ROTATION = 21, SUBSTRAT = 22, RULE = 23, 
-    DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, TIMEOUT = 27, VOLATILE = 28, 
-    PERSISTENT = 29, DEFAULT = 30, LET = 31, VAR = 32, ON = 33, WHEN = 34, 
-    DUMP = 35, SYSTEM = 36, SET = 37, DO = 38, TO = 39, AND_C = 40, OR_C = 41, 
-    NOT_C = 42, MIN = 43, MAX = 44, AVG = 45, SUMC = 46, TYPE_PROFILE = 47, 
-    STRING_PROFILE = 48, ID = 49, CONST_REF = 50, STRING = 51, FLOAT = 52, 
-    DECIMAL = 53, REAL = 54, IS_EQ = 55, IS_NQ = 56, IS_GR = 57, IS_LS = 58, 
-    IS_GE = 59, IS_LE = 60, EXCLAMATION = 61, DOUBLE_BAR = 62, DOT = 63, 
-    UNDERLINE = 64, AT = 65, SHARP = 66, AND = 67, MOD = 68, DOLLAR = 69, 
-    COMMA = 70, SEMI = 71, COLON = 72, DOUBLE_COLON = 73, STAR = 74, DIVIDE = 75, 
-    PLUS = 76, MINUS = 77, BIT_NOT = 78, BIT_OR = 79, BIT_XOR = 80, SPACE = 81, 
-    COMMENT = 82, LINE_COMMENT2 = 83
+    INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, RATIONAL_T = 11, SELECT = 12, 
+    STREAM = 13, FROM = 14, DECLARE = 15, RETENTION = 16, FILE = 17, BINFILE = 18, 
+    TEXTFILE = 19, DEVICE = 20, STORAGE = 21, ROTATION = 22, SUBSTRAT = 23, 
+    RULE = 24, DISPOSABLE = 25, ONESHOT = 26, HOLD = 27, TIMEOUT = 28, VOLATILE = 29, 
+    PERSISTENT = 30, DEFAULT = 31, LET = 32, VAR = 33, ON = 34, WHEN = 35, 
+    DUMP = 36, SYSTEM = 37, SET = 38, DO = 39, TO = 40, AND_C = 41, OR_C = 42, 
+    NOT_C = 43, MIN = 44, MAX = 45, AVG = 46, SUMC = 47, TYPE_PROFILE = 48, 
+    STRING_PROFILE = 49, ID = 50, CONST_REF = 51, STRING = 52, FLOAT = 53, 
+    DECIMAL = 54, REAL = 55, IS_EQ = 56, IS_NQ = 57, IS_GR = 58, IS_LS = 59, 
+    IS_GE = 60, IS_LE = 61, EXCLAMATION = 62, DOUBLE_BAR = 63, DOT = 64, 
+    UNDERLINE = 65, AT = 66, SHARP = 67, AND = 68, MOD = 69, DOLLAR = 70, 
+    COMMA = 71, SEMI = 72, COLON = 73, DOUBLE_COLON = 74, STAR = 75, DIVIDE = 76, 
+    PLUS = 77, MINUS = 78, BIT_NOT = 79, BIT_OR = 80, BIT_XOR = 81, SPACE = 82, 
+    COMMENT = 83, LINE_COMMENT2 = 84
   };
 
   enum {
     RuleProg = 0, RuleDefault_statement = 1, RuleLet_statement = 2, RuleLet_value = 3, 
-    RuleVar_statement = 4, RuleInt_const = 5, RuleCompiler_option = 6, RuleSelect_statement = 7, 
-    RuleDeclare_statement = 8, RuleRule_statement = 9, RuleDumppart = 10, 
-    RuleSystempart = 11, RuleSetpart = 12, RuleRational_se = 13, RuleRetention_from = 14, 
-    RuleFraction_rule = 15, RuleField_declaration = 16, RuleField_type = 17, 
-    RuleSelect_list = 18, RuleField_id = 19, RuleUnary_op_expression = 20, 
-    RuleAsterisk = 21, RuleExpression = 22, RuleLogic = 23, RuleExpression_logic = 24, 
-    RuleTerm_logic = 25, RuleExpression_factor = 26, RuleTerm = 27, RuleStream_expression = 28, 
-    RuleStream_factor = 29, RuleGen_index = 30, RuleAgregator = 31, RuleStream_fn_call = 32, 
-    RuleWindow_agg = 33, RuleFunction_call = 34
+    RuleVar_statement = 4, RuleVar_type = 5, RuleInt_const = 6, RuleCompiler_option = 7, 
+    RuleSelect_statement = 8, RuleDeclare_statement = 9, RuleRule_statement = 10, 
+    RuleDumppart = 11, RuleSystempart = 12, RuleSetpart = 13, RuleRational_se = 14, 
+    RuleRetention_from = 15, RuleFraction_rule = 16, RuleField_declaration = 17, 
+    RuleField_type = 18, RuleSelect_list = 19, RuleField_id = 20, RuleUnary_op_expression = 21, 
+    RuleAsterisk = 22, RuleExpression = 23, RuleLogic = 24, RuleExpression_logic = 25, 
+    RuleTerm_logic = 26, RuleExpression_factor = 27, RuleTerm = 28, RuleStream_expression = 29, 
+    RuleStream_factor = 30, RuleGen_index = 31, RuleAgregator = 32, RuleStream_fn_call = 33, 
+    RuleWindow_agg = 34, RuleFunction_call = 35
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -64,6 +64,7 @@ public:
   class Let_statementContext;
   class Let_valueContext;
   class Var_statementContext;
+  class Var_typeContext;
   class Int_constContext;
   class Compiler_optionContext;
   class Select_statementContext;
@@ -217,11 +218,30 @@ public:
     antlr4::tree::TerminalNode *IS_EQ();
     Let_valueContext *let_value();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *COLON();
+    Var_typeContext *var_type();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Var_statementContext* var_statement();
+
+  class  Var_typeContext : public antlr4::ParserRuleContext {
+  public:
+    Var_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *INTEGER_T();
+    antlr4::tree::TerminalNode *UNSIGNED_T();
+    antlr4::tree::TerminalNode *FLOAT_T();
+    antlr4::tree::TerminalNode *DOUBLE_T();
+    antlr4::tree::TerminalNode *RATIONAL_T();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Var_typeContext* var_type();
 
   class  Int_constContext : public antlr4::ParserRuleContext {
   public:

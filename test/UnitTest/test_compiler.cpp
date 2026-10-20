@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -5823,4 +5824,155 @@ TEST(xparser, set_refusals_name_the_target_the_rule_and_the_position) {
   EXPECT_NE(setPlanStatus("VAR V = 1\n" + std::string(kLetHeader) + "\nRULE r ON s WHEN 1 = 1 DO SET ?V = 2")
                 .find("cannot be attached to declaration stream 's'"),
             std::string::npos);
+}
+
+// --- Jawny typ zmiennej `VAR NAZWA : TYP = literal` (#546, etap H) --------------------------------
+
+TEST(xparser, var_type_annotation_converts_the_declared_literal) {
+  // covers: rqlparser.parser-rql-string.18~1
+  // Macierz H3: literal x typ. nullopt to odmowa z nazwa, typem i pozycja.
+  using V      = std::optional<rdb::descFldVT>;
+  const auto R = [](const int nom, const int den) { return V{boost::rational<int>(nom, den)}; };
+  struct Case {
+    std::string literal;
+    V integer, uint, floating, doubling, rational;
+  };
+  const std::vector<Case> matrix = {
+      {"10", V{10}, V{10U}, V{10.0F}, V{10.0}, R(10, 1)},
+      {"-1", V{-1}, std::nullopt, V{-1.0F}, V{-1.0}, R(-1, 1)},
+      {"2.5", std::nullopt, std::nullopt, V{2.5F}, V{2.5}, R(5, 2)},
+      {"4/2", V{2}, V{2U}, V{2.0F}, V{2.0}, R(2, 1)},
+      {"1/3", std::nullopt, std::nullopt, V{static_cast<float>(1.0 / 3)}, V{1.0 / 3}, R(1, 3)},
+      {"0.123456789012", std::nullopt, std::nullopt, V{0.123456789012F}, V{0.123456789012}, std::nullopt},
+      // Poza macierza z issue: zero czesci ulamkowej jest dokladne, zakres UINT siega dalej niz int,
+      // mianownik 2^20 zapisany 20 cyframi jest dokladny, zera wiodace nie znacza liczby osemkowej.
+      {"2.0", V{2}, V{2U}, V{2.0F}, V{2.0}, R(2, 1)},
+      {"3000000000", std::nullopt, V{3000000000U}, V{3000000000.0F}, V{3000000000.0}, std::nullopt},
+      {"4294967296", std::nullopt, std::nullopt, V{4294967296.0F}, V{4294967296.0}, std::nullopt},
+      {"-2147483648", V{std::numeric_limits<int>::min()}, std::nullopt, V{-2147483648.0F}, V{-2147483648.0},
+       R(std::numeric_limits<int>::min(), 1)},
+      {"0.00000095367431640625", std::nullopt, std::nullopt, V{0.00000095367431640625F}, V{0.00000095367431640625},
+       R(1, 1048576)},
+      {"007", V{7}, V{7U}, V{7.0F}, V{7.0}, R(7, 1)},
+      {"-0.5", std::nullopt, std::nullopt, V{-0.5F}, V{-0.5}, R(-1, 2)},
+  };
+  for (const auto &row : matrix) {
+    for (const auto &[type, expected] : std::vector<std::pair<std::string, V>>{{"INTEGER", row.integer},
+                                                                               {"UINT", row.uint},
+                                                                               {"FLOAT", row.floating},
+                                                                               {"DOUBLE", row.doubling},
+                                                                               {"RATIONAL", row.rational}}) {
+      const std::string rql =
+          "VAR X : " + type + " = " + row.literal + "\n" + std::string(kLetHeader) + "\nSELECT s[0], ?X STREAM o FROM s";
+      SCOPED_TRACE(rql);
+      qTree plan;
+      const PlanSource loaded = parsePlanText(plan, rql);
+      if (!expected) {
+        EXPECT_EQ(loaded.status, "line 1:4: value " + row.literal + " of variable ?X is out of range for " + type);
+        continue;
+      }
+      ASSERT_EQ(loaded.status, "OK");
+      ASSERT_EQ(plan.variables.size(), 1U);
+      EXPECT_EQ(plan.variables[0].initial, *expected);
+      ASSERT_EQ(compiler(plan).compile(), "OK");
+      // Typ pola SELECT czytajacego zmienna to typ z adnotacji.
+      EXPECT_EQ(plan.getQuery("o").lSchema.back().field_.rtype, static_cast<rdb::descFld>(expected->index()));
+    }
+  }
+
+  // Pisownia typow jak w DECLARE; typ spoza H2 i wielkosc liter spoza listy to blad skladni.
+  EXPECT_EQ(letPlanStatus("VAR X : Uint = 1\nVAR Y : Rational = 1\nVAR Z : Double = 1\n" + std::string(kLetHeader) +
+                          "\nSELECT s[0], ?X, ?Y, ?Z STREAM o FROM s"),
+            "OK");
+  for (const std::string type : {"BYTE", "STRING", "rational", "INTPAIR"}) {
+    SCOPED_TRACE(type);
+    const std::string status = letPlanStatus("VAR X : " + type + " = 1\n" + std::string(kLetHeader));
+    EXPECT_TRUE(status.starts_with("line 1:8 ")) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
+  // Wartosc spoza double nie przechodzi juz przez deklaracje, jak bez adnotacji.
+  EXPECT_EQ(letPlanStatus("VAR X : DOUBLE = " + std::string(400, '9') + ".0\n" + std::string(kLetHeader)),
+            "line 1:4: value " + std::string(400, '9') + ".0 of variable ?X is out of range");
+  // RATIONAL jest od #546 slowem zastrzezonym, tak jak pozostale nazwy typow.
+  EXPECT_NE(letPlanStatus("DECLARE RATIONAL INTEGER STREAM s, 1 TEXTFILE 'in.txt'"), "OK");
+}
+
+TEST(xparser, set_single_literal_converts_to_the_variable_type) {
+  // covers: rqlparser.parser-rql-string.19~1, compiler.compiler.16~1
+  const std::string head =
+      "VAR N : UINT = 5\nVAR R : RATIONAL = 0\nVAR F = 0.5\nVAR D : DOUBLE = 0\nVAR V = 1\n"
+      "LET Q = 1/4\nLET I = 3\n" +
+      std::string(kLetHeader) + "\nSELECT s[0], s[1] STREAM o FROM s\nRULE r ON o WHEN o[0] > 0 DO ";
+  // Prawa strona SET po parsowaniu albo status odmowy.
+  const auto setValue = [&head](const std::string &action) -> std::variant<std::string, std::list<token>> {
+    qTree plan;
+    const PlanSource loaded = parsePlanText(plan, head + action);
+    if (loaded.status != "OK") return loaded.status;
+    const std::string compiled = compiler(plan).compile();
+    if (compiled != "OK") return compiled;
+    return plan.getQuery("o").lRules.front().setValue;
+  };
+  const auto single = [&setValue](const std::string &action) -> std::optional<rdb::descFldVT> {
+    const auto result = setValue(action);
+    if (const auto *status = std::get_if<std::string>(&result)) {
+      ADD_FAILURE() << action << ": " << *status;
+      return std::nullopt;
+    }
+    const auto &program = std::get<std::list<token>>(result);
+    if (program.size() != 1 || program.front().getCommandID() != PUSH_VAL) {
+      ADD_FAILURE() << action << ": not a single PUSH_VAL";
+      return std::nullopt;
+    }
+    return program.front().getVT();
+  };
+  const auto refusal = [&setValue](const std::string &action) {
+    const auto result  = setValue(action);
+    const auto *status = std::get_if<std::string>(&result);
+    return status != nullptr ? *status : std::string("OK");
+  };
+
+  // Literal i stala LET w typie zmiennej, z tekstu: 0.1 to dokladnie 1/10, a DOUBLE nie przechodzi przez float.
+  EXPECT_EQ(single("SET ?N = 0"), rdb::descFldVT{0U});
+  EXPECT_EQ(single("SET ?N = 3000000000"), rdb::descFldVT{3000000000U});
+  EXPECT_EQ(single("SET ?N = ?I"), rdb::descFldVT{3U});
+  EXPECT_EQ(single("SET ?R = 0.1"), rdb::descFldVT{boost::rational<int>(1, 10)});
+  EXPECT_EQ(single("SET ?R = ?Q"), rdb::descFldVT{boost::rational<int>(1, 4)});
+  EXPECT_EQ(single("SET ?R = -?Q"), rdb::descFldVT{boost::rational<int>(-1, 4)});
+  EXPECT_EQ(single("SET ?R = -3"), rdb::descFldVT{boost::rational<int>(-3, 1)});
+  EXPECT_EQ(single("SET ?F = 0"), rdb::descFldVT{0.0F});
+  EXPECT_EQ(single("SET ?D = 0.1"), rdb::descFldVT{0.1});
+  EXPECT_EQ(single("SET ?V = 2.0"), rdb::descFldVT{2});
+  // Literal juz w typie zmiennej daje ten sam token co przed #546.
+  EXPECT_EQ(single("SET ?V = -7"), rdb::descFldVT{-7});
+  EXPECT_EQ(single("SET ?F = 0.25"), rdb::descFldVT{0.25F});
+
+  // Literal bez wartosci w typie zmiennej: odmowa z celem, typem i pozycja celu.
+  EXPECT_EQ(refusal("SET ?N = -1"), "line 10:33: value -1 in DO SET ?N is out of range for UINT");
+  EXPECT_EQ(refusal("SET ?V = 2.5"), "line 10:33: value 2.5 in DO SET ?V is out of range for INTEGER");
+  EXPECT_EQ(refusal("SET ?V = ?Q"), "line 10:33: value ?Q = 1/4 in DO SET ?V is out of range for INTEGER");
+  EXPECT_EQ(refusal("SET ?R = 0.123456789012"), "line 10:33: value 0.123456789012 in DO SET ?R is out of range for RATIONAL");
+
+  // Kazde inne wyrazenie zostaje pod D4: `1/4` to dzielenie calkowite, nawias to wyrazenie, a odmowy
+  // liscia, ktory okazal sie poczatkiem wiekszego wyrazenia, wracaja.
+  const auto mismatch = [](const std::string &name, const std::string &got, const std::string &declared) {
+    return "line 10:33: rule 'r' on stream 'o': DO SET ?" + name + " - expression is " + got + ", but variable ?" + name +
+           " is " + declared +
+           " (declared by VAR); no implicit conversion, use an explicit conversion function or declare VAR " + name + " : " +
+           got + " = ...";
+  };
+  EXPECT_EQ(refusal("SET ?N = 1/4"), mismatch("N", "INTEGER", "UINT"));
+  EXPECT_EQ(refusal("SET ?R = 1/4"), mismatch("R", "INTEGER", "RATIONAL"));
+  EXPECT_EQ(refusal("SET ?N = (0)"), mismatch("N", "INTEGER", "UINT"));
+  EXPECT_EQ(refusal("SET ?R = ?Q * 2"),
+            "constant ?Q = 1/4 (line 10:38) is a fraction, which an expression has no literal for; write it as a decimal");
+  EXPECT_EQ(refusal("SET ?N = 3000000000 + ?N"), "numeric literal 3000000000 is out of range");
+  EXPECT_EQ(refusal("SET ?N = ?Z"), "line 10:38: constant ?Z in expression is not declared; LET must precede its first use");
+  EXPECT_EQ(refusal("SET ?F = o[0] * 0.5 + ?D"), mismatch("F", "DOUBLE", "FLOAT"));
+
+  // H4: bez podpowiedzi, gdy typu wyrazenia zmienna miec nie moze.
+  const std::string text = refusal("SET ?V = to_string(o[0])");
+  EXPECT_TRUE(
+      text.ends_with("but variable ?V is INTEGER (declared by VAR); no implicit conversion, use an explicit "
+                     "conversion function"))
+      << text;
 }

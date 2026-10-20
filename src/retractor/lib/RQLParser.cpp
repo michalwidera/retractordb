@@ -9,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -17,6 +18,7 @@
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 // please note that the order of includes is important here
 
@@ -159,6 +161,78 @@ std::optional<T> parseLiteral(const std::string &text) {
     return std::nullopt;
   }
 }
+
+/// Liczba z cyfr dziesietnych - petla, nie konstruktor cpp_int z napisu, bo ten czyta `0..` jako
+/// liczbe osemkowa, a literal RQL moze miec zera wiodace.
+boost::multiprecision::cpp_int decimalDigits(const std::string_view digits) {
+  boost::multiprecision::cpp_int value = 0;
+  for (const char digit : digits)
+    value = value * 10 + (digit - '0');
+  return value;
+}
+
+/// Literal jako wartosc typu zmiennej (#546, H3) albo nullopt, gdy wartosci w tym typie nie ma.
+/// Wejscie to wpis deklaracji albo stalej LET, czyli tekst ze znakiem, a dla ulamka licznik
+/// i mianownik - nigdy wartosc tokenu PUSH_VAL, ktora jest juz float.
+///
+/// Do INTEGER, UINT i RATIONAL tylko dokladnie: wartosc wymierna liczona jest z tekstu bez
+/// ograniczenia dlugosci i skracana, wiec `0.25` daje 1/4, `4/2` i `2.0` daja 2, a `2.5` w typie
+/// calkowitym i `0.123456789012` w RATIONAL (mianownik poza int) nie maja wartosci. Do FLOAT
+/// i DOUBLE z zaokragleniem, jak literal dziesietny w wyrazeniu.
+std::optional<rdb::descFldVT> convertLiteral(const RqlConstant &literal, const rdb::descFld type) {
+  if (type == rdb::FLOAT || type == rdb::DOUBLE) {
+    if (literal.kind == RqlConstant::Kind::fraction) {
+      const double value = static_cast<double>(literal.nom) / literal.den;
+      if (type == rdb::DOUBLE) return value;
+      return static_cast<float>(value);
+    }
+    if (type == rdb::DOUBLE) {
+      if (const auto value = parseLiteral<double>(literal.text)) return *value;
+      return std::nullopt;
+    }
+    if (const auto value = parseLiteral<float>(literal.text)) return *value;
+    return std::nullopt;
+  }
+
+  using boost::multiprecision::cpp_int;
+  cpp_int nom = literal.nom;
+  cpp_int den = literal.den;
+  if (literal.kind != RqlConstant::Kind::fraction) {
+    std::string_view text(literal.text);
+    const bool negative = text.starts_with('-');
+    if (negative) text.remove_prefix(1);
+    const auto dot                  = text.find('.');
+    const std::string_view fraction = dot == std::string_view::npos ? std::string_view() : text.substr(dot + 1);
+    nom = decimalDigits(text.substr(0, dot)) * boost::multiprecision::pow(cpp_int(10), static_cast<unsigned>(fraction.size())) +
+          decimalDigits(fraction);
+    den = boost::multiprecision::pow(cpp_int(10), static_cast<unsigned>(fraction.size()));
+    if (negative) nom = -nom;
+  }
+  const cpp_int divisor = boost::multiprecision::gcd(nom, den);
+  nom /= divisor;
+  den /= divisor;
+
+  const auto fits = [](const cpp_int &value, const auto lowest, const auto highest) {
+    return value >= cpp_int(lowest) && value <= cpp_int(highest);
+  };
+  constexpr int kIntMin = std::numeric_limits<int>::min();
+  constexpr int kIntMax = std::numeric_limits<int>::max();
+  switch (type) {
+    case rdb::INTEGER:
+      if (den == 1 && fits(nom, kIntMin, kIntMax)) return static_cast<int>(nom);
+      break;
+    case rdb::UINT:
+      if (den == 1 && fits(nom, 0U, std::numeric_limits<unsigned>::max())) return static_cast<unsigned>(nom);
+      break;
+    case rdb::RATIONAL:
+      if (fits(nom, kIntMin, kIntMax) && fits(den, 1, kIntMax))
+        return boost::rational<int>(static_cast<int>(nom), static_cast<int>(den));
+      break;
+    default:
+      break;
+  }
+  return std::nullopt;
+}
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
@@ -267,7 +341,34 @@ class ParserListener : public RQLBaseListener {
   /// Rozstrzyga blad pierwszy: dalsze sa juz tylko jego nastepstwami.
   std::string semanticError_;
 
+  /// Liczba, literal albo stala na poczatku prawej strony SET (#546, O3) moze byc cala ta strona,
+  /// a wtedy jej wlasna odmowa (ulamek w wyrazeniu, zakres INTEGER/FLOAT) nie obowiazuje, bo wartosc
+  /// konwertuje exitSetpart do typu zmiennej. Rozstrzygnac tego w lisciu sie nie da: listener biegnie
+  /// w trakcie parsowania, a regula lewostronnie rekurencyjna wola wyjscie liscia `5` ZANIM przepnie
+  /// go pod `5 * x`, wiec rodzic liscia wyglada w obu przypadkach tak samo. Odmowa liscia w tym
+  /// polozeniu czeka wiec tutaj, a exitSetpart zglasza ja albo porzuca.
+  bool deferSetValueErrors_{false};
+  std::string deferredSetValueError_;
+
+  /// Ustawia odkladanie odmow na czas jednego liscia wyrazenia - patrz deferSetValueErrors_.
+  /// @requirements-exempt SetValueCandidate: Zakres flagi deferSetValueErrors_; logike ma exitSetpart.
+  struct SetValueCandidate {
+    ParserListener &listener;
+    SetValueCandidate(ParserListener &owner, const antlr4::ParserRuleContext *leaf) : listener(owner) {
+      const auto *whole = dynamic_cast<const RQLParser::ExpTermContext *>(leaf->parent);
+      listener.deferSetValueErrors_ =
+          whole != nullptr && dynamic_cast<const RQLParser::SetpartContext *>(whole->parent) != nullptr;
+    }
+    ~SetValueCandidate() { listener.deferSetValueErrors_ = false; }
+    SetValueCandidate(const SetValueCandidate &)            = delete;
+    SetValueCandidate &operator=(const SetValueCandidate &) = delete;
+  };
+
   void reportSemanticError(const std::string &message) {
+    if (deferSetValueErrors_) {
+      if (deferredSetValueError_.empty()) deferredSetValueError_ = message;
+      return;
+    }
     std::cerr << "Error: " << message << '\n';
     SPDLOG_ERROR("Parser: {}", message);
     if (semanticError_.empty()) semanticError_ = message;
@@ -701,8 +802,14 @@ class ParserListener : public RQLBaseListener {
       abortInternal(fmt::format("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText()));
   }
 
-  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, literal<float>(ctx->getText())); }
-  void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, literal<int>(ctx->getText())); }
+  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override {
+    const SetValueCandidate candidate(*this, ctx);
+    recpToken(PUSH_VAL, literal<float>(ctx->getText()));
+  }
+  void exitExpDec(RQLParser::ExpDecContext *ctx) override {
+    const SetValueCandidate candidate(*this, ctx);
+    recpToken(PUSH_VAL, literal<int>(ctx->getText()));
+  }
 
   /// `?NAZWA` i `-?NAZWA` w wyrazeniu (#440, etap B) - ten sam token co literal `'-'? DECIMAL` albo
   /// `'-'? FLOAT`. Dziesietna parsuje sie z tekstu stalej ta sama funkcja co literal (FLOAT, nie double
@@ -710,6 +817,7 @@ class ParserListener : public RQLBaseListener {
   /// zapisac sie nie da - `1/40` w wyrazeniu to dzielenie calkowite, czyli 0 - wiec jest odmowa.
   /// Wartosc zastepcza 0 trzyma ksztalt programu po odmowie, jak w literal().
   void exitExpConst(RQLParser::ExpConstContext *ctx) override {
+    const SetValueCandidate candidate(*this, ctx);
     const antlr4::Token *ref = ctx->CONST_REF()->getSymbol();
     const bool negated       = ctx->MINUS() != nullptr;
     // Zmienna VAR (#531) nie znika jak stala: czyta ja ewaluator w kazdym takcie. Argument okna
@@ -1216,9 +1324,17 @@ class ParserListener : public RQLBaseListener {
   /// w parserze i nie ma czego ustawiac, a nazwa niezadeklarowana to ta sama odmowa co przy odczycie.
   /// Prawa strona to program zebrany przez `expression_factor` - odczyty `?VAR` sa w nim juz tokenami
   /// PUSH_VAR (exitExpConst). Typ prawej strony wobec typu zmiennej sprawdza kompilator (D4).
+  ///
+  /// Wyjatek (#546, O3): prawa strona bedaca JEDNYM literalem albo JEDNA stala LET przechodzi
+  /// konwersje do typu zmiennej jak literal deklaracji (convertLiteral), z tekstu, a nie z wartosci
+  /// tokenu - `DO SET ?r = 0.1` daje dokladnie 1/10. Plan dotad przyjmowany wyniku nie zmienia: literal
+  /// typu zmiennej konwertuje sie na te sama wartosc, a kazdy inny byl odmowa D4.
   void exitSetpart(RQLParser::SetpartContext *ctx) override {
     setValue = program;
     program.clear();
+    const std::string deferred = std::exchange(deferredSetValueError_, {});
+    const auto literal         = wholeSetLiteral(ctx);
+    if (!literal && !deferred.empty()) reportSemanticError(deferred);
     const antlr4::Token *ref = ctx->target;
     const auto found         = constants_.find(ref->getText().substr(1));
     if (found == constants_.end()) {
@@ -1235,14 +1351,50 @@ class ParserListener : public RQLBaseListener {
     setTarget          = *found->second.variable;
     setPosition        = position(ref);
     actionType         = rule::SET;
+    if (!literal) return;
+    const auto type  = static_cast<rdb::descFld>(coreInstance.variables.at(setTarget).initial.index());
+    const auto value = convertLiteral(*literal, type);
+    if (!value) {
+      reportSemanticError(position(ref) + ": value " + ctx->value->getText() +
+                          (literal->text != ctx->value->getText() ? " = " + literal->text : std::string()) + " in DO SET " +
+                          ref->getText() + " is out of range for " + std::string(rdb::GetStringdescFld(type)));
+      return;
+    }
+    setValue = {token(PUSH_VAL, *value)};
+  }
+
+  /// Prawa strona SET jako literal do konwersji (#546, O3), gdy jest nia jeden literal calkowity albo
+  /// dziesietny, takze ujemny, albo jedna stala LET; inaczej nullopt. Nawias i ulamek `1/4` to juz
+  /// wyrazenie. Drzewo jest tu kompletne, wiec `ctx->value` to korzen wyrazenia po przepieciach.
+  std::optional<RqlConstant> wholeSetLiteral(RQLParser::SetpartContext *ctx) const {
+    auto *whole = dynamic_cast<RQLParser::ExpTermContext *>(ctx->value);
+    if (whole == nullptr) return std::nullopt;
+    auto *leaf = whole->term();
+    if (dynamic_cast<RQLParser::ExpDecContext *>(leaf) != nullptr)
+      return RqlConstant{.kind = RqlConstant::Kind::integer, .text = leaf->getText()};
+    if (dynamic_cast<RQLParser::ExpFloatContext *>(leaf) != nullptr)
+      return RqlConstant{.kind = RqlConstant::Kind::decimal, .text = leaf->getText()};
+    auto *reference = dynamic_cast<RQLParser::ExpConstContext *>(leaf);
+    if (reference == nullptr) return std::nullopt;
+    const auto found = constants_.find(reference->CONST_REF()->getText().substr(1));
+    if (found == constants_.end() || found->second.variable) return std::nullopt;
+    RqlConstant constant = found->second;
+    if (reference->MINUS() != nullptr) {
+      constant.text = constant.text.starts_with('-') ? constant.text.substr(1) : "-" + constant.text;
+      constant.nom  = -constant.nom;
+    }
+    return constant;
   }
 
   /// Wpis deklaracji `LET` albo `VAR` po kontroli nazwy i literalu, albo nullopt po zgloszonej odmowie.
   /// Nazwa rozroznia wielkosc liter jak kazdy ID; `$` jest w ID legalny, ale nie w nazwie, bo token
   /// odwolania `?NAZWA` go nie obejmuje. LET i VAR dziela przestrzen nazw (#531, D5), wiec kolizja
   /// miedzy formami jest taka sama odmowa jak powtorzenie jednej z nich.
+  ///
+  /// Literal calkowity sprawdza tu zakres int tylko wtedy, gdy typ bierze sie z literalu
+  /// (`literalTyped`); przy jawnym typie VAR zakres sprawdza convertLiteral, bo UINT siega dalej.
   std::optional<RqlConstant> declaration(const antlr4::Token *nameToken, RQLParser::Let_valueContext *value,
-                                         const std::string &kind) {
+                                         const std::string &kind, const bool literalTyped = true) {
     const std::string name  = nameToken->getText();
     const std::string where = position(nameToken);
     if (name.find('$') != std::string::npos) {
@@ -1279,7 +1431,7 @@ class ParserListener : public RQLBaseListener {
       }
       constant.nom = value->sign != nullptr ? -*nom : *nom;
       constant.den = *den;
-    } else {
+    } else if (literalTyped) {
       // Tekst niesie znak, wiec std::stoi przyjmuje takze najmniejsza wartosc int.
       const auto integer = parseLiteral<int>(constant.text);
       if (!integer) {
@@ -1297,32 +1449,61 @@ class ParserListener : public RQLBaseListener {
       constants_.emplace(ctx->name->getText(), std::move(*constant));
   }
 
+  /// Typ z adnotacji `VAR NAZWA : TYP` (#546, H2); regula var_type przyjmuje tylko te piec tokenow.
+  [[nodiscard]] rdb::descFld declaredType(RQLParser::Var_typeContext *ctx) {
+    switch (ctx->getStart()->getType()) {
+      case RQLParser::INTEGER_T:
+        return rdb::INTEGER;
+      case RQLParser::UNSIGNED_T:
+        return rdb::UINT;
+      case RQLParser::FLOAT_T:
+        return rdb::FLOAT;
+      case RQLParser::DOUBLE_T:
+        return rdb::DOUBLE;
+      case RQLParser::RATIONAL_T:
+        return rdb::RATIONAL;
+      default:
+        abortInternal(fmt::format("RQLParser::declaredType: unknown variable type '{}'", ctx->getText()));
+    }
+  }
+
   /// `VAR NAZWA = wartosc` (#531): wpis w tej samej tablicy co LET oraz deklaracja w planie, z ktorej
   /// dataModel buduje wartosc biezaca (D6). Typ zmiennej to typ literalu w wyrazeniu (D4): calkowity
   /// INTEGER, dziesietny FLOAT - jak exitExpFloat, wiec plan z VAR bez SET liczy to samo co plan z LET -
-  /// a ulamek, ktorego wyrazenie literalem nie zapisze, RATIONAL.
+  /// a ulamek, ktorego wyrazenie literalem nie zapisze, RATIONAL. Jawny typ `VAR NAZWA : TYP = literal`
+  /// (#546) zastepuje typ literalu, a literal przechodzi konwersje H3 (convertLiteral).
   void exitVar(RQLParser::VarContext *ctx) override {
-    auto variable = declaration(ctx->name, ctx->let_value(), "variable");
+    auto variable = declaration(ctx->name, ctx->let_value(), "variable", ctx->var_type() == nullptr);
     if (!variable) return;
     rdb::descFldVT initial;
-    switch (variable->kind) {
-      case RqlConstant::Kind::integer:
-        initial = variable->integer;
-        break;
-      case RqlConstant::Kind::decimal: {
-        // declaration() sprawdzil zakres double; FLOAT ma wezszy, jak literal w wyrazeniu.
-        const auto value = parseLiteral<float>(variable->text);
-        if (!value) {
-          reportSemanticError(position(ctx->name) + ": value " + variable->text + " of variable ?" + ctx->name->getText() +
-                              " is out of range");
-          return;
-        }
-        initial = *value;
-      } break;
-      case RqlConstant::Kind::fraction:
-        initial = boost::rational<int>(variable->nom, variable->den);
-        break;
-    }
+    if (ctx->var_type() != nullptr) {
+      const rdb::descFld type = declaredType(ctx->var_type());
+      auto value              = convertLiteral(*variable, type);
+      if (!value) {
+        reportSemanticError(position(ctx->name) + ": value " + variable->text + " of variable ?" + ctx->name->getText() +
+                            " is out of range for " + std::string(rdb::GetStringdescFld(type)));
+        return;
+      }
+      initial = std::move(*value);
+    } else
+      switch (variable->kind) {
+        case RqlConstant::Kind::integer:
+          initial = variable->integer;
+          break;
+        case RqlConstant::Kind::decimal: {
+          // declaration() sprawdzil zakres double; FLOAT ma wezszy, jak literal w wyrazeniu.
+          const auto value = parseLiteral<float>(variable->text);
+          if (!value) {
+            reportSemanticError(position(ctx->name) + ": value " + variable->text + " of variable ?" + ctx->name->getText() +
+                                " is out of range");
+            return;
+          }
+          initial = *value;
+        } break;
+        case RqlConstant::Kind::fraction:
+          initial = boost::rational<int>(variable->nom, variable->den);
+          break;
+      }
     variable->variable = coreInstance.variables.size();
     coreInstance.variables.push_back({.name = ctx->name->getText(), .initial = std::move(initial), .line = variable->line});
     constants_.emplace(ctx->name->getText(), std::move(*variable));

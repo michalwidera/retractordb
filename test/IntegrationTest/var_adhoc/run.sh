@@ -118,7 +118,7 @@ awk '
 # --- 4. Odmowy ad hoc nie zmieniaja planu ani wartosci zmiennych. ---
 before=$(last_count)
 latch_line=$(grep -n '^VAR LATCH' plan.rql | cut -d: -f1)
-expect_refusal "expression is FLOAT, but variable ?LATCH is INTEGER" "RULE bad ON st WHEN 1 = 1 DO SET ?LATCH = 0.5"
+expect_refusal "expression is FLOAT, but variable ?LATCH is INTEGER" "RULE bad ON st WHEN 1 = 1 DO SET ?LATCH = st[0] * 0.5"
 expect_refusal "variable ?T_ON in DO SET is not declared" "RULE bad ON st WHEN 1 = 1 DO SET ?T_ON = 1"
 expect_refusal "constant ?T_ON in expression is not declared" "SELECT st[0] * ?T_ON STREAM bad FROM st"
 expect_refusal "variable ?LATCH is already declared on line $latch_line" "VAR LATCH = 1"
