@@ -274,13 +274,16 @@ TEST_F(embedStorageGuardBoundary, invalid_tmpdir_preserves_errno) {
   const std::optional<std::string> previous = getenv("TMPDIR") ? std::optional<std::string>{getenv("TMPDIR")} : std::nullopt;
   const auto missing                        = (directory / "missing").string();
   ASSERT_EQ(setenv("TMPDIR", missing.c_str(), 1), 0);
+  std::error_code expected;
+  (void)fs::temp_directory_path(expected);
   const auto refused = rdb::embed::temporaryStorageDirectory();
   if (previous)
     setenv("TMPDIR", previous->c_str(), 1);
   else
     unsetenv("TMPDIR");
+  ASSERT_TRUE(expected);
   ASSERT_RDB_ERROR(refused, rdb::Errc::IO, "TMPDIR");
-  EXPECT_EQ(refused.error().err(), ENOENT);
+  EXPECT_EQ(refused.error().err(), expected.value());
 }
 
 TEST_F(embedStorageGuardBoundary, mkdtemp_failure_preserves_errno_without_creating_a_directory) {

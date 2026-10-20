@@ -215,12 +215,10 @@ class IpcServerQueues : public ::testing::Test {
 
 }  // namespace
 
+#if RDB_HAS_BOOST_POSIX_SHM
+// Backend plikowy nie wywoluje shm_open; nie podmieniamy wtedy sygnatury z SDK.
 extern "C" int __real_shm_open(const char *name, int flags, mode_t mode);
-extern "C" int __real_fstatvfs(int fd, struct statvfs *info);
-extern "C" int __real_statvfs(const char *path, struct statvfs *info);
 RDB_WRAP_SYSCALL(int, shm_open, (const char *name, int flags, mode_t mode), (name, flags, mode));
-RDB_WRAP_SYSCALL(int, fstatvfs, (int fd, struct statvfs *info), (fd, info));
-RDB_WRAP_SYSCALL(int, statvfs, (const char *path, struct statvfs *info), (path, info));
 extern "C" int __wrap_shm_open(const char *name, int flags, mode_t mode) {
   std::string_view token(name);
   if (token.starts_with('/')) token.remove_prefix(1);
@@ -230,6 +228,12 @@ extern "C" int __wrap_shm_open(const char *name, int flags, mode_t mode) {
   }
   return __real_shm_open(name, flags, mode);
 }
+#endif
+
+extern "C" int __real_fstatvfs(int fd, struct statvfs *info);
+extern "C" int __real_statvfs(const char *path, struct statvfs *info);
+RDB_WRAP_SYSCALL(int, fstatvfs, (int fd, struct statvfs *info), (fd, info));
+RDB_WRAP_SYSCALL(int, statvfs, (const char *path, struct statvfs *info), (path, info));
 extern "C" int __wrap_fstatvfs(int fd, struct statvfs *info) {
   const int result = __real_fstatvfs(fd, info);
   if (result == 0 && noQueueSpace) info->f_bavail = 0;

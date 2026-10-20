@@ -548,7 +548,7 @@ TEST_F(LockFileSafety, IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice) {
   // covers: lockmanager.flock-service-guard.1~1, lockmanager.flock-service-guard.4~1, lockmanager.flock-service-guard.7~1
   // covers: lockmanager.flock-service-guard.8~1
   FlockServiceGuard guard(service);
-  EXPECT_EQ(guard.lockDirectory(), std::filesystem::temp_directory_path().string());
+  EXPECT_TRUE(std::filesystem::equivalent(guard.lockDirectory(), std::filesystem::temp_directory_path()));
   guard.setLockDir(dir.string());
   EXPECT_EQ(guard.lockDirectory(), dir.string());
   EXPECT_FALSE(guard.acquireIpcLock("contract", dir.string()));

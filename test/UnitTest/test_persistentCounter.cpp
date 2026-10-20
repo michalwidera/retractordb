@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -99,16 +100,17 @@ extern "C" int __wrap_close(int fd) {
 }
 
 namespace {
-bool renameProbe    = false;
-bool renameProbeHit = false;
+constexpr bool kRenameNoexcept = noexcept(::rename("", ""));
+bool renameProbe               = false;
+bool renameProbeHit            = false;
 }  // namespace
 
 // filesystem::rename wywoluje libc z biblioteki dzielonej, poza zasiegiem --wrap.
 // Na ELF eksport symbolu z testu przechwytuje te droge. Na Darwinie biblioteka dzielona
 // rozwiazuje rename dwupoziomowo, prosto w libSystem, wiec podmiana tam nie dziala -
 // rozstrzyga o tym sonda renameInterposed(), nie nazwa systemu.
-extern "C" int rename(const char *source, const char *target) noexcept {
-  using Rename         = int (*)(const char *, const char *);
+extern "C" int rename(const char *source, const char *target) noexcept(kRenameNoexcept) {
+  using Rename         = decltype(&::rename);
   static auto original = reinterpret_cast<Rename>(::dlsym(RTLD_NEXT, "rename"));
   if (renameProbe) {
     renameProbeHit = true;
