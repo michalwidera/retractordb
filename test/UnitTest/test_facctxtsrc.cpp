@@ -5,6 +5,7 @@
 #include <array>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -757,12 +758,24 @@ TEST_F(TextSourceROTest, invalid_numeric_token_reads_as_null) {
     int size;
   };
   const std::vector<Case> cases{
-      {"abc", rdb::INTEGER, sizeof(int)},         {"abc", rdb::UINT, sizeof(unsigned)}, {"abc", rdb::FLOAT, sizeof(float)},
-      {"abc", rdb::DOUBLE, sizeof(double)},       {"12x", rdb::INTEGER, sizeof(int)},   {"12x", rdb::UINT, sizeof(unsigned)},
-      {"99999999999", rdb::INTEGER, sizeof(int)}, {"-5", rdb::UINT, sizeof(unsigned)},  {"300", rdb::BYTE, 1},
-      {"1e999", rdb::DOUBLE, sizeof(double)},     {"1e39", rdb::FLOAT, sizeof(float)},  {"inf", rdb::DOUBLE, sizeof(double)},
-      {"nan", rdb::DOUBLE, sizeof(double)},       {"+-5", rdb::INTEGER, sizeof(int)},   {"-5", rdb::BYTE, 1},
+      {"abc", rdb::INTEGER, sizeof(int)},
+      {"abc", rdb::UINT, sizeof(unsigned)},
+      {"abc", rdb::FLOAT, sizeof(float)},
+      {"abc", rdb::DOUBLE, sizeof(double)},
+      {"12x", rdb::INTEGER, sizeof(int)},
+      {"12x", rdb::UINT, sizeof(unsigned)},
+      {"99999999999", rdb::INTEGER, sizeof(int)},
+      {"-5", rdb::UINT, sizeof(unsigned)},
+      {"300", rdb::BYTE, 1},
+      {"1e999", rdb::DOUBLE, sizeof(double)},
+      {"1e39", rdb::FLOAT, sizeof(float)},
+      {"inf", rdb::DOUBLE, sizeof(double)},
+      {"nan", rdb::DOUBLE, sizeof(double)},
+      {"+-5", rdb::INTEGER, sizeof(int)},
+      {"-5", rdb::BYTE, 1},
       {"1.5x", rdb::DOUBLE, sizeof(double)},
+      {"1e-999x", rdb::FLOAT, sizeof(float)},
+      {"1e-999x", rdb::DOUBLE, sizeof(double)},
   };
 
   for (const auto &c : cases) {
@@ -966,22 +979,33 @@ TEST_F(TextSourceROTest, empty_looped_file_reports_eio_on_every_read) {
   }
 }
 
-TEST_F(TextSourceROTest, floating_point_underflow_is_zero_with_clear_null_bits) {
+TEST_F(TextSourceROTest, floating_point_underflow_preserves_values_with_clear_null_bits) {
   // covers: facctxtsrc.text-source-ro.2~1
-  const auto file = createTestFile("test_underflow.txt", "1e-999 1e-999");
-  const rdb::Descriptor descriptor{{"f", 4, 1, rdb::FLOAT}, {"d", 8, 1, rdb::DOUBLE}};
-  rdb::textSourceRO source(file, descriptor, false);
-  std::array<uint8_t, 12> bytes;
-  bytes.fill(0xFF);
-  std::vector<bool> nulls;
-  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
-  float f  = 1;
-  double d = 1;
-  std::memcpy(&f, bytes.data(), sizeof(f));
-  std::memcpy(&d, bytes.data() + sizeof(f), sizeof(d));
-  EXPECT_EQ(f, 0.0F);
-  EXPECT_EQ(d, 0.0);
-  EXPECT_EQ(nulls, (std::vector<bool>{false, false}));
+  struct Case {
+    std::string text;
+    float f;
+    double d;
+  };
+  for (const auto &c :
+       {Case{"1e-999 1e-999", 0.0F, 0.0}, Case{"-1e-999 -1e-999", -0.0F, -0.0}, Case{"1e-40 1e-310", 1e-40F, 1e-310}}) {
+    SCOPED_TRACE(c.text);
+    const auto file = createTestFile("test_underflow.txt", c.text);
+    const rdb::Descriptor descriptor{{"f", 4, 1, rdb::FLOAT}, {"d", 8, 1, rdb::DOUBLE}};
+    rdb::textSourceRO source(file, descriptor, false);
+    std::array<uint8_t, 12> bytes;
+    bytes.fill(0xFF);
+    std::vector<bool> nulls;
+    EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
+    float f  = 1;
+    double d = 1;
+    std::memcpy(&f, bytes.data(), sizeof(f));
+    std::memcpy(&d, bytes.data() + sizeof(f), sizeof(d));
+    EXPECT_EQ(f, c.f);
+    EXPECT_EQ(d, c.d);
+    EXPECT_EQ(std::signbit(f), std::signbit(c.f));
+    EXPECT_EQ(std::signbit(d), std::signbit(c.d));
+    EXPECT_EQ(nulls, (std::vector<bool>{false, false}));
+  }
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

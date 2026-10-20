@@ -6,8 +6,11 @@
 #include <algorithm>
 #include <cerrno>
 #include <charconv>  // from_chars
-#include <cstring>   // memcpy
+#include <cmath>
+#include <cstdlib>
+#include <cstring>  // memcpy
 #include <format>
+#include <limits>
 #include <memory>  // make_unique
 #include <optional>
 #include <ranges>
@@ -54,10 +57,26 @@ std::optional<T> parseAs(const std::string &token) {
     if (ec != std::errc{} || ptr != last) return std::nullopt;
   } else {
     // FLOAT/DOUBLE zostaja na strumieniu: from_chars przyjmuje "inf"/"nan", a strumien je odrzuca.
-    // failbit niesie tez przekroczenie zakresu (`1e999`), a niedomiar (`1e-999` -> 0) go nie ustawia.
+    // failbit niesie przekroczenie zakresu (`1e999`). libc++ ustawia go takze przy niedomiarze (`1e-999`),
+    // libstdc++ nie - tylko ten przypadek odzyskujemy przez strtof/strtod.
     std::istringstream in(token);
     in >> var;
-    if (in.fail() || in.peek() != std::char_traits<char>::eof()) return std::nullopt;
+    if (in.fail()) {
+      if (!in.eof()) return std::nullopt;
+      char *end            = nullptr;
+      const int savedErrno = errno;
+      errno                = 0;
+      if constexpr (std::is_same_v<T, float>)
+        var = std::strtof(token.c_str(), &end);
+      else
+        var = std::strtod(token.c_str(), &end);
+      const int error = errno;
+      errno           = savedErrno;
+      if (end != token.c_str() + token.size() || error != ERANGE || std::abs(var) >= std::numeric_limits<T>::min())
+        return std::nullopt;
+    } else if (in.peek() != std::char_traits<char>::eof()) {
+      return std::nullopt;
+    }
   }
   return var;
 }

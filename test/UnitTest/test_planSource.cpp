@@ -1261,10 +1261,11 @@ TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
   const std::string fifo    = (dir / "feed.fifo").string();
   const std::string regular = (dir / "values.dat").string();
   const std::string loop    = (dir / "loop").string();
-  const std::string device  = "/dev/shm/rdb_planSource_" + std::to_string(::getpid());
+  // Prefiks wybiera przestarzale DEVICE, ale /dev/.. prowadzi do zwyklego pliku testu.
+  const std::string device = "/dev/.." + fs::absolute(regular).string();
   ASSERT_EQ(::mkfifo(fifo.c_str(), 0600), 0);
   std::ofstream(regular) << "1\n";
-  std::ofstream(device) << "1\n";
+  ASSERT_TRUE(fs::is_regular_file(device));
   fs::create_symlink("loop", loop);
 
   const auto check = [](const std::string &text) {
@@ -1296,7 +1297,6 @@ TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
             "stream 'src': BINFILE '" + dir.string() +
                 "' is a directory, not a regular file (deprecated FILE resolved this path as BINFILE)");
 
-  fs::remove(device);
   fs::remove_all(dir);
 }
 

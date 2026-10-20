@@ -179,7 +179,9 @@ TEST_F(KbHitRedirectedStdin, tty_key_remains_available_and_terminal_mode_is_rest
   ASSERT_EQ(write(pty.master, "k", 1), 1);
   EXPECT_TRUE(_kbhit(false));
   ASSERT_EQ(tcgetattr(STDIN_FILENO, &after), 0);
-  EXPECT_EQ(after.c_lflag, before.c_lflag);
+  // PENDIN jest stanem jadra ustawianym przy powrocie do ICANON, nie ustawieniem operatora.
+  const auto settingsMask = ~static_cast<tcflag_t>(PENDIN);
+  EXPECT_EQ(after.c_lflag & settingsMask, before.c_lflag & settingsMask);
   EXPECT_EQ(after.c_iflag, before.c_iflag);
   EXPECT_EQ(fcntl(STDIN_FILENO, F_GETFL) & O_NONBLOCK, 0);
   EXPECT_EQ(_getch(), 'k');
