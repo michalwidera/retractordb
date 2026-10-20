@@ -233,6 +233,13 @@ std::optional<rdb::descFldVT> convertLiteral(const RqlConstant &literal, const r
   }
   return std::nullopt;
 }
+
+/// Wpis literalu z przeciwnym znakiem - wejscie convertLiteral dla `-?NAZWA` (#546 O3, #547 L4).
+RqlConstant negatedLiteral(RqlConstant literal) {
+  literal.text = literal.text.starts_with('-') ? literal.text.substr(1) : "-" + literal.text;
+  literal.nom  = -literal.nom;
+  return literal;
+}
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
@@ -432,9 +439,17 @@ class ParserListener : public RQLBaseListener {
   /// Uzycie przed deklaracja i nazwa nieznana to ten sam przypadek: tablica rosnie w kolejnosci
   /// planu, wiec pozniejszego LET jeszcze w niej nie ma. Stala dziesietna albo ulamek w kontekscie
   /// calkowitym jest odmowa, bo literal tej postaci bylby tu bledem skladni.
+  ///
+  /// Stala z adnotacja (#547, L5) jest tu dopuszczalna tylko jako INTEGER, z wartoscia po konwersji
+  /// L3 - `LET N : INTEGER = 4/2` to 2.
   std::optional<int> constantValue(const antlr4::Token *ref, const std::string &what) {
     const RqlConstant *constant = findConstant(ref, what);
     if (constant == nullptr) return std::nullopt;
+    if (constant->type) {
+      if (*constant->type == rdb::INTEGER) return constant->integer;
+      reportAnnotationMisuse(ref, *constant->type, what, "INTEGER");
+      return std::nullopt;
+    }
     if (constant->kind != RqlConstant::Kind::integer) {
       reportSemanticError(position(ref) + ": constant " + ref->getText() + " = " + constant->text + " in " + what +
                           " is not an integer");
@@ -467,6 +482,14 @@ class ParserListener : public RQLBaseListener {
   void reportVariableMisuse(const antlr4::Token *ref, const std::string &what) {
     reportSemanticError(position(ref) + ": variable " + ref->getText() + " cannot be used in " + what +
                         "; VAR is allowed only in scalar expressions of SELECT and RULE WHEN");
+  }
+
+  /// Odmowa L5 (#547), wzorem D2: adnotacja deklaruje typ wartosci w wyrazeniu, a kontekst strukturalny
+  /// przyjmuje tylko adnotacje naturalna dla siebie (`accepted`) - bez cichej konwersji.
+  void reportAnnotationMisuse(const antlr4::Token *ref, const rdb::descFld type, const std::string &what,
+                              const std::string &accepted) {
+    reportSemanticError(position(ref) + ": constant " + ref->getText() + " : " + std::string(rdb::GetStringdescFld(type)) +
+                        " cannot be used in " + what + "; it takes a constant without annotation or annotated " + accepted);
   }
 
   /// Odwolanie do stalej w komunikacie: `?NAZWA = wartosc (line L:C)`.
@@ -835,6 +858,17 @@ class ParserListener : public RQLBaseListener {
       recpToken(PUSH_VAL, 0);
       return;
     }
+    // Stala z adnotacja (#547, L4) to PUSH_VAL w typie z adnotacji - takze RATIONAL, ktorego literal
+    // w wyrazeniu nie istnieje. Minus neguje wartosc w tym typie: konwersja idzie z zanegowanego
+    // tekstu, wiec `-?N` dla UINT jest odmowa, a nie zawinieciem.
+    if (constant->type) {
+      const auto value = convertLiteral(negated ? negatedLiteral(*constant) : *constant, *constant->type);
+      if (!value)
+        reportSemanticError("expression " + std::string(negated ? "-" : "") + constantText(ref, *constant) +
+                            " is out of range for " + std::string(rdb::GetStringdescFld(*constant->type)));
+      recpToken(PUSH_VAL, value.value_or(0));
+      return;
+    }
     switch (constant->kind) {
       case RqlConstant::Kind::integer: {
         const long long value = negated ? -static_cast<long long>(constant->integer) : constant->integer;
@@ -1069,22 +1103,33 @@ class ParserListener : public RQLBaseListener {
 
     bool negative = false;
     std::optional<boost::rational<int>> magnitude;
-    switch (constant->kind) {
-      case RqlConstant::Kind::integer:
-        negative = constant->integer < 0;
-        // Modul najmniejszej wartosci int sie w int nie miesci - jak literal 2147483648.
-        if (const long long value = std::abs(static_cast<long long>(constant->integer)); std::in_range<int>(value))
-          magnitude = boost::rational<int>(static_cast<int>(value));
-        break;
-      case RqlConstant::Kind::decimal:
-        negative  = constant->text.starts_with('-');
-        magnitude = rationalFromFloat(negative ? constant->text.substr(1) : constant->text);
-        break;
-      case RqlConstant::Kind::fraction:
-        negative  = constant->nom < 0;
-        magnitude = boost::rational<int>(std::abs(constant->nom), constant->den);
-        break;
-    }
+    if (constant->type) {
+      // L5 (#547): tylko INTEGER albo RATIONAL, z wartoscia po konwersji L3 - dokladnie, z tekstu.
+      // Modul liczy sie z tekstu bez znaku, bo `-2147483648` nie ma modulu w rational<int>.
+      if (*constant->type != rdb::INTEGER && *constant->type != rdb::RATIONAL) {
+        reportAnnotationMisuse(ref, *constant->type, what, "INTEGER or RATIONAL");
+        return;
+      }
+      negative = constant->text.starts_with('-');
+      if (const auto value = convertLiteral(negative ? negatedLiteral(*constant) : *constant, rdb::RATIONAL))
+        magnitude = std::get<boost::rational<int>>(*value);
+    } else
+      switch (constant->kind) {
+        case RqlConstant::Kind::integer:
+          negative = constant->integer < 0;
+          // Modul najmniejszej wartosci int sie w int nie miesci - jak literal 2147483648.
+          if (const long long value = std::abs(static_cast<long long>(constant->integer)); std::in_range<int>(value))
+            magnitude = boost::rational<int>(static_cast<int>(value));
+          break;
+        case RqlConstant::Kind::decimal:
+          negative  = constant->text.starts_with('-');
+          magnitude = rationalFromFloat(negative ? constant->text.substr(1) : constant->text);
+          break;
+        case RqlConstant::Kind::fraction:
+          negative  = constant->nom < 0;
+          magnitude = boost::rational<int>(std::abs(constant->nom), constant->den);
+          break;
+      }
     // Przy TIMEOUT nazwa strumienia jest juz znana, a komunikaty literalu ja podaja (exitDeclare).
     std::string owner;
     if (timeout) {
@@ -1378,12 +1423,7 @@ class ParserListener : public RQLBaseListener {
     if (reference == nullptr) return std::nullopt;
     const auto found = constants_.find(reference->CONST_REF()->getText().substr(1));
     if (found == constants_.end() || found->second.variable) return std::nullopt;
-    RqlConstant constant = found->second;
-    if (reference->MINUS() != nullptr) {
-      constant.text = constant.text.starts_with('-') ? constant.text.substr(1) : "-" + constant.text;
-      constant.nom  = -constant.nom;
-    }
-    return constant;
+    return reference->MINUS() != nullptr ? negatedLiteral(found->second) : found->second;
   }
 
   /// Wpis deklaracji `LET` albo `VAR` po kontroli nazwy i literalu, albo nullopt po zgloszonej odmowie.
@@ -1392,7 +1432,7 @@ class ParserListener : public RQLBaseListener {
   /// miedzy formami jest taka sama odmowa jak powtorzenie jednej z nich.
   ///
   /// Literal calkowity sprawdza tu zakres int tylko wtedy, gdy typ bierze sie z literalu
-  /// (`literalTyped`); przy jawnym typie VAR zakres sprawdza convertLiteral, bo UINT siega dalej.
+  /// (`literalTyped`); przy jawnym typie VAR i LET zakres sprawdza convertLiteral, bo UINT siega dalej.
   std::optional<RqlConstant> declaration(const antlr4::Token *nameToken, RQLParser::Let_valueContext *value,
                                          const std::string &kind, const bool literalTyped = true) {
     const std::string name  = nameToken->getText();
@@ -1443,13 +1483,35 @@ class ParserListener : public RQLBaseListener {
     return constant;
   }
 
-  /// `LET NAZWA = wartosc` (#440): wpis do tablicy stalych planu, bez zadnego sladu w coreInstance.
-  void exitLet(RQLParser::LetContext *ctx) override {
-    if (auto constant = declaration(ctx->name, ctx->let_value(), "constant"))
-      constants_.emplace(ctx->name->getText(), std::move(*constant));
+  /// Literal deklaracji z jawnym typem jako wartosc tego typu (#546 H3, #547 L3) albo nullopt po
+  /// zgloszonej odmowie. Jedna konwersja i jeden komunikat dla `VAR` i `LET`.
+  std::optional<rdb::descFldVT> annotatedValue(const antlr4::Token *nameToken, const RqlConstant &declared,
+                                               const rdb::descFld type, const std::string &kind) {
+    auto value = convertLiteral(declared, type);
+    if (!value)
+      reportSemanticError(position(nameToken) + ": value " + declared.text + " of " + kind + " ?" + nameToken->getText() +
+                          " is out of range for " + std::string(rdb::GetStringdescFld(type)));
+    return value;
   }
 
-  /// Typ z adnotacji `VAR NAZWA : TYP` (#546, H2); regula var_type przyjmuje tylko te piec tokenow.
+  /// `LET NAZWA = wartosc` (#440): wpis do tablicy stalych planu, bez zadnego sladu w coreInstance.
+  /// Jawny typ `LET NAZWA : TYP = literal` (#547) przechodzi konwersje L3 juz tutaj, wiec odmowa
+  /// wskazuje deklaracje; wartosc dla wyrazenia liczy kazde odwolanie z tekstu (L4).
+  void exitLet(RQLParser::LetContext *ctx) override {
+    auto constant = declaration(ctx->name, ctx->let_value(), "constant", ctx->var_type() == nullptr);
+    if (!constant) return;
+    if (ctx->var_type() != nullptr) {
+      const rdb::descFld type = declaredType(ctx->var_type());
+      const auto value        = annotatedValue(ctx->name, *constant, type, "constant");
+      if (!value) return;
+      constant->type = type;
+      if (const auto *integer = std::get_if<int>(&*value)) constant->integer = *integer;
+    }
+    constants_.emplace(ctx->name->getText(), std::move(*constant));
+  }
+
+  /// Typ z adnotacji `VAR NAZWA : TYP` (#546, H2) i `LET NAZWA : TYP` (#547); regula var_type przyjmuje
+  /// tylko te piec tokenow.
   [[nodiscard]] rdb::descFld declaredType(RQLParser::Var_typeContext *ctx) {
     switch (ctx->getStart()->getType()) {
       case RQLParser::INTEGER_T:
@@ -1477,13 +1539,8 @@ class ParserListener : public RQLBaseListener {
     if (!variable) return;
     rdb::descFldVT initial;
     if (ctx->var_type() != nullptr) {
-      const rdb::descFld type = declaredType(ctx->var_type());
-      auto value              = convertLiteral(*variable, type);
-      if (!value) {
-        reportSemanticError(position(ctx->name) + ": value " + variable->text + " of variable ?" + ctx->name->getText() +
-                            " is out of range for " + std::string(rdb::GetStringdescFld(type)));
-        return;
-      }
+      auto value = annotatedValue(ctx->name, *variable, declaredType(ctx->var_type()), "variable");
+      if (!value) return;
       initial = std::move(*value);
     } else
       switch (variable->kind) {

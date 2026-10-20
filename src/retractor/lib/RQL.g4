@@ -17,8 +17,9 @@ default_statement   : DEFAULT VOLATILE # DefaultOption
 // (RQLParser.cpp, tablica RqlConstants jednego planu) - do kompilatora trafiaja juz liczby, wiec
 // deklaracja nie tworzy wezla, pola ani strumienia. Prawa strona to jeden literal: calkowity,
 // dziesietny albo ulamek. Ulamek ma tu wlasna alternatywe, a nie `fraction_rule`, bo przebiegi
-// rational_se zapisuja kazdy ulamek do interwalu biezacej deklaracji.
-let_statement       : LET name=ID IS_EQ let_value
+// rational_se zapisuja kazdy ulamek do interwalu biezacej deklaracji. Jawny typ
+// `LET NAZWA : TYP = literal` (#547, L1-L5) konwertuje literal tak jak w VAR (var_type).
+let_statement       : LET name=ID (COLON var_type)? IS_EQ let_value
                     # Let
                     ;
 
@@ -35,7 +36,7 @@ var_statement       : VAR name=ID (COLON var_type)? IS_EQ let_value
                     # Var
                     ;
 
-// Typy zmiennej (#546, H2). Osobna regula, nie `field_type`: STRING nie ma literalu w let_value,
+// Typy zmiennej (#546, H2) i stalej LET (#547). Osobna regula, nie `field_type`: STRING nie ma literalu w let_value,
 // a BYTE nie da sie ustawic wyrazeniem (BYTE op INTEGER daje INTEGER, funkcji to_byte nie ma).
 var_type            : INTEGER_T | UNSIGNED_T | FLOAT_T | DOUBLE_T | RATIONAL_T
                     ;

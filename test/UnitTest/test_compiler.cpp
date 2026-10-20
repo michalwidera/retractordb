@@ -5829,8 +5829,9 @@ TEST(xparser, set_refusals_name_the_target_the_rule_and_the_position) {
 // --- Jawny typ zmiennej `VAR NAZWA : TYP = literal` (#546, etap H) --------------------------------
 
 TEST(xparser, var_type_annotation_converts_the_declared_literal) {
-  // covers: rqlparser.parser-rql-string.18~1
-  // Macierz H3: literal x typ. nullopt to odmowa z nazwa, typem i pozycja.
+  // covers: rqlparser.parser-rql-string.18~1, rqlparser.parser-rql-string.20~1, rqlparser.parser-rql-string.21~1
+  // Macierz H3: literal x typ. nullopt to odmowa z nazwa, typem i pozycja. Ta sama macierz obowiazuje
+  // stala LET z adnotacja (#547, L3).
   using V      = std::optional<rdb::descFldVT>;
   const auto R = [](const int nom, const int den) { return V{boost::rational<int>(nom, den)}; };
   struct Case {
@@ -5865,6 +5866,22 @@ TEST(xparser, var_type_annotation_converts_the_declared_literal) {
       const std::string rql =
           "VAR X : " + type + " = " + row.literal + "\n" + std::string(kLetHeader) + "\nSELECT s[0], ?X STREAM o FROM s";
       SCOPED_TRACE(rql);
+      {
+        // LET: odwolanie w wyrazeniu to jeden PUSH_VAL w typie z adnotacji, a pole SELECT ma ten typ (L4).
+        qTree let;
+        const PlanSource loaded = parsePlanText(let, "LET" + rql.substr(3));
+        if (!expected)
+          EXPECT_EQ(loaded.status, "line 1:4: value " + row.literal + " of constant ?X is out of range for " + type);
+        else {
+          ASSERT_EQ(loaded.status, "OK");
+          ASSERT_EQ(compiler(let).compile(), "OK");
+          const auto &field = let.getQuery("o").lSchema.back();
+          ASSERT_EQ(field.lProgram.size(), 1U);
+          EXPECT_EQ(field.lProgram.front().getCommandID(), PUSH_VAL);
+          EXPECT_EQ(field.lProgram.front().getVT(), *expected);
+          EXPECT_EQ(field.field_.rtype, static_cast<rdb::descFld>(expected->index()));
+        }
+      }
       qTree plan;
       const PlanSource loaded = parsePlanText(plan, rql);
       if (!expected) {
@@ -5884,11 +5901,16 @@ TEST(xparser, var_type_annotation_converts_the_declared_literal) {
   EXPECT_EQ(letPlanStatus("VAR X : Uint = 1\nVAR Y : Rational = 1\nVAR Z : Double = 1\n" + std::string(kLetHeader) +
                           "\nSELECT s[0], ?X, ?Y, ?Z STREAM o FROM s"),
             "OK");
+  EXPECT_EQ(letPlanStatus("LET X : Uint = 1\nLET Y : Rational = 1\nLET Z : Double = 1\n" + std::string(kLetHeader) +
+                          "\nSELECT s[0], ?X, ?Y, ?Z STREAM o FROM s"),
+            "OK");
   for (const std::string type : {"BYTE", "STRING", "rational", "INTPAIR"}) {
-    SCOPED_TRACE(type);
-    const std::string status = letPlanStatus("VAR X : " + type + " = 1\n" + std::string(kLetHeader));
-    EXPECT_TRUE(status.starts_with("line 1:8 ")) << status;
-    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+    for (const std::string keyword : {"VAR", "LET"}) {
+      SCOPED_TRACE(keyword + " " + type);
+      const std::string status = letPlanStatus(keyword + " X : " + type + " = 1\n" + std::string(kLetHeader));
+      EXPECT_TRUE(status.starts_with("line 1:8 ")) << status;
+      EXPECT_FALSE(isInternalCompilerError(status)) << status;
+    }
   }
   // Wartosc spoza double nie przechodzi juz przez deklaracje, jak bez adnotacji.
   EXPECT_EQ(letPlanStatus("VAR X : DOUBLE = " + std::string(400, '9') + ".0\n" + std::string(kLetHeader)),
@@ -5975,4 +5997,146 @@ TEST(xparser, set_single_literal_converts_to_the_variable_type) {
       text.ends_with("but variable ?V is INTEGER (declared by VAR); no implicit conversion, use an explicit "
                      "conversion function"))
       << text;
+}
+
+// --- LET z jawnym typem (#547): wyrazenie, SET i konteksty strukturalne -------------------------
+
+TEST(xparser, let_type_annotation_in_expressions_set_and_structural_contexts) {
+  // covers: rqlparser.parser-rql-string.21~1, rqlparser.parser-rql-string.22~1, rqlparser.parser-rql-string.19~1
+  const std::string consts =
+      "LET K : DOUBLE = 0.1\nLET Q : RATIONAL = 1/4\nLET N : UINT = 3000000000\nLET F : FLOAT = 0.1\n"
+      "LET I : INTEGER = 4/2\nLET Z : UINT = 0\nLET M : INTEGER = -2147483648\n";
+  const std::string header = "DECLARE a INTEGER, b UINT, c DOUBLE STREAM s, 1 TEXTFILE 'in.txt'";
+  const std::string plan   = consts + header + "\nSELECT ";  // instrukcja SELECT w wierszu 9
+  // L4: program i typ pola SELECT; stala daje PUSH_VAL w typie z adnotacji, minus neguje w tym typie.
+  const auto field = [&plan](const std::string &expression) -> std::pair<std::list<token>, rdb::descFld> {
+    qTree tree;
+    const PlanSource loaded = parsePlanText(tree, plan + expression + " STREAM o FROM s");
+    EXPECT_EQ(loaded.status, "OK") << expression;
+    EXPECT_EQ(compiler(tree).compile(), "OK") << expression;
+    if (!tree.exists("o")) return {};
+    const auto &f = tree.getQuery("o").lSchema.back();
+    return {f.lProgram, f.field_.rtype};
+  };
+  const auto values = [](const std::list<token> &program) {
+    std::vector<rdb::descFldVT> found;
+    for (const auto &tk : program)
+      if (tk.getCommandID() == PUSH_VAL) found.push_back(tk.getVT());
+    return found;
+  };
+  using VT = rdb::descFldVT;
+  const VT quarter{boost::rational<int>(1, 4)};
+  {
+    const auto [program, type] = field("s[2] * ?K");
+    EXPECT_EQ(values(program), std::vector<VT>{VT{0.1}});
+    EXPECT_EQ(type, rdb::DOUBLE);
+  }
+  {
+    const auto [program, type] = field("s[0] * ?Q");
+    EXPECT_EQ(values(program), std::vector<VT>{quarter});
+    EXPECT_EQ(type, rdb::RATIONAL);
+  }
+  {
+    const auto [program, type] = field("s[1] + ?N");
+    EXPECT_EQ(values(program), std::vector<VT>{VT{3000000000U}});
+    EXPECT_EQ(type, rdb::UINT);
+  }
+  EXPECT_EQ(values(field("-?Q").first), std::vector<VT>{VT{boost::rational<int>(-1, 4)}});
+  EXPECT_EQ(values(field("-?K").first), std::vector<VT>{VT{-0.1}});
+  EXPECT_EQ(values(field("?F").first), std::vector<VT>{VT{0.1F}});
+  EXPECT_EQ(values(field("?I").first), std::vector<VT>{VT{2}});
+  EXPECT_EQ(values(field("-?Z").first), std::vector<VT>{VT{0U}});
+  EXPECT_EQ(field("?Q").second, rdb::RATIONAL);
+  {
+    qTree tree;
+    ASSERT_EQ(parsePlanText(tree, plan + "s[0] STREAM o FROM s\nRULE r ON o WHEN s[1] > ?N DO DUMP 0 TO 1").status, "OK");
+    EXPECT_EQ(values(tree.getQuery("o").lRules.front().condition), std::vector<VT>{VT{3000000000U}});
+  }
+  // Negacja bez wartosci w typie z adnotacji: odmowa z nazwa, typem i pozycja.
+  EXPECT_EQ(letPlanStatus(plan + "-?N STREAM o FROM s"), "expression -?N = 3000000000 (line 9:8) is out of range for UINT");
+  EXPECT_EQ(letPlanStatus(plan + "s[0] + -?M STREAM o FROM s"),
+            "expression -?M = -2147483648 (line 9:15) is out of range for INTEGER");
+
+  // SET (O3 bez zmian): cala prawa strona bedaca stala konwertuje sie z TEKSTU stalej do typu zmiennej,
+  // niezaleznie od adnotacji - 0.1 DOUBLE do RATIONAL to dokladnie 1/10. Kazde inne wyrazenie - D4.
+  const std::string rule = "VAR V = 1\nVAR R : RATIONAL = 0\nVAR D : DOUBLE = 0\n" + consts + header +
+                           "\nSELECT s[0] STREAM o FROM s\nRULE r ON o WHEN o[0] > 0 DO ";  // RULE w wierszu 13
+  const auto setValue = [&rule](const std::string &action) -> std::variant<std::string, std::list<token>> {
+    qTree tree;
+    const PlanSource loaded = parsePlanText(tree, rule + action);
+    if (loaded.status != "OK") return loaded.status;
+    if (const std::string compiled = compiler(tree).compile(); compiled != "OK") return compiled;
+    return tree.getQuery("o").lRules.front().setValue;
+  };
+  const auto setSingle = [&setValue, &values](const std::string &action) {
+    const auto result = setValue(action);
+    if (const auto *status = std::get_if<std::string>(&result)) return std::vector<VT>{VT{*status}};
+    return values(std::get<std::list<token>>(result));
+  };
+  EXPECT_EQ(setSingle("SET ?R = ?K"), std::vector<VT>{VT{boost::rational<int>(1, 10)}});
+  EXPECT_EQ(setSingle("SET ?V = ?I"), std::vector<VT>{VT{2}});
+  EXPECT_EQ(setSingle("SET ?V = ?Q"),
+            std::vector<VT>{VT{"line 13:33: value ?Q = 1/4 in DO SET ?V is out of range for INTEGER"}});
+  // Odmowa liscia `-?N` (negacja UINT) czeka na exitSetpart i przepada, bo -3000000000 jest DOUBLE.
+  EXPECT_EQ(setSingle("SET ?D = -?N"), std::vector<VT>{VT{-3000000000.0}});
+  EXPECT_EQ(setSingle("SET ?R = -?N"),
+            std::vector<VT>{VT{"line 13:33: value -?N = -3000000000 in DO SET ?R is out of range for RATIONAL"}});
+  EXPECT_EQ(setSingle("SET ?V = -?Z"), std::vector<VT>{VT{0}});
+  EXPECT_EQ(setSingle("SET ?V = ?Q * 2"),
+            std::vector<VT>{VT{"line 13:33: rule 'r' on stream 'o': DO SET ?V - expression is RATIONAL, but variable ?V is "
+                               "INTEGER (declared by VAR); no implicit conversion, use an explicit conversion function or "
+                               "declare VAR V : RATIONAL = ..."}});
+
+  // L5: w kontekscie strukturalnym tylko adnotacja naturalna dla niego, z wartoscia po konwersji L3 -
+  // plan nie do odroznienia od literalowego.
+  const std::string let                                        = std::string(kLetHeader);
+  const std::string device                                     = "DECLARE a INTEGER STREAM d, 1 DEVICE 'dev.fifo' TIMEOUT ";
+  const std::vector<std::pair<std::string, std::string>> pairs = {
+      {let + "\nSELECT * STREAM o FROM s > 2", "LET W : INTEGER = 4/2\n" + let + "\nSELECT * STREAM o FROM s > ?W"},
+      {let + "\nSELECT s[1-$] STREAM o[2] FROM s\nSELECT o$1[0] STREAM p FROM o[1]",
+       "LET L : INTEGER = 1.0\nLET G : Integer = 2\n" + let +
+           "\nSELECT s[?L-$] STREAM o[?G] FROM s\nSELECT o$1[0] STREAM p FROM o[?L]"},
+      {let + "\nSELECT * STREAM o FROM s - 3/2\nSELECT * STREAM p FROM s & 3",
+       "LET R : RATIONAL = 1.5\nLET T : INTEGER = 6/2\n" + let +
+           "\nSELECT * STREAM o FROM s - ?R\nSELECT * STREAM p FROM s & ?T"},
+      {"DECLARE a INTEGER STREAM u, 1/10000000 TEXTFILE 'u.txt'",
+       "LET R : RATIONAL = 0.0000001\nDECLARE a INTEGER STREAM u, ?R TEXTFILE 'u.txt'"},
+      {device + "1/2", "LET T : RATIONAL = -0.5\n" + device + "-?T"},
+  };
+  for (const auto &[literal, named] : pairs) {
+    SCOPED_TRACE(named);
+    const std::string expected = letPlanFingerprint(literal);
+    ASSERT_EQ(expected.find("parse:"), std::string::npos) << expected;
+    ASSERT_EQ(expected.find("compile:"), std::string::npos) << expected;
+    EXPECT_EQ(letPlanFingerprint(named), expected);
+  }
+  const std::string integer  = "; it takes a constant without annotation or annotated INTEGER";
+  const std::string rational = "; it takes a constant without annotation or annotated INTEGER or RATIONAL";
+  const std::vector<std::pair<std::string, std::string>> refusals = {
+      {"LET K : DOUBLE = 3\n" + let + "\nSELECT * STREAM o FROM s > ?K",
+       "line 3:27: constant ?K : DOUBLE cannot be used in time shift" + integer},
+      {"LET N : UINT = 0\n" + let + "\nSELECT s[?N] STREAM o FROM s",
+       "line 3:9: constant ?N : UINT cannot be used in field index" + integer},
+      {"LET R : RATIONAL = 2\n" + let + "\nSELECT * STREAM o FROM s@(?R, 2)",
+       "line 3:26: constant ?R : RATIONAL cannot be used in AGSE step" + integer},
+      {"LET N : UINT = 1\n" + let + "\nSELECT s[?N-$] STREAM o[2] FROM s",
+       "line 3:9: constant ?N : UINT cannot be used in generator index" + integer},
+      {"LET W : FLOAT = 2\nDECLARE a STRING[?W] STREAM s, 1 TEXTFILE 'in.txt'",
+       "line 2:17: constant ?W : FLOAT cannot be used in field size" + integer},
+      {"LET F : FLOAT = 2\n" + let + "\nSELECT * STREAM o FROM s & ?F",
+       "line 3:27: constant ?F : FLOAT cannot be used in interval" + rational},
+      {"LET U : UINT = 2\nDECLARE a INTEGER STREAM s, ?U TEXTFILE 's.txt'",
+       "line 2:28: constant ?U : UINT cannot be used in interval" + rational},
+      {"LET D : DOUBLE = 1\n" + device + "?D", "line 2:56: constant ?D : DOUBLE cannot be used in TIMEOUT" + rational},
+      {"LET R : RATIONAL = -1/2\n" + let + "\nSELECT * STREAM o FROM s - ?R",
+       "interval ?R = -1/2 (line 3:27) must be greater than zero"},
+      {"LET R : RATIONAL = -2147483648\n" + let + "\nSELECT * STREAM o FROM s - ?R",
+       "interval ?R = -2147483648 (line 3:27) must be greater than zero"},
+  };
+  for (const auto &[rql, expected] : refusals) {
+    SCOPED_TRACE(rql);
+    const std::string status = letPlanStatus(rql);
+    EXPECT_NE(status.find(expected), std::string::npos) << status;
+    EXPECT_FALSE(isInternalCompilerError(status)) << status;
+  }
 }
