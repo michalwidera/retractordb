@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "fldType.hpp"  // rdb::descFld
+
 /// Wejscie do parsera RQL (RQLParser.cpp). Naglowek jest JEDYNYM miejscem, w ktorym te
 /// symbole sa deklarowane: do 2026-09-07 kazdy konsument robil to u siebie wlasnym `extern`,
 /// a przy trzech przeciazeniach `parserRQLString` taka deklaracja nie tylko moze rozjechac
@@ -19,7 +21,7 @@
 
 class qTree;
 
-/// Stala `LET NAZWA = wartosc` (#440). Stala ma typ swojego literalu: kazdy kontekst zamienia ja ta
+/// Stala `LET NAZWA = wartosc` (#440). Stala bez adnotacji (#547) ma typ swojego literalu: kazdy kontekst zamienia ja ta
 /// sama konwersja, ktora stosuje do literalu tej postaci. Dziesietna nie ma tu wartosci liczbowej, bo
 /// literal dziesietny ma w roznych kontekstach rozne typy (FLOAT w wyrazeniu, Rationalize w
 /// rational_se) - kontekst parsuje jej tekst. Uzycie, ktorego literal tej postaci nie ma (dziesietna
@@ -29,7 +31,7 @@ struct RqlConstant {
   enum class Kind { integer, decimal, fraction };
   Kind kind{Kind::integer};
   std::string text;  ///< Prawa strona deklaracji, ze znakiem - do komunikatow i parsowania dziesietnej.
-  int integer{0};    ///< Wartosc, gdy kind == integer.
+  int integer{0};    ///< Wartosc, gdy kind == integer albo type == INTEGER (#547).
   int nom{0};        ///< Licznik ze znakiem, gdy kind == fraction.
   int den{1};        ///< Mianownik, dodatni, gdy kind == fraction.
   size_t line{0};    ///< Wiersz deklaracji w pliku planu.
@@ -37,6 +39,10 @@ struct RqlConstant {
   /// Indeks w qTree::variables, gdy nazwe zadeklarowal VAR (#531), a nie LET. Jedna tablica dla
   /// obu form, bo dziela znacznik `?` i przestrzen nazw (D5).
   std::optional<size_t> variable;
+  /// Jawny typ stalej `LET NAZWA : TYP` (#547). Gdy jest, wyrazenie i kontekst strukturalny biora
+  /// wartosc literalu po konwersji do TYPU (L4, L5), a nie wedlug jego pisowni; tekst zostaje dla
+  /// prawej strony SET, ktora konwertuje go do typu zmiennej (O3).
+  std::optional<rdb::descFld> type;
 };
 
 /// Tablica stalych i zmiennych JEDNEGO planu: nazwa (bez `?`) -> wpis. Zyje dluzej niz jedno
@@ -66,6 +72,9 @@ using RqlConstants = std::map<std::string, RqlConstant>;
 /// - [rqlparser.parser-rql-string.17~1] akcję `DO SET ?NAZWA = wyrażenie` zapisywać w regule jako SET z indeksem zmiennej VAR celu, programem prawej strony (odczyty VAR jako PUSH_VAR), pozycją celu `line L:C` i numerem reguły w tekście planu; cel będący stałą LET albo nazwą niezadeklarowaną zwracać jako błąd semantyczny z nazwą i pozycją.
 /// - [rqlparser.parser-rql-string.18~1] deklarację `VAR NAZWA : TYP = literał` z typem INTEGER, UINT, FLOAT, DOUBLE albo RATIONAL dopisywać do qTree::variables z literałem przekonwertowanym do TYPU (#546, H3): do INTEGER i UINT tylko dokładnie, do RATIONAL dokładnie z tekstu literału, do FLOAT i DOUBLE z zaokrągleniem; literał bez wartości w TYPIE zwracać jako błąd semantyczny z nazwą, typem i pozycją, a typ spoza tej piątki jako błąd składni.
 /// - [rqlparser.parser-rql-string.19~1] prawą stronę `DO SET` będącą jednym literałem całkowitym albo dziesiętnym, także ujemnym, albo jedną stałą LET zapisywać jako PUSH_VAL w typie zmiennej celu, po tej samej konwersji co literał deklaracji z jawnym typem (#546, O3), a literał bez wartości w tym typie zwracać jako błąd semantyczny z celem, typem i pozycją; każdą inną prawą stronę zostawiać bez konwersji.
+/// - [rqlparser.parser-rql-string.20~1] deklarację `LET NAZWA : TYP = literał` z typem INTEGER, UINT, FLOAT, DOUBLE albo RATIONAL dopisywać do tablicy constants z TYPEM i konwertować literał jak deklarację VAR z jawnym typem (#547, L3); literał bez wartości w TYPIE zwracać jako błąd semantyczny z nazwą stałej, typem i pozycją.
+/// - [rqlparser.parser-rql-string.21~1] odwołanie `'-'? ?NAZWA` do stałej z jawnym typem w wyrażeniu SELECT i RULE WHEN zamieniać na PUSH_VAL w tym typie, liczony z tekstu stałej, a przy minusie z tekstu zanegowanego (#547, L4); negację bez wartości w typie zwracać jako błąd semantyczny z nazwą, typem i pozycją.
+/// - [rqlparser.parser-rql-string.22~1] stałą z jawnym typem przyjmować w int_const i indeksie z `$` tylko jako INTEGER, a w rational_se tylko jako INTEGER albo RATIONAL, z wartością po konwersji z jej deklaracji (#547, L5); każdy inny typ zwracać jako błąd semantyczny z nazwą, typem, kontekstem i pozycją `line L:C`.
 ///
 /// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
 ///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca

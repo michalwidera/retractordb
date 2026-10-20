@@ -660,3 +660,74 @@ TEST(exprSimplify, variable_read_is_a_typed_leaf_never_a_constant) {
   EXPECT_EQ(inferStringWidth({var}, noShape), std::nullopt);
   EXPECT_EQ(inferStringWidth({pushString("ab"), var, token(ADD)}, noShape), std::optional<int>{2});
 }
+
+TEST(exprSimplify, typed_constants_of_uint_double_and_rational) {
+  // covers: exprsimplify.simplify-expression.4~1, exprsimplify.simplify-expression.6~1, exprsimplify.simplify-expression.8~1
+  // covers: exprsimplify.simplify-expression.11~1, exprsimplify.simplify-expression.12~1
+  // Stala LET z adnotacja (#547) wnosi do wyrazenia PUSH_VAL typu UINT, DOUBLE i RATIONAL - dotad tylko
+  // INTEGER, FLOAT i STRING. Inwentaryzacja: A liczy ewaluatorem, B odmawia (stale nie sa INTEGER),
+  // C dziala dla UINT i RATIONAL przy rownym typie, D stalych nie dotyczy.
+  const auto rational = [](int nom, int den) { return token(PUSH_VAL, boost::rational<int>(nom, den)); };
+  const auto single   = [](const std::list<token> &program) -> rdb::descFldVT {
+    EXPECT_EQ(program.size(), 1U) << dump(program);
+    return program.empty() ? rdb::descFldVT{} : program.front().getVT();
+  };
+
+  // A - wartosc zwinietej stalej to wynik ewaluatora, takze dla DOUBLE.
+  std::list<token> quarters{rational(1, 4), rational(1, 4), token(ADD)};
+  EXPECT_EQ(simplifyExpression(quarters, testFieldType), 1U);
+  EXPECT_EQ(single(quarters), rdb::descFldVT{boost::rational<int>(1, 2)});
+  const std::list<token> scaledOriginal{token(PUSH_VAL, 0.1), token(PUSH_VAL, 3), token(MULTIPLY)};
+  std::list<token> scaled = scaledOriginal;
+  EXPECT_EQ(simplifyExpression(scaled, testFieldType), 1U);
+  expressionEvaluator evaluator;
+  EXPECT_EQ(single(scaled), rdbtest::ok(evaluator.eval(scaledOriginal, nullptr)));
+  EXPECT_EQ(single(scaled).index(), static_cast<std::size_t>(rdb::DOUBLE));
+  // Przepelnienie UINT i RATIONAL daje NULL, wiec stala zostaje w programie i NULL liczy takt.
+  for (auto program : {std::list<token>{token(PUSH_VAL, UINT_MAX), token(PUSH_VAL, 1U), token(ADD)},
+                       std::list<token>{rational(INT_MAX, 1), rational(1, 1), token(ADD)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, testFieldType), 0U) << before;
+    EXPECT_EQ(dump(program), before);
+  }
+
+  // B - reasocjacja wymaga stalych INTEGER; UINT i RATIONAL zostaja krokowe. E*0 nie znika nigdy.
+  const token var(PUSH_VAR, std::pair<std::string, int>{"R", 0});
+  const auto rationalVariable = [](int) -> std::optional<rdb::descFld> { return rdb::RATIONAL; };
+  for (auto program : {std::list<token>{pushId(0), token(PUSH_VAL, 1U), token(ADD), token(PUSH_VAL, 2U), token(ADD)},
+                       std::list<token>{var, rational(1, 4), token(ADD), rational(1, 4), token(ADD)},
+                       std::list<token>{pushId(0), token(PUSH_VAL, 0U), token(MULTIPLY)},
+                       std::list<token>{var, rational(0, 1), token(MULTIPLY)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, uintFieldType, rationalVariable), 0U) << before;
+    EXPECT_EQ(dump(program), before);
+  }
+
+  // C - element neutralny tego samego typu co E znika, z obu stron operatora przemiennego.
+  for (auto program : {std::list<token>{pushId(0), token(PUSH_VAL, 0U), token(ADD)},
+                       std::list<token>{token(PUSH_VAL, 1U), pushId(0), token(MULTIPLY)},
+                       std::list<token>{pushId(0), token(PUSH_VAL, 1U), token(DIVIDE)}}) {
+    const auto original = program;
+    EXPECT_EQ(simplifyExpression(program, uintFieldType), 1U) << dump(original);
+    EXPECT_EQ(dump(program), dump({pushId(0)}));
+    for (const unsigned u : {0U, 7U, UINT_MAX})
+      expectSameUintResult(original, program, u);
+  }
+  for (auto program :
+       {std::list<token>{var, rational(1, 1), token(MULTIPLY)}, std::list<token>{var, rational(0, 1), token(SUBTRACT)},
+        std::list<token>{rational(0, 1), var, token(ADD)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, uintFieldType, rationalVariable), 1U) << before;
+    EXPECT_EQ(dump(program), dump({var}));
+  }
+  // C odmawia, gdy typ stalej rozni sie od typu E (UINT 0 nad INTEGER), i dla DOUBLE.
+  const auto doubleField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::DOUBLE; };
+  for (const auto &[program, lookup] : std::vector<std::pair<std::list<token>, fieldTypeLookup>>{
+           {{pushId(0), token(PUSH_VAL, 0U), token(ADD)}, testFieldType},
+           {{pushId(0), token(PUSH_VAL, 0.0), token(ADD)}, doubleField},
+           {{pushId(0), token(PUSH_VAL, 1.0), token(MULTIPLY)}, doubleField}}) {
+    auto copy = program;
+    EXPECT_EQ(simplifyExpression(copy, lookup), 0U) << dump(program);
+    EXPECT_EQ(dump(copy), dump(program));
+  }
+}

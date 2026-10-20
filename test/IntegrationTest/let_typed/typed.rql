@@ -1,0 +1,13 @@
+# Plan testu it_let_typed (#547): jawny typ stalej w deklaracji LET. ?K : DOUBLE i ?C bez adnotacji
+# maja te sama pisownie 0.1, ale ?C jest w wyrazeniu FLOAT (#440 D1), wiec pole roznicowe pokazuje
+# blad float 0.1 w szesciu cyfrach wydruku xtrdb. ?Q : RATIONAL daje w wyrazeniu ulamek, ktorego
+# literalem zapisac sie nie da, a ?N : UINT - prog spoza zakresu INTEGER w porownaniu z polem UINT.
+STORAGE 'temp'
+LET K : DOUBLE = 0.1
+LET C = 0.1
+LET Q : RATIONAL = 1/4
+LET N : UINT = 3000000000
+VAR trafienia : UINT = 0
+DECLARE x DOUBLE, k INTEGER, u UINT STREAM src, 1 TEXTFILE 'data.txt'
+SELECT src[0], src[0] * ?K, src[0] * ?C, src[0] * ?K - src[0] * ?C, src[1] * ?Q, src[2], ?trafienia STREAM wynik FROM src
+RULE prog ON wynik WHEN wynik[5] > ?N DO SET ?trafienia = ?trafienia + 1
