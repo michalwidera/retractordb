@@ -2488,6 +2488,68 @@ TEST(xparser, unary_minus_in_a_rule_condition_stays_in_the_condition) {
   EXPECT_EQ(out.str(), "PUSH_ID2(t[0]);NEGATE(0);PUSH_VAL(0);CMP_LT(0);");
 }
 
+// #441: porownanie ma najwyzej dwa operandy. Do 2026-10-20 lancuch przechodzil i liczyl sie
+// cicho - `0 < t[0] < 10` jako `(0 < t[0]) < 10`, czyli zawsze 1. Odmowa wskazuje DRUGI
+// operator, a zakres zapisany przez AND daje dwa porownania i jedno AND.
+TEST(xparser, comparison_chain_in_rule_condition_is_a_syntax_error) {
+  const std::string plan = "DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'\nSELECT v STREAM t FROM a\nRULE r ON t WHEN ";
+  for (const auto &[condition, second] : {std::pair<std::string, std::string>{"0 < t[0] < 10", "<"},
+                                          {"0 <= t[0] < 10", "<"},
+                                          {"t[0] = 1 = 1", "="},
+                                          {"t[0] > 1 != 0", "!="},
+                                          {"t[0] >= 0 AND 1 <= t[0] <= 9", "<="}}) {
+    qTree instance;
+    testing::internal::CaptureStderr();
+    auto [parseResult, keyword, streamName] = parserRQLString(instance, plan + condition + " DO DUMP -1 TO 1\n");
+    testing::internal::GetCapturedStderr();
+    EXPECT_NE(parseResult, "OK") << condition;
+    EXPECT_TRUE(parseResult.contains("'" + second + "'")) << condition << ": " << parseResult;
+  }
+
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, plan + "0 < t[0] AND t[0] < 10 DO DUMP -1 TO 1\n");
+  ASSERT_EQ(parseResult, "OK");
+  std::ostringstream out;
+  for (const auto &tk : instance.getQuery("t").lRules.front().condition)
+    out << tk << ";";
+  EXPECT_EQ(out.str(), "PUSH_VAL(0);PUSH_ID2(t[0]);CMP_LT(0);PUSH_ID2(t[0]);PUSH_VAL(10);CMP_LT(0);AND(0);");
+}
+
+// #441: `NOT` neguje cale porownanie i wiaze mocniej niz AND i OR, jak w SQL. Do 2026-10-20
+// stal w `term`, wiec `NOT t[0] < 0` znaczylo `(NOT t[0]) < 0` - regula, ktora nigdy nie
+// zadziala. Poza warunkiem RULE `NOT` jest bledem skladni.
+TEST(xparser, not_negates_the_whole_comparison) {
+  const std::string plan = "DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'\nSELECT v STREAM t FROM a\nRULE r ON t WHEN ";
+  for (const auto &[condition, expected] :
+       {std::pair<std::string, std::string>{"NOT t[0] < 0", "PUSH_ID2(t[0]);PUSH_VAL(0);CMP_LT(0);NOT(0);"},
+        {"NOT t[0] < 0 AND t[0] > 5",
+         "PUSH_ID2(t[0]);PUSH_VAL(0);CMP_LT(0);NOT(0);PUSH_ID2(t[0]);PUSH_VAL(5);CMP_GT(0);AND(0);"},
+        {"t[0] > 1 AND NOT t[0] = 5",
+         "PUSH_ID2(t[0]);PUSH_VAL(1);CMP_GT(0);PUSH_ID2(t[0]);PUSH_VAL(5);CMP_EQUAL(0);NOT(0);AND(0);"},
+        {"NOT t[0] = 1 OR t[0] = 3",
+         "PUSH_ID2(t[0]);PUSH_VAL(1);CMP_EQUAL(0);NOT(0);PUSH_ID2(t[0]);PUSH_VAL(3);CMP_EQUAL(0);OR(0);"},
+        {"NOT t[0] + 1 = 0", "PUSH_ID2(t[0]);PUSH_VAL(1);ADD(0);PUSH_VAL(0);CMP_EQUAL(0);NOT(0);"},
+        {"NOT NOT t[0]", "PUSH_ID2(t[0]);NOT(0);NOT(0);"}}) {
+    qTree instance;
+    auto [parseResult, keyword, streamName] = parserRQLString(instance, plan + condition + " DO DUMP -1 TO 1\n");
+    ASSERT_EQ(parseResult, "OK") << condition;
+    std::ostringstream out;
+    for (const auto &tk : instance.getQuery("t").lRules.front().condition)
+      out << tk << ";";
+    EXPECT_EQ(out.str(), expected) << condition;
+  }
+
+  for (const std::string &rejected : {"DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'\nSELECT NOT v STREAM t FROM a\n",
+                                      "DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'\nSELECT v STREAM t FROM a\nRULE r ON t "
+                                      "WHEN t[0] + NOT t[0] DO DUMP -1 TO 1\n"}) {
+    qTree instance;
+    testing::internal::CaptureStderr();
+    auto [parseResult, keyword, streamName] = parserRQLString(instance, rejected);
+    testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(parseResult.contains("'NOT'")) << rejected << ": " << parseResult;
+  }
+}
+
 namespace {
 
 /// Kompilacja planu z jednym zrodlem `src` typu `type` i jednym wyrazeniem `expression`

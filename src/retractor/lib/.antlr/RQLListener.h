@@ -134,29 +134,14 @@ public:
   virtual void enterExpAnd(RQLParser::ExpAndContext *ctx) = 0;
   virtual void exitExpAnd(RQLParser::ExpAndContext *ctx) = 0;
 
+  virtual void enterExpNot(RQLParser::ExpNotContext *ctx) = 0;
+  virtual void exitExpNot(RQLParser::ExpNotContext *ctx) = 0;
+
   virtual void enterExpTermLogic(RQLParser::ExpTermLogicContext *ctx) = 0;
   virtual void exitExpTermLogic(RQLParser::ExpTermLogicContext *ctx) = 0;
 
-  virtual void enterExpLs(RQLParser::ExpLsContext *ctx) = 0;
-  virtual void exitExpLs(RQLParser::ExpLsContext *ctx) = 0;
-
-  virtual void enterExpLe(RQLParser::ExpLeContext *ctx) = 0;
-  virtual void exitExpLe(RQLParser::ExpLeContext *ctx) = 0;
-
-  virtual void enterExpNq(RQLParser::ExpNqContext *ctx) = 0;
-  virtual void exitExpNq(RQLParser::ExpNqContext *ctx) = 0;
-
-  virtual void enterExpGr(RQLParser::ExpGrContext *ctx) = 0;
-  virtual void exitExpGr(RQLParser::ExpGrContext *ctx) = 0;
-
-  virtual void enterExpFactor(RQLParser::ExpFactorContext *ctx) = 0;
-  virtual void exitExpFactor(RQLParser::ExpFactorContext *ctx) = 0;
-
-  virtual void enterExpEq(RQLParser::ExpEqContext *ctx) = 0;
-  virtual void exitExpEq(RQLParser::ExpEqContext *ctx) = 0;
-
-  virtual void enterExpGe(RQLParser::ExpGeContext *ctx) = 0;
-  virtual void exitExpGe(RQLParser::ExpGeContext *ctx) = 0;
+  virtual void enterTerm_logic(RQLParser::Term_logicContext *ctx) = 0;
+  virtual void exitTerm_logic(RQLParser::Term_logicContext *ctx) = 0;
 
   virtual void enterExpTerm(RQLParser::ExpTermContext *ctx) = 0;
   virtual void exitExpTerm(RQLParser::ExpTermContext *ctx) = 0;
@@ -199,9 +184,6 @@ public:
 
   virtual void enterExpField(RQLParser::ExpFieldContext *ctx) = 0;
   virtual void exitExpField(RQLParser::ExpFieldContext *ctx) = 0;
-
-  virtual void enterExpNot(RQLParser::ExpNotContext *ctx) = 0;
-  virtual void exitExpNot(RQLParser::ExpNotContext *ctx) = 0;
 
   virtual void enterExpString(RQLParser::ExpStringContext *ctx) = 0;
   virtual void exitExpString(RQLParser::ExpStringContext *ctx) = 0;
