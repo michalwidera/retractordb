@@ -1,0 +1,22 @@
+# #531 uc11: automat trybow pracy turbiny wiatrowej.
+# Symuluje wiatr w dziesiatych czesciach m/s i obroty wirnika. MODE oznacza:
+# 0 - postoj, 1 - rozruch, 2 - produkcje, 3 - wylaczenie burzowe. Licznik CALM
+# pamieta spokojne rekordy po burzy; kolejny poryw przerywa odliczanie.
+# Przyklad automatu skonczonego z pamiecia w VAR: przejscia czytaja tryb sprzed
+# slotu, wiec nie kaskaduja przez kilka stanow w jednym rekordzie (D1).
+# Dane wymuszaja nieudany rozruch, pelny cykl trybow i przerwana cisze.
+# Przejscie do wylaczenia burzowego uruchamia tez osobna akcje DUMP (D9).
+# Cisza 600 -> 40 rekordow; zakres DUMP -30..30 pozostaje jak w szkicu.
+STORAGE 'temp'
+VAR MODE = 0
+VAR CALM = 0
+DECLARE wind INTEGER, rpm INTEGER STREAM turb, 1 TEXTFILE 'turbine.txt'
+SELECT turb[0], turb[1], ?MODE, ?CALM STREAM state FROM turb
+RULE m01 ON state WHEN ?MODE = 0 AND state[0] >= 35 DO SET ?MODE = 1
+RULE m12 ON state WHEN ?MODE = 1 AND state[1] >= 900 DO SET ?MODE = 2
+RULE m10 ON state WHEN ?MODE = 1 AND state[0] < 30 DO SET ?MODE = 0
+RULE m23 ON state WHEN ?MODE = 2 AND state[0] >= 250 DO SET ?MODE = 3
+RULE m23_dump ON state WHEN ?MODE = 2 AND state[0] >= 250 DO DUMP -30 TO 30
+RULE calm_count ON state WHEN ?MODE = 3 AND state[0] <= 200 DO SET ?CALM = ?CALM + 1
+RULE calm_break ON state WHEN state[0] > 200 DO SET ?CALM = 0
+RULE m30 ON state WHEN ?MODE = 3 AND ?CALM >= 40 DO SET ?MODE = 0

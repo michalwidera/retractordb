@@ -1,0 +1,14 @@
+# #531 uc16: ograniczanie szybkosci, przypadek graniczny token bucket.
+# Symuluje zadania o roznych rozmiarach co 1/10 s i zapas TOK startujacy od 50.
+# Regula refill proponuje dodanie dwoch jednostek, consume proponuje odjecie
+# rozmiaru zadania, jesli stary zapas wystarcza na jego obsluge.
+# Przyklad znanego ograniczenia D3: obie propozycje korzystaja ze starego TOK,
+# a pozniejsza consume wygrywa, wiec uzupelnienie w tym slocie przepada.
+# Dwa pierwsze zadania po 5 daja kolejne stany 50, 45, 40; test utrwala wlasnie
+# taki wynik i przypadki odrzucenia duzego zadania. Parametry szkicu bez zmiany.
+STORAGE 'temp'
+VAR TOK = 50
+DECLARE size INTEGER STREAM req, 1/10 TEXTFILE 'req.txt'
+SELECT req[0], ?TOK STREAM bucket FROM req
+RULE refill ON bucket WHEN ?TOK < 48 DO SET ?TOK = ?TOK + 2
+RULE consume ON bucket WHEN ?TOK >= bucket[0] DO SET ?TOK = ?TOK - bucket[0]

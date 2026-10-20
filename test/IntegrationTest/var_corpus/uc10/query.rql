@@ -1,0 +1,24 @@
+# #531 uc10: sterowanie sprezarka w chlodni.
+# Symuluje temperature komory w dziesiatych czesciach stopnia C i wolny sygnal
+# zegara. Sprezarka wlacza sie od 5 C, wylacza do 2 C, a pomiedzy progami pamieta
+# poprzedni stan. Ponad szesc cykli w okresie wyzwala zrzut historii temperatury.
+# Przyklad histerezy i licznika zboczy: cycle czyta jeszcze stary COMP (D1).
+# W slotach 120 i 160 cykl koliduje z zerowaniem licznika; hour_reset wygrywa
+# jako pozniejsza regula (D3). Osobny scenariusz restartu pokazuje utrate pamieci
+# sprezarki do nastepnego przekroczenia progu. Takt godzinny 3600 -> 40 s;
+# progi i zakres DUMP -60..0 pozostaja takie jak w szkicu.
+STORAGE 'temp'
+LET T_ON = 50
+LET T_OFF = 20
+LET MAX_CYCLES = 6
+VAR COMP = 0
+VAR CYCLES = 0
+DECLARE t INTEGER STREAM temp, 1 TEXTFILE 'temp.txt'
+DECLARE k INTEGER STREAM hour, 40 TEXTFILE 'hour.txt'
+SELECT temp[0], ?COMP, ?CYCLES STREAM status FROM temp
+SELECT hour[0] STREAM hour_tick FROM hour
+RULE cycle ON status WHEN status[0] >= ?T_ON AND ?COMP = 0 DO SET ?CYCLES = ?CYCLES + 1
+RULE comp_on ON status WHEN status[0] >= ?T_ON DO SET ?COMP = 1
+RULE comp_off ON status WHEN status[0] <= ?T_OFF DO SET ?COMP = 0
+RULE hour_reset ON hour_tick WHEN 1 = 1 DO SET ?CYCLES = 0
+RULE short_cycling ON status WHEN ?CYCLES > ?MAX_CYCLES DO DUMP -60 TO 0
