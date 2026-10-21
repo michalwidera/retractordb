@@ -364,7 +364,8 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         // wiec regula A nigdy jej nie zwinie - nawet `?X * 0`, ktore przy NULL daje NULL.
         node leaf;
         leaf.program.push_back(tk);
-        if (const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT()); reference && typeOfVariable)
+        if (const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT());
+            reference != nullptr && typeOfVariable)
           leaf.type = typeOfVariable(reference->second);
         stack.push_back(std::move(leaf));
       } break;

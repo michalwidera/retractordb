@@ -40,6 +40,7 @@ using namespace antlr4;
 
 namespace {
 constexpr size_t kAgseWindowSignChildIndex = 5;
+constexpr int kDecimalBase                 = 10;
 
 /// Blad skladni RQL: przerywa parsowanie, zamiast konczyc proces.
 ///
@@ -167,7 +168,7 @@ std::optional<T> parseLiteral(const std::string &text) {
 boost::multiprecision::cpp_int decimalDigits(const std::string_view digits) {
   boost::multiprecision::cpp_int value = 0;
   for (const char digit : digits)
-    value = value * 10 + (digit - '0');
+    value = value * kDecimalBase + (digit - '0');
   return value;
 }
 
@@ -203,14 +204,18 @@ std::optional<rdb::descFldVT> convertLiteral(const RqlConstant &literal, const r
     if (negative) text.remove_prefix(1);
     const auto dot                  = text.find('.');
     const std::string_view fraction = dot == std::string_view::npos ? std::string_view() : text.substr(dot + 1);
-    nom = decimalDigits(text.substr(0, dot)) * boost::multiprecision::pow(cpp_int(10), static_cast<unsigned>(fraction.size())) +
-          decimalDigits(fraction);
-    den = boost::multiprecision::pow(cpp_int(10), static_cast<unsigned>(fraction.size()));
+    cpp_int scale                   = 1;
+    for (size_t digit = 0; digit < fraction.size(); ++digit)
+      scale *= kDecimalBase;
+    nom = decimalDigits(text.substr(0, dot)) * scale + decimalDigits(fraction);
+    den = scale;
     if (negative) nom = -nom;
   }
-  const cpp_int divisor = boost::multiprecision::gcd(nom, den);
-  nom /= divisor;
-  den /= divisor;
+  // Skraca cpp_rational, nie gcd(): gcd() i pow() nad cpp_int z szablonami wyrazen zwracaja wyrazenie
+  // z referencja do tymczasowego funktora, co clang-analyzer zglasza jako StackAddressEscape w Boost.
+  const boost::multiprecision::cpp_rational reduced(nom, den);
+  nom = numerator(reduced);
+  den = denominator(reduced);
 
   const auto fits = [](const cpp_int &value, const auto lowest, const auto highest) {
     return value >= cpp_int(lowest) && value <= cpp_int(highest);
@@ -337,7 +342,7 @@ class ParserListener : public RQLBaseListener {
 
   template <typename T>
   void recpToken(command_id id, T arg1) {
-    program.push_back(token(id, arg1));
+    program.push_back(token(id, std::move(arg1)));
   };
 
   /// Pierwszy blad semantyczny calego przebiegu - czyli taki, ktorego gramatyka nie lapie,
@@ -528,11 +533,12 @@ class ParserListener : public RQLBaseListener {
       const std::string text = ctx->getText();
       const auto value       = parseLiteral<int>(text);
       if (!value) reportOutOfRange(text);
-      return {text, value};
+      return {.text = text, .value = value};
     }
     const antlr4::Token *ref = ctx->CONST_REF()->getSymbol();
     const auto value         = constantValue(ref, what);
-    return {ref->getText() + " = " + (value ? std::to_string(*value) : "?") + " (" + position(ref) + ")", value};
+    return {.text  = ref->getText() + " = " + (value ? std::to_string(*value) : "?") + " (" + position(ref) + ")",
+            .value = value};
   }
 
   /// Wymiar z przedzialu [min, max]; min to 0 albo 1.
@@ -577,8 +583,8 @@ class ParserListener : public RQLBaseListener {
   /// `cells[23-$]` (#440). Kompilator czyta indeks z tekstu tokenu (expandStreamGenerators,
   /// rozwiazywanie pol), wiec stala musi zniknac juz tutaj; literal zostaje doslowny. Wartosc ujemna
   /// jest odmowa: literal w nawiasie jest zawsze nieujemny, a genIndexFolder nie zna minusa unarnego.
-  std::string resolvedText(antlr4::tree::ParseTree *tree, const std::string &what) {
-    if (auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(tree)) {
+  std::string resolvedText(antlr4::tree::ParseTree &tree, const std::string &what) {
+    if (auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(&tree)) {
       const antlr4::Token *symbol = terminal->getSymbol();
       if (symbol->getType() != RQLParser::CONST_REF) return terminal->getText();
       const auto value = constantValue(symbol, what);
@@ -588,8 +594,8 @@ class ParserListener : public RQLBaseListener {
       return std::to_string(value.value_or(0));
     }
     std::string text;
-    for (auto *child : tree->children)
-      text += resolvedText(child, what);
+    for (auto *child : tree.children)
+      text += resolvedText(*child, what);
     return text;
   }
 
@@ -732,7 +738,7 @@ class ParserListener : public RQLBaseListener {
   void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override {
     if (ctx->column_index->CONST_REF() == nullptr && !parseLiteral<int>(ctx->column_index->getText()))
       reportOutOfRange(ctx->column_index->getText());
-    recpToken(PUSH_ID2, resolvedText(ctx, "field index"));
+    recpToken(PUSH_ID2, resolvedText(*ctx, "field index"));
   }
 
   /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
@@ -741,7 +747,7 @@ class ParserListener : public RQLBaseListener {
   /// compiler::expandStreamGenerators() zwija do postaci literalowej zanim zobaczy go
   /// ktorykolwiek dalszy przebieg. Osobny opcode byl tu zbedny.
   void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) override {
-    recpToken(PUSH_ID2, resolvedText(ctx, "generator index"));
+    recpToken(PUSH_ID2, resolvedText(*ctx, "generator index"));
   }
 
   void exitExpAddSub(RQLParser::ExpAddSubContext *ctx) override {
@@ -773,6 +779,8 @@ class ParserListener : public RQLBaseListener {
         break;
       case RQLParser::IS_LE:
         recpToken(CMP_LE);
+        break;
+      default:
         break;
     }
   }
@@ -868,6 +876,7 @@ class ParserListener : public RQLBaseListener {
     if (const auto found = constants_.find(ref->getText().substr(1)); found != constants_.end() && found->second.variable) {
       found->second.used = true;
       if (!windowArgMarks.empty()) reportVariableMisuse(ref, "record window argument");
+      // NOLINTNEXTLINE(bugprone-unchecked-optional-access): sprawdzone w warunku; checker gubi to przez dwa `found->`
       recpToken(PUSH_VAR, std::make_pair(found->first, static_cast<int>(*found->second.variable)));
       if (negated) recpToken(NEGATE);
       return;
@@ -1651,7 +1660,7 @@ class ParserListener : public RQLBaseListener {
     // `cell[3]` i `cell[$]` musza wejsc z nawiasem: samo ctx->ID() zgubiloby indeks, a to on
     // wskazuje instancje rodziny. Nazwe fizyczna (`cell$3`) podstawia expandStreamGenerators().
     if (ctx->gen_index() != nullptr)
-      program.emplace_back(PUSH_STREAM, resolvedText(ctx, "stream index"));
+      program.emplace_back(PUSH_STREAM, resolvedText(*ctx, "stream index"));
     else
       program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
   }

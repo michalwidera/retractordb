@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <map>
 #include <optional>
@@ -28,7 +29,7 @@ class qTree;
 /// w kontekscie calkowitym, ulamek w wyrazeniu), jest odmowa - bez niejawnej konwersji.
 /// @requirements-exempt RqlConstant: Rekord tablicy stalych; logike ma parser.
 struct RqlConstant {
-  enum class Kind { integer, decimal, fraction };
+  enum class Kind : std::uint8_t { integer, decimal, fraction };
   Kind kind{Kind::integer};
   std::string text;  ///< Prawa strona deklaracji, ze znakiem - do komunikatow i parsowania dziesietnej.
   int integer{0};    ///< Wartosc, gdy kind == integer albo type == INTEGER (#547).

@@ -454,7 +454,7 @@ Result<rdb::ReadStatus> storage::revRead(const size_t recordIndexFromBack, uint8
 // loguje - wykona je revRead(0), ktorym wolajacy zamyka petle okna.
 Result<const payload *> storage::revPeek(const size_t recordIndexFromBack) {
   if (isDeclared() && !isHold_ && recordIndexFromBack < buffer_.size() &&
-      !(recordIndexFromBack == 0 && bufferState == sourceState::flux))
+      (recordIndexFromBack != 0 || bufferState != sourceState::flux))
     return &buffer_.history(recordIndexFromBack);
 
   RDB_TRY_ASSIGN(const auto status, revRead(recordIndexFromBack));

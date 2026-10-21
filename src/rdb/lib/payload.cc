@@ -62,6 +62,7 @@ int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFla
   const auto flatCount = descriptor.flatElementCount();
   if (positionFlat < 0 || positionFlat >= flatCount) [[unlikely]]
     flatPositionOutOfRange(positionFlat, flatCount, context);
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access): pozycja w zakresie ma wpis zawsze (wyzej)
   return descriptor.flatIndexToDescriptorPosition(positionFlat)->first;
 }
 
