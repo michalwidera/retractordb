@@ -113,6 +113,45 @@ add_test(
     ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/test_proofOracle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/proofOracle.hpp)
 
+# Binding Pythona (#447) w zwyklym `ninja test` buildu z RDB_PYTHON=ON - bez
+# drugiej kompilacji silnika w osobnym drzewie. python_stage odswieza kopie .py
+# i .pyi, bo POST_BUILD _core nie odpala, gdy zmieniono tylko pakiet. Tryb jawny
+# conftest.py (RDB_PYTHON_MODULE_DIR, RDB_XRETRACTOR) zamienia brak zaleznosci,
+# nieaktualna kopie i obcy xretractor/xqry w PATH w blad, nie w skip. Pusty
+# PYTEST_ADDOPTS: ustawienia uzytkownika nie moga zawezic zestawu np. przez -k.
+# Bez etykiety valgrind, wiec poza `ninja test-valgrind`.
+if(TARGET _core)
+  get_directory_property(
+    RDB_PYTHON_INTERPRETER DIRECTORY ${CMAKE_SOURCE_DIR}/src/python DEFINITION
+                                     Python_EXECUTABLE)
+  add_test(
+    NAME python_stage
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_directory
+      ${CMAKE_SOURCE_DIR}/api/python/retractordb
+      ${RDB_PYTHON_MODULE_DIR}/retractordb)
+  add_test(
+    NAME python_binding
+    COMMAND
+      ${RDB_PYTHON_INTERPRETER} -m pytest -q -ra
+      ${CMAKE_SOURCE_DIR}/api/python/tests
+      --junitxml=${CMAKE_BINARY_DIR}/python-test-results.xml)
+  set_tests_properties(python_stage PROPERTIES LABELS python FIXTURES_SETUP
+                                               python_package)
+  set_tests_properties(
+    python_binding
+    PROPERTIES
+      LABELS
+      python
+      FIXTURES_REQUIRED
+      python_package
+      ENVIRONMENT
+      "RDB_PYTHON_MODULE_DIR=${RDB_PYTHON_MODULE_DIR};RDB_XRETRACTOR=$<TARGET_FILE:xretractor>;PYTEST_ADDOPTS="
+      ENVIRONMENT_MODIFICATION
+      "PATH=path_list_prepend:$<TARGET_FILE_DIR:xqry>;PATH=path_list_prepend:$<TARGET_FILE_DIR:xretractor>"
+  )
+endif()
+
 # Srodowisko kontroli higieny IPC dla skryptow testowych. Generowane PO
 # file(COPY ...) wyzej, bo trafia do tego samego katalogu w drzewie budowy i
 # kopia skasowalaby plik wygenerowany wczesniej. Tresc i uzasadnienie: patrz
