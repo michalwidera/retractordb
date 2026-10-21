@@ -66,6 +66,21 @@ def pytest_configure(config: pytest.Config) -> None:
             raise pytest.UsageError(f"explicit embedded acceptance environment is incomplete: {exc}") from exc
         if Path(core.__file__).resolve().parent != (root / "retractordb").resolve():
             raise pytest.UsageError(f"wrong _core provenance: {core.__file__}; expected {root}")
+        # Kopia pakietu obok _core musi byc zrodlem, ktore testujemy - POST_BUILD
+        # odswieza ja tylko przy linkowaniu _core.
+        source = REPO_ROOT / "api/python/retractordb"
+        for path in source.rglob("*"):
+            if path.suffix in (".py", ".pyi"):
+                copied = root / "retractordb" / path.relative_to(source)
+                if not copied.is_file() or copied.read_bytes() != path.read_bytes():
+                    raise pytest.UsageError(f"stale package copy: {copied}; expected {path}")
+        # Klient wola xqry po nazwie, wiec PATH musi wskazywac programy tego buildu.
+        if os.environ.get("RDB_XRETRACTOR"):
+            xretractor = Path(os.environ["RDB_XRETRACTOR"]).resolve()
+            for name, expected in (("xretractor", xretractor), ("xqry", xretractor.parent.parent / "qry/xqry")):
+                selected = shutil.which(name)
+                if selected is None or Path(selected).resolve() != expected.resolve():
+                    raise pytest.UsageError(f"wrong {name} in PATH: {selected}; expected {expected}")
 
 
 @pytest.fixture(scope="session")

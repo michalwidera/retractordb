@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Obowiazkowa lokalna kontrola bindingu (#447), poza workflow commit.
-# Osobny build z PIC nie zmienia konfiguracji ani instalacji zwyklego silnika.
+# Lokalna kontrola bindingu (#447) dla buildu z RDB_PYTHON=OFF, poza workflow commit.
+# Build z RDB_PYTHON=ON obejmuje ja w `ninja test` (etykieta python). Osobny build
+# z PIC nie zmienia konfiguracji ani instalacji zwyklego silnika.
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -66,50 +67,19 @@ PY
 started=$SECONDS
 echo "check-python: source $(git -C "$repo_dir" rev-parse HEAD) plus working-tree changes"
 echo "check-python: interpreter $python; build $build_dir; jobs $jobs"
-cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
-  -U '_Python_*' -U nanobind_DIR \
-  -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_BUILD_TYPE=Debug \
-  -DRDB_PYTHON=ON -DRDB_NOEXCEPT_CHECK=ON -DPython_EXECUTABLE="$python"
+# Konfiguracja tylko przy pierwszym uruchomieniu albo zmianie interpretera;
+# po zmianie plikow CMake ninja przekonfiguruje drzewo sam.
+cached=$(grep -m1 '^Python_EXECUTABLE:' "$build_dir/CMakeCache.txt" 2>/dev/null | cut -d= -f2- || true)
+if [[ ! -f $build_dir/build.ninja || $cached != "$python" ]]; then
+  cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+    -U '_Python_*' -U nanobind_DIR \
+    -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_BUILD_TYPE=Debug \
+    -DRDB_PYTHON=ON -DRDB_NOEXCEPT_CHECK=ON -DPython_EXECUTABLE="$python"
+fi
 cmake --build "$build_dir" --parallel "$jobs" --target \
   _core xretractor xqry rdb_noexcept_check retractorcore_noexcept_check rdbembed_noexcept_check
 
-# POST_BUILD nie odpala, gdy zmieniono tylko .py lub .pyi i _core nie jest linkowany.
-cmake -E copy_directory "$repo_dir/api/python/retractordb" "$build_dir/python/retractordb"
-export PYTHONPATH="$build_dir/python"
-export RDB_PYTHON_MODULE_DIR="$build_dir/python"
-export RDB_XRETRACTOR="$build_dir/src/retractor/xretractor"
-export PATH="$build_dir/src/retractor:$build_dir/src/qry:$PATH"
-
-"$python" - "$repo_dir" "$build_dir" <<'PY'
-import shutil
-import sys
-import sysconfig
-from pathlib import Path
-
-import retractordb
-import retractordb._core as core
-
-repo, build = map(Path, sys.argv[1:])
-package = build / "python/retractordb"
-expected = package / ("_core" + sysconfig.get_config_var("EXT_SUFFIX"))
-if Path(core.__file__).resolve() != expected.resolve():
-    raise SystemExit(f"check-python: wrong _core: {core.__file__}; expected {expected}")
-for source in (repo / "api/python/retractordb").rglob("*"):
-    if source.suffix in (".py", ".pyi"):
-        copied = package / source.relative_to(repo / "api/python/retractordb")
-        if copied.read_bytes() != source.read_bytes():
-            raise SystemExit(f"check-python: stale package copy: {copied}")
-for name, directory in (("xretractor", "retractor"), ("xqry", "qry")):
-    expected_binary = build / "src" / directory / name
-    selected = shutil.which(name)
-    if selected is None or Path(selected).resolve() != expected_binary.resolve():
-        raise SystemExit(f"check-python: wrong {name}: {selected}; expected {expected_binary}")
-    print(f"check-python: {name}: {selected}")
-print(f"check-python: _core: {core.__file__}; Engine: {retractordb.Engine}")
-print("check-python: package source comparisons passed")
-PY
-
-# Ustawienia uzytkownika nie moga ograniczyc obowiazkowego zestawu np. przez -k.
-PYTEST_ADDOPTS='' "$python" -m pytest -q -ra "$repo_dir/api/python/tests" \
-  --junitxml="$build_dir/python-test-results.xml"
+# Kopie pakietu, srodowisko oraz pochodzenie _core, xretractor i xqry ustalaja
+# testy python_stage i python_binding (test/CMakeLists.txt, conftest.py).
+ctest --test-dir "$build_dir" -L python -V
 echo "check-python: OK ($((SECONDS - started)) s); report: $build_dir/python-test-results.xml"

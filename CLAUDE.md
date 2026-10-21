@@ -215,21 +215,27 @@ No marker appears in an intermediate update, nor while a check is still running:
 | `ninja test-valgrind` | the same condition as `ninja test`; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
 | `ninja test_gate` | the session touched engine sources (`src/`); otherwise say explicitly that it was skipped and why |
 | ablation floor (below) | the session touched an optimizer pass |
-| `scripts/check-python.sh` (from the repository root) | the diff touches engine sources/headers/grammars under `src/`, CMake or Conan configuration used by `_core`, the Python package/tests, or this check script |
+| Python binding: `ninja test` in a `build/Debug` with `RDB_PYTHON=ON` (label `python`), otherwise `scripts/check-python.sh` from the repository root | the diff touches engine sources/headers/grammars under `src/`, CMake or Conan configuration used by `_core`, the Python package/tests, or this check script |
 
 A check runs because it can see the change: a run that the diff cannot turn red is not evidence and only costs time. When a row's condition does not hold (documentation, notebooks, a script outside ctest), say that the check was skipped and why, and name the check that does exercise the change - for example `docker/wheel/notebook-smoke.sh` for the notebooks.
 
 A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
 
-**Python binding (#447): mandatory local check.** The binding is maintained, with `xretractor` taking priority. Its check runs locally before the handoff, commit and push under the condition above; it adds no job or step to the `commit` or `manual-nightly-full` workflows. Ordinary builds may keep `RDB_PYTHON=OFF`.
+**Python binding (#447): mandatory local check.** The binding is maintained, with `xretractor` taking priority. Its check runs locally before the handoff, commit and push under the condition above; it adds no job or step to the `commit` or `manual-nightly-full` workflows, whose builds keep `RDB_PYTHON=OFF`.
 
-Prepare Debug Conan dependencies and a Python 3.10+ venv with nanobind, NumPy, pytest and torch. `scripts/python-venv.sh` prepares the first three; install torch separately in that venv (CPU is sufficient, no GPU is required). Then run from the repository root:
+Prepare Debug Conan dependencies and a Python 3.10+ venv with nanobind, NumPy, pytest and torch. `scripts/python-venv.sh` prepares the first three; install torch separately in that venv (CPU is sufficient, no GPU is required).
+
+**Preferred route: `RDB_PYTHON=ON` in `build/Debug`.** Configure it once with `cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE=<repo>/.venv-python/bin/python3 .` (a reconfigure deletes `build/Debug/test`; run `ninja` before `ctest`). Every `ninja` then builds `_core` next to the engine, and `ninja test` runs the binding as two ctest entries labelled `python`: `python_stage` refreshes the package's `.py`/`.pyi` copies next to `_core` (its `POST_BUILD` copy runs only when `_core` relinks), and `python_binding` runs `pytest api/python/tests`. That costs seconds and no second compilation of the engine. `ninja test-valgrind` does not include them. A build without `RDB_PYTHON=ON` registers neither entry.
+
+**Fallback: `scripts/check-python.sh`** for a `build/Debug` that keeps `RDB_PYTHON=OFF`:
 
 ```bash
 scripts/check-python.sh --python .venv-python/bin/python3 --jobs 4
 ```
 
-The script configures the separate `build/Check-Python` directory with `RDB_PYTHON=ON`, rebuilds `_core`, reference `xretractor` and `xqry`, and runs the core no-exceptions compile checks. It refreshes and byte-compares the package's `.py`/`.pyi` copies even when only Python sources changed, verifies that the imported `_core` is the target built for the selected interpreter, and checks reference executable paths before `pytest api/python/tests`. It does not install project binaries. Missing dependencies or references fail the check; skipped tests are unperformed coverage and must be reported with their reasons. Record the source revision, interpreter, `_core` and reference paths, pytest summary and elapsed time; JUnit results are stored in `build/Check-Python/python-test-results.xml`.
+The script keeps the separate `build/Check-Python` directory with `RDB_PYTHON=ON`, configures it only on the first run or when the interpreter changes (ninja reconfigures it after CMake changes), rebuilds `_core`, reference `xretractor` and `xqry` and the core no-exceptions compile checks, and runs `ctest -L python` there. Measured on 2026-10-21: a first run from an empty directory takes about 3 min (4 jobs, no ccache), a run with nothing to rebuild about 6 s. It does not install project binaries.
+
+On both routes the ctest entry sets `RDB_PYTHON_MODULE_DIR` and `RDB_XRETRACTOR`, which put `api/python/tests/conftest.py` into explicit mode: missing NumPy or torch, a `_core` from another directory, a stale package copy, or an `xretractor`/`xqry` in `PATH` other than the build's targets fails the run instead of skipping tests. Skipped tests are unperformed coverage and must be reported with their reasons. Record the source revision, build directory, interpreter, pytest summary and elapsed time; `ctest -N -V -R python_binding` shows the interpreter, `_core` directory and reference paths, and JUnit results are stored in `<build>/python-test-results.xml`.
 
 **Why Valgrind runs locally.** The commit workflow on CircleCI does not run Valgrind (executor resource limits); only `run_manual_nightly_full` does, so without the local run a memory defect can sit in the history for up to two weeks.
 
