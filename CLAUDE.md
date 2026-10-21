@@ -215,10 +215,21 @@ No marker appears in an intermediate update, nor while a check is still running:
 | `ninja test-valgrind` | the same condition as `ninja test`; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
 | `ninja test_gate` | the session touched engine sources (`src/`); otherwise say explicitly that it was skipped and why |
 | ablation floor (below) | the session touched an optimizer pass |
+| `scripts/check-python.sh` (from the repository root) | the diff touches engine sources/headers/grammars under `src/`, CMake or Conan configuration used by `_core`, the Python package/tests, or this check script |
 
 A check runs because it can see the change: a run that the diff cannot turn red is not evidence and only costs time. When a row's condition does not hold (documentation, notebooks, a script outside ctest), say that the check was skipped and why, and name the check that does exercise the change - for example `docker/wheel/notebook-smoke.sh` for the notebooks.
 
 A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
+
+**Python binding (#447): mandatory local check.** The binding is maintained, with `xretractor` taking priority. Its check runs locally before the handoff, commit and push under the condition above; it adds no job or step to the `commit` or `manual-nightly-full` workflows. Ordinary builds may keep `RDB_PYTHON=OFF`.
+
+Prepare Debug Conan dependencies and a Python 3.10+ venv with nanobind, NumPy, pytest and torch. `scripts/python-venv.sh` prepares the first three; install torch separately in that venv (CPU is sufficient, no GPU is required). Then run from the repository root:
+
+```bash
+scripts/check-python.sh --python .venv-python/bin/python3 --jobs 4
+```
+
+The script configures the separate `build/Check-Python` directory with `RDB_PYTHON=ON`, rebuilds `_core`, reference `xretractor` and `xqry`, and runs the core no-exceptions compile checks. It refreshes and byte-compares the package's `.py`/`.pyi` copies even when only Python sources changed, verifies that the imported `_core` is the target built for the selected interpreter, and checks reference executable paths before `pytest api/python/tests`. It does not install project binaries. Missing dependencies or references fail the check; skipped tests are unperformed coverage and must be reported with their reasons. Record the source revision, interpreter, `_core` and reference paths, pytest summary and elapsed time; JUnit results are stored in `build/Check-Python/python-test-results.xml`.
 
 **Why Valgrind runs locally.** The commit workflow on CircleCI does not run Valgrind (executor resource limits); only `run_manual_nightly_full` does, so without the local run a memory defect can sit in the history for up to two weeks.
 
