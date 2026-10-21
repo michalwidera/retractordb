@@ -457,13 +457,19 @@ TEST_F(BinaryDeviceROTest, await_returns_when_a_late_writer_completes_the_record
   auto desc        = fixedIntDescriptor();
   rdb::binaryDeviceRO dev(path, desc, true, "DEVICE");
 
-  std::thread late([writer] {
+  clock_type::time_point writeBegins;
+  std::thread late([writer, &writeBegins] {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    writeBegins = clock_type::now();
     writeAll(writer, {0x01, 0x02, 0x03, 0x04});
   });
-  const auto elapsed = timedAwait({{&dev, std::chrono::seconds(3)}});
+  const auto elapsed  = timedAwait({{&dev, std::chrono::seconds(3)}});
+  const auto phaseEnd = clock_type::now();
   late.join();
-  EXPECT_GE(elapsed, std::chrono::milliseconds(90));
+  // Dolna granica wzgledem chwili zapisu, nie poczatku fazy: przestoj watku glownego przed timedAwait
+  // przesuwa zapis wczesniej wzgledem `start` (#559). Znacznik stoi przed writeAll - po nim faza mogla
+  // juz poprawnie wrocic.
+  EXPECT_GE(phaseEnd, writeBegins) << "faza skonczyla sie przed zapisem";
   EXPECT_LT(elapsed, std::chrono::milliseconds(2000));
   EXPECT_EQ(readRecord(dev), (std::vector<uint8_t>{0x01, 0x02, 0x03, 0x04}));
   ::close(writer);
