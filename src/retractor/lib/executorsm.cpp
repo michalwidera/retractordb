@@ -15,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <print>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <thread>
