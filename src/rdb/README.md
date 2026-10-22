@@ -65,6 +65,8 @@ xtrdb -s datafile
 - `-n` / `--noprompt` suppresses the prompt, colours, and `ok` responses for scripted input. The legacy positional spelling `xtrdb noprompt` is also accepted.
 - `-s <file>` / `--storagemap <file>` prints the storage-family map for the named data file and exits without starting the interactive terminal.
 
+In batch mode, supply commands without the displayed `.` prompt and end with `quit` or end-of-file. Command refusals can leave the terminal running and still result in process exit code 0; check diagnostics and `status` when verifying a script.
+
 ## Interactive Terminal Interface
 
 ### Starting xtrdb
@@ -101,7 +103,7 @@ rox                              Toggle "remove on exit" flag
 print|printt                     Display payload (multiline/single-line)
 list|rlist [count]               List first/last records
 input [[field][value]]           Fill payload with values
-hex|dec                          Toggle hex/decimal display mode
+hex|dec                          Select hex/decimal integer input and output
 size                             Show total records in database
 cap [value]                      Set stream backread capacity
 dump                             Show raw payload memory dump
@@ -141,9 +143,13 @@ help|h                           Show help
 
 Supply a schema to `open` only when the corresponding `.desc` file does not exist. When it already exists, use `open file` and let `xtrdb` load that descriptor.
 
+`status` prints the payload state: `clean`, `changed`, `fetched`, `stored`, or `error`. Successful `append` and `write N` set it to `stored`; an append refused by a read-only source sets it to `error`. An out-of-range `read` or `rread` on writable storage leaves the payload and its previous status unchanged. `list N` and `rlist N` report each requested index beyond the record count as `record out of range - list command`.
+
 `policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`, `GENERIC`, `BINFILE`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `BINFILE`, `DEVICE` and `TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an existing descriptor overrides the policy selected at the prompt.
 
-`quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`. It is not a complete artifact-family cleanup: a data `.shadow` file and retention segments can remain. Use `dropfile { file1 file2 ... }` to remove explicitly named leftovers after verifying that no running `xretractor` instance owns them.
+`xtrdb` loads the standard system and user TOML configuration layers and has no `--config` option. A writable storage descriptor whose `REF` points outside the storage directory requires that directory in `storage.ref_dirs`. A `REF` supplied directly in a new `open` schema is the operator's explicit choice and does not require this allowance.
+
+`quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`. If a `REF` loaded from `.desc` points outside the storage directory and `storage.ref_dirs`, only the descriptor is removed; the external data and metadata are preserved. It is not a complete artifact-family cleanup: a data `.shadow` file and retention segments can remain. Use `dropfile file1 file2 ... }` to remove explicitly named leftovers after verifying that no running `xretractor` instance owns them. The file list ends with `}` and has no opening brace.
 
 ## Usage Examples
 
@@ -300,10 +306,10 @@ ok
 ```mermaid
 %%{init: {'theme': 'redux-color', "flowchart" : { "curve" : "basis" } } }%%
 flowchart TD
-    A[Start xtrdb] --> B[.open filename with schema]
-    B --> C{Descriptor exists?}
-    C -->|No| D[Create filename.desc from schema]
-    C -->|Yes| E[Load filename.desc]
+    A[Start xtrdb] --> C{Descriptor exists?}
+    C -->|No| B[.open filename with schema]
+    B --> D[Create filename.desc from schema]
+    C -->|Yes| E[.open filename without schema]
     D --> F[.desc - View schema]
     E --> F
     F --> G[.set field1 value1]
@@ -325,7 +331,7 @@ flowchart TD
 
 **Process:**
 1. Start xtrdb terminal
-2. Open/create file with schema definition
+2. Open an existing descriptor without a schema, or supply a schema to create a new one
 3. Set field values in payload buffer
 4. Preview with `.print`
 5. Append to file when satisfied
@@ -503,7 +509,9 @@ ok
 **What this shows:**
 - Byte arrays for sensor data
 - Switching between decimal and hexadecimal display
-- `.hex` and `.dec` commands toggle display mode
+- `hex` and `dec` select the base for both integer input and output; they do not toggle it
+
+For example, after `.hex`, `.set readings 10 20 30 40 50 60 70 80` stores hexadecimal bytes (`0x10`, `0x20`, etc.). Use `.dec` before entering decimal values again. Floating-point input and output are unaffected by this integer-base selection.
 
 ### Example 5: Listing and Browsing Records
 
@@ -529,7 +537,7 @@ ok
 ok
 
 # View all records from start
-.list 10                         # List first 10 records
+.list 3                          # List the three records just appended
 { timestamp:1000 temp_celsius:22.5 }
 { timestamp:1001 temp_celsius:23.1 }
 { timestamp:1002 temp_celsius:21.8 }
@@ -591,7 +599,7 @@ ok
 
 **Use case:** Creating a deterministic binary fixture whose contents can be compared with expected records.
 
-> An `.desc` file created by `xtrdb` describes writable storage. It is not a `DECLARE` source descriptor, which additionally contains `REF` and `TYPE BINFILE`, `TYPE TEXTSOURCE` or `TYPE DEVICE`; do not reuse it unchanged as a query input descriptor.
+> The `input_stream.desc` created in this example describes writable storage. A source descriptor used by `BINFILE`, `TEXTFILE`, or `DEVICE` needs the corresponding `TYPE BINFILE`, `TYPE TEXTSOURCE`, or `TYPE DEVICE` and a `REF` consistent with that declaration; do not reuse the fixture descriptor unchanged as a query input descriptor.
 
 ## Practical Use Cases
 
@@ -755,13 +763,16 @@ sequenceDiagram
     participant Meta as metaData
     
     Note over Client,Meta: Initialize storage
-    Client->>Rdb: storage(qryID, fileName, storageParam, policy)
+    Client->>Rdb: storage::create(qryID, fileName, storageParam, policy)
     activate Rdb
+    Rdb-->>Client: Result containing storage or an error
+    Note over Client,Rdb: Continue only after successful creation
     Client->>Rdb: attachDescriptor(optional schema)
     Rdb->>Description: Load or create .desc and verify if supplied
     Rdb->>Payload: Create descriptor-shaped payload
     Rdb->>Factory: makeAccessor() and makeMetaIndex()
     Factory-->>Rdb: Data accessor and metadata index
+    Rdb-->>Client: Result containing success or an error
     deactivate Rdb
     
     Note over Client,Meta: Read record
@@ -772,7 +783,7 @@ sequenceDiagram
     Rdb->>Meta: nullBitsetFor(index)
     Meta-->>Rdb: Latest null state
     Rdb->>Payload: Store bytes and null state
-    Rdb-->>Client: Status
+    Rdb-->>Client: Result containing ReadStatus or an error
     deactivate Rdb
     
     Note over Client,Meta: Append or update record
@@ -786,12 +797,12 @@ sequenceDiagram
         Rdb->>Data: write(payload, byte offset)
         Rdb->>Meta: onRecordModified()
     end
-    Rdb-->>Client: Status
+    Rdb-->>Client: Result containing WriteStatus or an error
     deactivate Rdb
 ```
 
 **Key interactions:**
-1. **Initialization**: Resolve the descriptor and construct the selected data accessor, metadata index, and payload
+1. **Initialization**: Check the result of `storage::create`, then check `attachDescriptor` as it resolves the descriptor and constructs the selected data accessor, metadata index, and payload
 2. **Read Data**: Combine the latest record bytes with the corresponding null state
 3. **Write Data**: Append or update both record data and metadata; shadow-capable policies preserve corrections separately
 
@@ -802,9 +813,11 @@ This diagram illustrates the current `rdb::storage` initialization process.
 ```mermaid
 %%{init: {'theme': 'redux-color', "flowchart" : { "curve" : "basis" } } }%%
 flowchart TD
-    Start([Start]) --> A[rdb::storage<br/>qryID, fileName, storageParam, policy]
+    Start([Start]) --> A[storage::create<br/>qryID, fileName, storageParam, policy]
     
-    A --> B[attachDescriptor<br/>with optional schema]
+    A --> Created{Creation succeeded?}
+    Created -->|No| Stop1([Return error])
+    Created -->|Yes| B[attachDescriptor<br/>with optional schema]
     
     B --> C{Descriptor file<br/>exists?}
     
@@ -816,17 +829,23 @@ flowchart TD
     F -->|No| K[Descriptor is ready]
     G -->|Yes| K
     G -->|No| H[Descriptor mismatch error]
-    H --> Stop1([Stop])
+    H --> Stop1
     E -->|No| I[Missing descriptor error]
     I --> Stop1
     E -->|Yes| J[Save supplied schema as .desc]
     J --> K
 
-    K --> L[Apply REF path and create payload/source buffer]
+    K --> L[Resolve REF path and create payload/source buffer]
     L --> M[Read TYPE policy if present]
-    M --> N[makeAccessor]
-    N --> O[makeMetaIndex]
-    O --> P{Declared read-only source?}
+    M --> RefAllowed{REF permitted for this storage?}
+    RefAllowed -->|No| Stop1
+    RefAllowed -->|Yes| N[makeAccessor]
+    N --> AccessorReady{Accessor initialized?}
+    AccessorReady -->|No| Stop1
+    AccessorReady -->|Yes| O[makeMetaIndex]
+    O --> MetaReady{Metadata initialized?}
+    MetaReady -->|No| Stop1
+    MetaReady -->|Yes| P{Declared read-only source?}
     P -->|Yes| R[Storage is ready]
     P -->|No| Q[Count records and detect startup state]
     Q --> R
@@ -839,10 +858,10 @@ flowchart TD
 ```
 
 **Process steps:**
-1. **Initialization**: Construct `rdb::storage` with logical and physical paths
+1. **Initialization**: Call `storage::create` with logical and physical paths and check its `Result`
 2. **Descriptor Resolution**: Load an existing `.desc` or require and save a supplied schema
 3. **Descriptor Validation**: Check a supplied schema against an existing descriptor
-4. **Storage Attachment**: Select the data accessor and matching metadata-index variant
+4. **Storage Attachment**: Validate the retained descriptor's REF permissions, select the data accessor and matching metadata-index variant, and propagate initialization errors
 5. **Payload Setup**: Create the payload and source buffer before exposing the ready storage
 
 These diagrams show the low-level implementation details of RetractorDB's storage layer.
