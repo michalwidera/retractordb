@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -192,15 +191,6 @@ inline std::string serviceName(std::string_view serverName) { return withServerS
 /// - [constants.service-lock-file.1~1] zwracać nazwę pliku blokady instancji: serviceName z dopisanym kServiceLockSuffix, bez katalogu.
 inline std::string serviceLockFile(std::string_view serviceName) {
   return std::string(serviceName) + std::string(kServiceLockSuffix);
-}
-
-/// Funkcja serviceLockDir powinna:
-/// - [constants.service-lock-dir.1~1] zwracać skonfigurowany katalog blokad instancji (paths.lock_dir), a gdy jest pusty - katalog tymczasowy procesu z std::filesystem::temp_directory_path.
-///
-/// @note Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
-inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
-  if (configuredDir.empty()) return std::filesystem::temp_directory_path();
-  return {configuredDir};
 }
 
 /// Funkcja serviceLockInstance powinna:

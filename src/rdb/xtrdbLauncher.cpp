@@ -33,6 +33,7 @@
 #include "constants.hpp"
 #include "ICommand.hpp"
 #include "rdb/storage.hpp"
+#include "serviceLockDir.hpp"
 #include "uxSysTermTools.hpp"
 #include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
