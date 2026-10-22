@@ -825,14 +825,13 @@ rdb::descFldVT stringLength(const rdb::descFldVT &inVar, std::string_view &error
   return static_cast<int>(text->length());
 }
 
-/// Przeciazenie <double(double)> funkcji matematycznej, wskazane JAWNIE.
+/// Funkcje matematyczne trafiaja do callFun()/callRealFun() jako lambdy, a NIE przez adres.
 ///
-/// `floor` nie jest pojedyncza funkcja, tylko zbiorem przeciazen (float, double,
-/// long double), a w libc++ dodatkowo szablonem dla typow calkowitych. Sama nazwa nie
-/// ma wiec jak przejsc na std::function<double(double)>: nie da sie wybrac, o ktora
-/// wersje chodzi. Pod libstdc++ wybor wypadal jednoznacznie i rzutowanie nie bylo
-/// potrzebne, ale to byla wlasciwosc TAMTEJ biblioteki, a nie gwarancja jezyka.
-using mathFn = double (*)(double);
+/// Pobranie adresu funkcji biblioteki standardowej jest od C++20 nieokreslone
+/// ([namespace.std]/6), wiec `static_cast<double (*)(double)>(std::floor)` nie jest
+/// gwarancja jezyka. `floor` jest przy tym zbiorem przeciazen (float, double, long double,
+/// w libc++ dodatkowo szablonem dla typow calkowitych). Lambda `[](double x) { return std::floor(x); }`
+/// funkcje WOLA, wiec przeciazenie <double(double)> wybiera zwykle rozstrzyganie przeciazen.
 
 rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
@@ -987,27 +986,27 @@ rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &pr
         const auto tkStr    = lowercased(original);
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
         if (tkStr == "floor")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::floor));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::floor(x); });
         else if (tkStr == "ceil")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::ceil));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::ceil(x); });
         else if (tkStr == "sqrt")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::sqrt));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::sqrt(x); });
         else if (tkStr == "round")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::round));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::round(x); });
         else if (tkStr == "sin")
-          RDB_EVAL_PUSH(callRealFun, b, static_cast<mathFn>(std::sin));
+          RDB_EVAL_PUSH(callRealFun, b, [](double x) { return std::sin(x); });
         else if (tkStr == "cos")
-          RDB_EVAL_PUSH(callRealFun, b, static_cast<mathFn>(std::cos));
+          RDB_EVAL_PUSH(callRealFun, b, [](double x) { return std::cos(x); });
         else if (tkStr == "exp")
-          RDB_EVAL_PUSH(callRealFun, b, static_cast<mathFn>(std::exp));
+          RDB_EVAL_PUSH(callRealFun, b, [](double x) { return std::exp(x); });
         else if (tkStr == "tan")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::tan));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::tan(x); });
         else if (tkStr == "log")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::log));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::log(x); });
         else if (tkStr == "log2")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::log2));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::log2(x); });
         else if (tkStr == "trunc")
-          RDB_EVAL_PUSH(callFun, b, static_cast<mathFn>(std::trunc));
+          RDB_EVAL_PUSH(callFun, b, [](double x) { return std::trunc(x); });
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
         // NULL -> 0, reszta bez zmian. Zeruje wartosc POCHLANIAJACA (dziura w danych, dzielenie
