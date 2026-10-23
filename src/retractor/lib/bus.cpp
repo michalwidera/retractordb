@@ -1164,7 +1164,17 @@ void Bus::releaseAdditional(const std::vector<std::string> &streams, const std::
 
   // Muteks z tego samego powodu co w release(): nieparzysty seq przy trzymanym muteksie ma
   // znaczyc wylacznie "pisarz zginal".
-  if (!impl->lock()) return;
+  std::string failure;
+  if (!impl->lock(&failure)) {
+    // ERROR, nie WARN: Release wycina WARN, a nazwy zostaja zajete do konca tej instancji (#303).
+    std::string names;
+    for (const auto &name : streams)
+      names += (names.empty() ? "" : ", ") + name;
+    for (const auto &store : stores)
+      names += (names.empty() ? "" : ", ") + store;
+    SPDLOG_ERROR("xrdbbus: cannot release {} ({}); they stay claimed by this instance.", names, failure);
+    return;
+  }
 
   Slot &mine                     = impl->segment->slots[impl->slotIndex];
   const std::uint32_t owned      = std::min(mine.streamCount, static_cast<std::uint32_t>(kMaxStreams));

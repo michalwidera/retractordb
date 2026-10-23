@@ -333,6 +333,7 @@ struct ClaimRequest {
 ///   Zakres testow: `BusRepairSeqlock.RepairPublishesFreshEvenSequence` (ut_busSlotCount i ut_busFallback), `BusRepairSeqlock.InterruptedRepairRemainsRecoverable` (ut_busSlotCount), `FallbackLock.DeadOwnerIsRecoveredAndInterruptedSlotInvalidated`, `BusRepairSeqlock.InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent` (ut_busSlotCount, przechwycenie pthread_mutex_consistent bez haka w produkcji).
 /// - [bus.bus.14~1] przy zniszczeniu zwalniać slot i odwzorowanie, a segment i plik obecności usuwać wyłącznie wtedy, gdy uda się zająć wyłączną blokadę obecności, czyli segmentu nie mapuje nikt inny.
 /// - [bus.bus.15~1] uniemożliwiać kopiowanie obiektu.
+/// - [bus.bus.16~1] gdy w releaseAdditional muteksu magistrali nie da się użyć, logować błąd z nazwami strumieni i ścieżkami magazynów, które zostają zajęte, zamiast wracać bez śladu.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_bus.cpp - static_assert(!std::is_copy_constructible_v<bus::Bus> && !std::is_copy_assignable_v<bus::Bus>).
 class Bus {
  public:
