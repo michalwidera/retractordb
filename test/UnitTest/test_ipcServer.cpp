@@ -15,6 +15,9 @@
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <format>
+#include <fstream>
 #include <future>
 #include <optional>
 #include <sstream>
@@ -809,6 +812,31 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(server.handled(), 1) << "komenda bez db.id zostala wykonana";
+}
+
+// Regresja A2 (21): tresc komendy szla wprost do read_info, a ten wykonuje dyrektywy INFO -
+// '#include "plik"' dolaczal do komendy dowolny plik czytelny dla serwera (FIFO zawiesiloby watek
+// komunikacyjny, /dev/zero zjadlo pamiec, stad w tescie plik zwykly). Ma byc odmowa przed parserem:
+// handler komendy nie widzi. Wariant z wiodacymi bialymi znakami, bo parser je pomija. Kontrola:
+// '#' w wartosci, ktora write_info pisze w linii klucza, nie jest dyrektywa i komenda przechodzi.
+TEST(IpcServerLoop, include_directive_in_command_is_rejected_without_reading_the_file) {
+  // covers: ipcserver.ipc-server.17~1
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+  const auto included = std::filesystem::temp_directory_path() / std::format("rdb_ipc_include_{}.info", getpid());
+  std::ofstream(included) << "injected 1\n";
+  const std::string directive = std::format("#include \"{}\"\n", included.string());
+
+  server.send(directive + command(kClientFull, "z dyrektywa"));
+  server.send(" \t" + directive + command(kClientFull, "z wcieta dyrektywa"));
+
+  const std::string valueWithHash = "#include \"" + included.string() + "\"";
+  server.send(command(kClientNext, valueWithHash));
+  const auto next = server.response(kClientNext);
+  std::filesystem::remove(included);
+  ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
+  EXPECT_EQ(next->get<std::size_t>("argumentLength"), valueWithHash.size()) << "'#' w wartosci odrzucony jako dyrektywa";
+  EXPECT_EQ(server.handled(), 1) << "komenda z dyrektywa INFO dotarla do handlera";
 }
 
 // Znacznik startu adresata pochodzi z komendy (db.start), nie z wpisu procesu czytanego przez serwer.

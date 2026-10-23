@@ -56,6 +56,7 @@
 /// - [ipcserver.ipc-server.15~1] po poprawnym powrocie z onReady kończyć wątek komunikacyjny z wpisem w logu przy std::exception nieobsłużonym wewnątrz pętli, bez ponownego wywołania onReady ani onFailure. Wyjątki spoza std::exception są poza kontraktem i nie mają gwarancji zatrzymania ograniczonego do tego wątku.
 /// - [ipcserver.ipc-server.16~1] uniemożliwiać kopiowanie obiektu.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_ipcServer.cpp, static_assert cech kopiowania IpcServer.
+/// - [ipcserver.ipc-server.17~1] odrzucać z wpisem w logu, przed parserem INFO i bez wywołania onCommand, komendę zawierającą linię, której pierwszy znak inny niż biały to '#' (dyrektywa parsera, np. #include otwierająca plik), tak aby treść komendy nie otwierała plików z prawami serwera.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
