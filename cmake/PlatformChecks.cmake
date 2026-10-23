@@ -222,7 +222,8 @@ endforeach()
 # Kazda proba z listy ponizej wybiera w kodzie galaz GLOWNA (1) albo ZAPASOWA (0):
 #
 #   CLOCK_NANOSLEEP     sen absolutny na mach_wait_until zamiast clock_nanosleep
-#   ABSOLUTE_SLEEP      sen WZGLEDNY - blad kazdego slotu sie kumuluje (dryf);
+#   ABSOLUTE_SLEEP      sen WZGLEDNY o czas pozostaly do terminu bezwzglednego - blad sie nie
+#                       kumuluje, przepada tylko wywlaszczenie miedzy odczytem zegara a zasnieciem;
 #                       0 tylko wtedy, gdy nie ma ani clock_nanosleep, ani mach_time
 #   SCHED_SETSCHEDULER  SCHED_FIFO przez pthread_setschedparam zamiast sched_setscheduler(0, ...);
 #                       zasieg ten sam - w obu galeziach tylko watek wolajacy
