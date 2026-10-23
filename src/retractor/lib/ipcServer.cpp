@@ -363,6 +363,13 @@ void IpcServer::commandLoop() const {
           // dostaje seq 0 i nadal odbiera swoja odpowiedz, bo sam tez czeka na 0.
           std::uint64_t clientSeq = 0;
           boost::conversion::try_lexical_convert(pt.get("db.seq", "0"), clientSeq);
+          // db.start to znacznik startu, ktory klient sam odczytal ze swojego wpisu procesu - wlasny
+          // wpis jest czytelny zawsze. Serwer czytal go z wpisu klienta: przy hidepid=2 albo w innej
+          // przestrzeni PID dostawal 0 i klient odrzucal wlasna odpowiedz, a po smierci klienta
+          // i ponownym uzyciu jego PID-u przypisywal odpowiedz nowemu procesowi. Klient bez db.start
+          // (starsza binarka) dostaje znacznik odczytany przez serwer, jak dotad.
+          std::uint64_t clientStart = 0;
+          boost::conversion::try_lexical_convert(pt.get("db.start", "0"), clientStart);
           ptree pt_retval;
           try {
             pt_retval = callbacks_.onCommand(pt);
@@ -393,10 +400,10 @@ void IpcServer::commandLoop() const {
           // Sending answer
           std::stringstream response_stream;
           write_info(response_stream, pt_retval);
-          // Znacznik startu klienta czytany TERAZ, w chwili zapisu: po nim serwer rozpozna, ze
-          // wlasciciel slotu umarl, nawet jesli jego PID dostal juz inny proces.
-          const ipc::responses::Owner owner{
-              .pid = clientProcessId, .startTime = osplat::inspectProcess(clientProcessId).startTime, .seq = clientSeq};
+          // Po znaczniku startu serwer rozpozna, ze wlasciciel slotu umarl, nawet jesli jego PID
+          // dostal juz inny proces.
+          if (clientStart == 0) clientStart = osplat::inspectProcess(clientProcessId).startTime;
+          const ipc::responses::Owner owner{.pid = clientProcessId, .startTime = clientStart, .seq = clientSeq};
           ipc::responses::publish(responses.segment(), owner, response_stream.str());
         } catch (const std::exception &ex) {
           SPDLOG_ERROR("IPC message dropped: {}", ex.what());

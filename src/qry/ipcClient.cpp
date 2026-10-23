@@ -136,6 +136,7 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", self.pid);
     pt_request.put("db.seq", self.seq);
+    pt_request.put("db.start", self.startTime);
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
     // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli: na obciążonej maszynie obrót trwa

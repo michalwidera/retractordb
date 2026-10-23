@@ -31,6 +31,7 @@
 #include "constants.hpp"
 #include "ipcResponses.hpp"
 #include "logCapture.hpp"
+#include "osPlatform.hpp"
 #include "retractor/lib/ipcServer.hpp"
 #include "syscallWrap.hpp"
 
@@ -712,12 +713,12 @@ class RunningServer {
   [[nodiscard]] const std::string &commandQueue() const { return names_.queryQueue; }
 
   /// Odpowiedz dla `clientId` ze slotow odpowiedzi, zdjeta tak, jak zdejmuje ja IpcClient::netClient.
-  /// Komendy testu nie niosa db.seq, a `clientId` nie jest zywym procesem, wiec serwer zapisuje
-  /// seq 0 i startTime 0 (znacznika startu nie ma czego odczytac).
-  [[nodiscard]] std::optional<ptree> response(int clientId) const {
+  /// Komendy testu nie niosa db.seq, a bez db.start `clientId` nie jest zywym procesem, wiec serwer
+  /// zapisuje seq 0 i startTime 0 (znacznika startu nie ma czego odczytac).
+  [[nodiscard]] std::optional<ptree> response(int clientId, std::uint64_t startTime = 0) const {
     const ipc::responses::Mapping responses(IPC::open_only, names_.shmemSegment);
     if (!responses.valid()) return std::nullopt;
-    const auto text = ipc::responses::take(responses.segment(), {.pid = clientId, .startTime = 0, .seq = 0},
+    const auto text = ipc::responses::take(responses.segment(), {.pid = clientId, .startTime = startTime, .seq = 0},
                                            std::chrono::steady_clock::now() + kResponseBudget, ipc::kClientResponsePollInterval);
     if (!text) return std::nullopt;
     std::stringstream stream(*text);
@@ -735,11 +736,13 @@ class RunningServer {
   std::atomic<int> handled_{0};
 };
 
-/// Komenda w formacie IpcClient::netClient; brak `clientId` daje komende bez db.id.
-std::string command(std::optional<int> clientId, const std::string &argument) {
+/// Komenda w formacie IpcClient::netClient; brak `clientId` daje komende bez db.id, brak `start` - bez db.start.
+std::string command(std::optional<int> clientId, const std::string &argument,
+                    std::optional<std::uint64_t> start = std::nullopt) {
   ptree request;
   request.put("db.message", "hello");
   if (clientId) request.put("db.id", *clientId);
+  if (start) request.put("db.start", *start);
   request.put("db.argument", argument);
   std::stringstream text;
   write_info(text, request);
@@ -755,7 +758,7 @@ std::string command(std::optional<int> clientId, const std::string &argument) {
 // Test pilnuje zachowania na granicy: komenda o pelnej dlugosci dochodzi w calosci,
 // a watek komunikacyjny obsluguje nastepna.
 TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving) {
-  // covers: ipcserver.ipc-server.2~1, ipcserver.ipc-server.3~1
+  // covers: ipcserver.ipc-server.2~1, ipcserver.ipc-server.3~2
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -796,7 +799,7 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
 // PO wykonaniu komendy. Komenda bez adresu zwrotnego ma byc odrzucona PRZED handlerem, zeby
 // odmowa nie miala skutkow ubocznych (kill, reset-commit bez nadawcy).
 TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_serving) {
-  // covers: ipcserver.ipc-server.3~1
+  // covers: ipcserver.ipc-server.3~2
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -806,6 +809,26 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(server.handled(), 1) << "komenda bez db.id zostala wykonana";
+}
+
+// Znacznik startu adresata pochodzi z komendy (db.start), nie z wpisu procesu czytanego przez serwer.
+// Przy hidepid=2 serwer czytal 0, a po ponownym uzyciu PID-u znacznik innego procesu - w obu
+// przypadkach slot mial inny znacznik niz klient, a ten odrzucal wlasna odpowiedz. Znacznik
+// rozny od prawdziwego odtwarza te sytuacje bez roota. Kontrola: bez db.start serwer czyta wpis.
+TEST(IpcServerLoop, response_slot_takes_client_start_time_from_command) {
+  // covers: ipcserver.ipc-server.3~2
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+  const int self        = getpid();
+  const auto realStart  = osplat::inspectProcess(self).startTime;
+  const auto claimStart = realStart + 1;
+  ASSERT_NE(realStart, 0U);
+
+  server.send(command(self, "z db.start", claimStart));
+  EXPECT_TRUE(server.response(self, claimStart).has_value()) << "slot nie niesie znacznika z db.start";
+
+  server.send(command(self, "bez db.start"));
+  EXPECT_TRUE(server.response(self, realStart).has_value()) << "bez db.start serwer nie odczytal znacznika adresata";
 }
 
 // Klient zabity w srodku send z muteksem kolejki komend w reku. try_receive rzucal potem

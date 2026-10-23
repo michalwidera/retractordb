@@ -53,7 +53,7 @@ struct Header {
 struct Slot {
   std::uint32_t state;  ///< SlotState, dostep wylacznie przez std::atomic_ref
   std::int32_t pid;
-  std::uint64_t startTime;  ///< znacznik startu klienta odczytany przez serwer w chwili zapisu
+  std::uint64_t startTime;  ///< znacznik startu klienta z db.start; bez niego odczytany przez serwer
   std::uint64_t seq;        ///< db.seq zadania, na ktore to jest odpowiedz
   std::uint32_t length;
   std::uint32_t reserved;

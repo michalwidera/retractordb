@@ -33,7 +33,7 @@ constexpr int kIpcClientDefaultResponseQueueOpenMaxFails = 100;
 
 /// Obiekt klasy IpcClient powinien:
 /// - [ipcclient.ipc-client.1~1] używać nazw obiektów IPC serwera o podanej nazwie albo nazw historycznych dla nazwy pustej, a budżety prób przyjmować nie mniejsze niż 1.
-/// - [ipcclient.ipc-client.2~1] w netClient wysyłać komendę z argumentem, pid procesu i numerem żądania unikalnym w obrębie procesu, także między kilkoma obiektami IpcClient, i odbierać odpowiedź wyłącznie ze slotu tego procesu (pid, czas startu procesu) i tego numeru żądania.
+/// - [ipcclient.ipc-client.2~2] w netClient wysyłać komendę z argumentem, pid procesu, czasem startu procesu (db.start) i numerem żądania unikalnym w obrębie procesu, także między kilkoma obiektami IpcClient, i odbierać odpowiedź wyłącznie ze slotu tego procesu (pid, czas startu procesu) i tego numeru żądania.
 /// - [ipcclient.ipc-client.3~1] wyznaczać jeden termin zegarem monotonicznym jako chwilę rozpoczęcia żądania plus max(1, budżet prób) razy interwał odpytywania; czekać do niego na miejsce w kolejce komend, ponawiając próbę wysłania co interwał odpytywania, a po wysłaniu na odpowiedź tylko przez pozostały czas, bez odnawiania terminu. Termin ogranicza oczekiwanie, nie czas operacji systemowych ani opóźnienie planisty.
 ///   Nietestowalne: wspolny termin obu czekan jest kontrola strukturalna netClient w ipcClient.cpp (jeden steady_clock deadline dla petli try_send i take), nie pomiarem dwoch niezaleznych budzetow.
 /// - [ipcclient.ipc-client.4~1] nie nadpisywać komend już czekających w kolejce komend.
