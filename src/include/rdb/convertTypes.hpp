@@ -28,10 +28,11 @@ inline constexpr int kDefaultRationalizeIterations = 11;
 ///   `cast_variant.pair_to_scalar_is_null`, `cast_any.pair_to_scalar_is_null`,
 ///   `cast_contract.invalid_rational_pairs_and_idxpair_targets_are_null`.
 /// - [converttypes.cast.6~1] dla pustego std::any i typu spoza descFldVT zwracać NULL na obsługiwanych ścieżkach konwersji do danych.
-/// - [converttypes.cast.7~1] konwertować STRING do typów skalarnych przez from_chars: prefiks int dla BYTE/INTEGER/UINT, prefiks double
-///   dla FLOAT/DOUBLE; odrzucać błąd parsowania lub zakresu bez wymogu odczytania całego napisu.
-/// - [converttypes.cast.8~1] czytać STRING do RATIONAL/INTPAIR przez strumień z separatorem '/' lub ',' i wartościami początkowymi 0, 1;
-///   błąd strumienia nie daje sam w sobie NULL. Para do RATIONAL daje NULL dla mianownika 0 lub INT_MIN oraz
+/// - [converttypes.cast.7~2] konwertować STRING do typów skalarnych przez from_chars: int dla BYTE/INTEGER/UINT, double
+///   dla FLOAT/DOUBLE; zwracać NULL przy błędzie parsowania lub zakresu oraz wtedy, gdy liczba nie zajmuje całego napisu.
+/// - [converttypes.cast.8~2] czytać STRING do RATIONAL/INTPAIR przez strumień jako parę z separatorem '/' lub ',' albo samą
+///   liczbę z drugą wartością 1; zwracać NULL, gdy liczby nie da się odczytać, przekracza zakres int albo za parą zostaje
+///   coś poza białymi znakami. Para do RATIONAL daje NULL dla mianownika 0 lub INT_MIN oraz
 ///   licznika INT_MIN przy ujemnym mianowniku; poprawna para jest normalizowana.
 ///   Zakres testow: `cast_contract.string_prefixes_and_pair_parsing_match_both_interfaces`,
 ///   `cast_contract.invalid_rational_pairs_and_idxpair_targets_are_null`.

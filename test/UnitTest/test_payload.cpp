@@ -98,6 +98,8 @@ TEST(payload, conversion_failure_and_nullopt_write_typed_fallback_bytes) {
     EXPECT_EQ(std::vector<uint8_t>(value.span().begin(), value.span().end()), expected);
     EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, true, true}));
     value.setItem(1, std::string("12tail"));
+    EXPECT_FALSE(value.getItem(1).has_value());
+    value.setItem(1, std::string("12"));
     EXPECT_EQ(std::any_cast<int>(value.getItem(1).value()), 12);
     EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, false, true}));
     value.setItem(2, std::string("256"));
