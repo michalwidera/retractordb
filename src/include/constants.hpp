@@ -231,7 +231,10 @@ constexpr std::size_t kNullTerminatorBytes = 1;
 constexpr std::size_t kResponseSlotCount = 16;
 
 // Najwieksza odpowiedz miesczaca sie w slocie (bajty). Dluzsza jest zastepowana bledem.
-constexpr std::size_t kResponseSlotDataSize = std::size_t{32} * 1024;
+// Miara jest odpowiedz 'get' (xqry -d, -s): plan kMaxPlanStreams strumieni z nazwami po 200 znakow
+// i sciezkami magazynow daje ok. 79 KB, wiec 32 KiB nie wystarczalo (#566). Segment zajmuje
+// kResponseSlotCount takich slotow w /dev/shm - patrz shmBudget.
+constexpr std::size_t kResponseSlotDataSize = std::size_t{128} * 1024;
 
 // Naglowek segmentu i naglowek slotu (bajty); sizeof obu struktur pilnuje static_assert
 // w ipcResponses.hpp.

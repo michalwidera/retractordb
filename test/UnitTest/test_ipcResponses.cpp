@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -233,7 +234,8 @@ TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
   std::stringstream stream(*text);
   boost::property_tree::ptree pt;
   read_info(stream, pt);
-  EXPECT_EQ(pt.get<std::string>("error.response", ""), "response too large (32769 B > 32768 B)");
+  EXPECT_EQ(pt.get<std::string>("error.response", ""),
+            std::format("response too large ({} B > {} B)", ipc::kResponseSlotDataSize + 1, ipc::kResponseSlotDataSize));
   EXPECT_NE(log.text().find("replaced with an error"), std::string::npos);
 }
 
