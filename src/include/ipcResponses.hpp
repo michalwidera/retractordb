@@ -79,6 +79,23 @@ struct Owner {
   std::uint64_t seq{0};
 };
 
+/// Numer zadania tego procesu, na ktorego odpowiedz jakis watek wlasnie czeka. Rejestr jest wspolny
+/// dla calego procesu, jak licznik requestSeq w ipcClient.cpp: bez niego tryTake jednego watku
+/// zwalnial odpowiedz zadania, na ktora drugi watek tego samego procesu jeszcze czekal.
+/// Obiekt klasy PendingRequest powinien:
+/// - [ipcresponses.pending-request.1~1] od konstrukcji do zniszczenia oznaczać numer `seq` jako żądanie w toku tego procesu, tak aby tryTake innego żądania nie zwolnił jego odpowiedzi.
+/// - [ipcresponses.pending-request.2~1] przy zniszczeniu wycofywać swój numer, po czym zaległa odpowiedź na niego jest zwalniana przez tryTake jak każda porzucona.
+class PendingRequest {
+ public:
+  explicit PendingRequest(std::uint64_t seq);
+  ~PendingRequest();
+  PendingRequest(const PendingRequest &)            = delete;
+  PendingRequest &operator=(const PendingRequest &) = delete;
+
+ private:
+  std::uint64_t seq_;
+};
+
 enum class PublishStatus : std::uint8_t {
   Published,  ///< w wolnym slocie
   Reclaimed,  ///< w slocie odzyskanym po martwym kliencie
@@ -108,7 +125,7 @@ PublishStatus publish(Segment &segment, const Owner &owner, std::string_view tex
 
 /// Funkcja tryTake powinna:
 /// - [ipcresponses.try-take.1~1] w jednym przeglądzie slotów zwracać treść odpowiedzi w stanie Ready z pid, startTime i seq równymi `owner` i zwalniać jej slot, a bez takiej odpowiedzi zwracać nullopt.
-/// - [ipcresponses.try-take.2~1] zwalniać po drodze sloty z pid-em `owner`, ale innym startTime albo seq (zaległe odpowiedzi poprzedniego procesu albo porzuconych żądań).
+/// - [ipcresponses.try-take.2~2] zwalniać po drodze sloty z pid-em `owner`, ale innym startTime (zaległe odpowiedzi poprzedniego procesu) albo innym seq, który nie jest żądaniem w toku tego procesu (porzucone żądania); slot żądania w toku (PendingRequest) oddawać w stanie Ready jego wątkowi.
 /// - [ipcresponses.try-take.3~1] oddawać w stanie Ready slot, który po przejęciu okazał się należeć do innego pid-u.
 ///   Nietestowalne: deterministyczna podmiana pid miedzy wstepnym odczytem a CAS nie ma punktu synchronizacji. Kontrola strukturalna tryTake w ipcResponses.cpp: drugi odczyt pid po CAS i oddanie Reading -> Ready przez CAS. Test `IpcResponses.foreign_pid_slot_is_left_alone` sprawdza tylko sciezke bez podmiany; nie zalicza sie jako test tego wyscigu.
 /// - [ipcresponses.try-take.4~1] odrzucać skopiowaną treść, gdy zwolnienie slotu po kopiowaniu się nie powiedzie, bo serwer mógł go w tym czasie nadpisać.

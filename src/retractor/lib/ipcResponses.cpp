@@ -6,8 +6,10 @@
 #include <cstring>
 #include <format>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
+#include <unordered_set>
 
 #include <spdlog/spdlog.h>
 #include <boost/property_tree/info_parser.hpp>
@@ -62,7 +64,35 @@ void faultReadDelay(std::size_t slotIndex) {
   std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
 }
 
+struct PendingRegistry {
+  std::mutex mutex;
+  std::unordered_set<std::uint64_t> seqs;
+};
+
+PendingRegistry &pendingRegistry() {
+  static PendingRegistry retVal;
+  return retVal;
+}
+
+bool isPending(std::uint64_t seq) {
+  auto &registry = pendingRegistry();
+  const std::scoped_lock lock(registry.mutex);
+  return registry.seqs.contains(seq);
+}
+
 }  // namespace
+
+PendingRequest::PendingRequest(std::uint64_t seq) : seq_(seq) {
+  auto &registry = pendingRegistry();
+  const std::scoped_lock lock(registry.mutex);
+  registry.seqs.insert(seq_);
+}
+
+PendingRequest::~PendingRequest() {
+  auto &registry = pendingRegistry();
+  const std::scoped_lock lock(registry.mutex);
+  registry.seqs.erase(seq_);
+}
 
 void initialize(Segment &segment) {
   segment.header.layoutVersion = kLayoutVersion;
@@ -144,10 +174,12 @@ std::optional<std::string> tryTake(Segment &segment, const Owner &owner) {
       transition(slot, SlotState::Reading, SlotState::Ready);
       continue;
     }
-    // Nasz pid, ale nie nasza odpowiedz: poprzedni proces o tym PID-ie albo nasze wlasne
-    // zadanie, na ktore przestalismy czekac. Nikt inny jej nie odbierze, wiec slot zwalniamy.
+    // Nasz pid, ale nie nasza odpowiedz. Zadanie w toku innego watku tego procesu odbierze ja
+    // samo - oddajemy slot. Odpowiedzi poprzedniego procesu o tym PID-ie albo zadania, na ktore
+    // przestalismy czekac, nikt nie odbierze, wiec slot zwalniamy.
     if (loadField(slot.startTime) != owner.startTime || loadField(slot.seq) != owner.seq) {
-      transition(slot, SlotState::Reading, SlotState::Free);
+      const bool otherPending = loadField(slot.startTime) == owner.startTime && isPending(loadField(slot.seq));
+      transition(slot, SlotState::Reading, otherPending ? SlotState::Ready : SlotState::Free);
       continue;
     }
 

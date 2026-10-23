@@ -45,6 +45,8 @@ constexpr int kIpcClientDefaultResponseQueueOpenMaxFails = 100;
 ///   Nietestowalne: brak snu po udanym odbiorze jest kontrola strukturalna producer w ipcClient.cpp; nie mierzymy szybkosci planisty.
 /// - [ipcclient.ipc-client.10~1] przez popQueue zwracać kolejny element odebrany przez producenta bez blokowania.
 /// - [ipcclient.ipc-client.11~1] kończyć pętlę producenta po ustawieniu done przez dowolny wątek, a przy wyjątku w odbiorze zapisywać diagnostykę i ustawiać done.
+/// - [ipcclient.ipc-client.12~1] w netClient oznaczać numer żądania jako żądanie w toku (ipc::responses::PendingRequest) od chwili przed wysłaniem komendy do końca odbioru odpowiedzi.
+///   Kontrola strukturalna: PendingRequest tworzony w netClient przed petla try_send i niszczony po take; mechanizm sprawdza `IpcResponses.answer_of_a_concurrent_request_of_this_process_is_left_for_its_thread`.
 class IpcClient {
   boost::lockfree::spsc_queue<boost::property_tree::ptree, boost::lockfree::capacity<kSpscQueueCapacity>> spsc_queue_;
   int clientResponseMaxFails_{kIpcClientDefaultResponseMaxFails};
