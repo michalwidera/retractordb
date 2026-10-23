@@ -2,16 +2,21 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include <boost/program_options.hpp>
+#include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include "constants.hpp"
 #include "logCapture.hpp"
 #include "rdb/faccbindev.hpp"
+#include "rdb/sizeLimits.hpp"
 #include "rdbResult.hpp"
 #include "retractor/lib/appConfig.hpp"
 #include "retractor/lib/bus.hpp"
@@ -105,6 +110,35 @@ TEST_F(ExecutorsmCommandsTest, get_lists_every_stream_with_its_parameters) {
   EXPECT_EQ(response.get("db.stream.result.cap", -1), plan.maxCapacity["result"]);
   EXPECT_EQ(response.get("db.stream.src", ""), "src");
   EXPECT_EQ(response.get("db.stream.src.size", ""), "-1");  // deklaracja nie ma rozmiaru
+}
+
+// Odpowiedz `get` dla planu o najwiekszej dozwolonej liczbie strumieni, z nazwami po 200 znakow
+// i sciezkami magazynow, musi sie zmiescic w slocie odpowiedzi IPC - serializowana tak jak w
+// IpcServer::commandLoop. Przy slocie 32 KiB nie miescila sie: `xqry -d` i `xqry -s` dostawaly
+// "response too large" dla planu, ktory silnik przyjal (#566).
+TEST_F(ExecutorsmCommandsTest, get_for_the_widest_plan_with_long_names_fits_a_response_slot) {
+  const auto name = [](std::size_t index) {
+    const auto prefix = std::format("s{:03}", index);
+    return prefix + std::string(200 - prefix.size(), 'x');
+  };
+  std::string text = "STORAGE '" + sandBoxFolder.string() + "'\nDECLARE value INTEGER STREAM " + name(0) + ", 1 BINFILE '" +
+                     (sandBoxFolder / "input.bin").string() + "'\n";
+  for (std::size_t index = 1; index < rdb::limits::kMaxPlanStreams; ++index)
+    text += "SELECT " + name(0) + "[0] STREAM " + name(index) + " FROM " + name(0) + "\n";
+  qTree wide;
+  ASSERT_EQ(parsePlanText(wide, text).status, "OK");
+  ASSERT_EQ(compiler(wide).compile(), "OK");
+  auto wideModel              = rdbtest::ok(dataModel::create(wide));
+  pProc                       = wideModel.get();
+  executorsm::coreInstancePtr = &wide;
+  const auto response         = executorsm::commandProcessor(command("get"));
+  pProc                       = model.get();
+  executorsm::coreInstancePtr = &plan;
+
+  ASSERT_EQ(response.get_child("db.stream").size(), rdb::limits::kMaxPlanStreams);
+  std::stringstream serialized;
+  write_info(serialized, response);
+  EXPECT_LE(serialized.str().size(), ipc::kResponseSlotDataSize);
 }
 
 // detail: schemat, okres, lokalizacja, pojemnosc, liczba rekordow i zapytanie jednego strumienia.

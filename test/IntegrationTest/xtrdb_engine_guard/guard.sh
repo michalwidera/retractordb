@@ -12,6 +12,10 @@
 #      alfy xtrdb znow pisze.
 #   c) zyje `--name beta` z blokada w paths.lock_dir, poza TMPDIR - xtrdb czytajacy te sama
 #      konfiguracje odmawia.
+#   d) FIFO z nazwa z rodziny w katalogu blokad - xtrdb go pomija i pisze. Zwykle open(O_RDONLY)
+#      wisialo na nim bez konca (#566).
+#   e) plik z rodziny bez prawa odczytu - xtrdb odmawia, bo nie umie sprawdzic, czy silnik zyje.
+#      Dawniej blad open liczyl sie jako "silnika brak" (#566).
 set -e
 . "$(dirname "$0")/../portable.sh"
 
@@ -27,6 +31,8 @@ LOCKDIR="$PWD/locks"
 LOCK_A="$TMPDIR/xretractor_service.alfa.lock"
 LOCK_B="$LOCKDIR/xretractor_service.beta.lock"
 STALE="$TMPDIR/xretractor_service.stale.lock"
+FIFO="$TMPDIR/xretractor_service.fifo.lock"
+NOACCESS="$TMPDIR/xretractor_service.noaccess.lock"
 
 rm -rf "$TMPDIR" "$LOCKDIR_CFG" "$LOCKDIR" guarded guarded.* guarddst guarddst.*
 mkdir -p "$TMPDIR" "$LOCKDIR" "$LOCKDIR_CFG/retractor"
@@ -54,7 +60,7 @@ cleanup() {
   trap - EXIT INT TERM
   if [ -n "$pid_a" ]; then stop_server alfa "$pid_a"; fi
   if [ -n "$pid_b" ]; then stop_server beta "$pid_b"; fi
-  rm -f "$LOCK_A" "$LOCK_B" "$STALE"
+  rm -f "$LOCK_A" "$LOCK_B" "$STALE" "$FIFO" "$NOACCESS"
   # Bramka higieny jak w multiserver_named: obiekty IPC tych instancji nie maja prawa zostac.
   # shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic - kontrola jest
   # wtedy jawnie POMINIETA, a nie uznana za zdana.
@@ -156,3 +162,42 @@ if [ "$(file_size guarded)" -ne "$size_b" ]; then
   echo "(c) xtrdb zmienil magazyn mimo odmowy"
   exit 1
 fi
+stop_server beta "$pid_b"
+pid_b=""
+
+# (d) FIFO w katalogu blokad: pominiety, nie otwierany w trybie blokujacym
+mkfifo "$FIFO"
+run_timeout 20 xtrdb noprompt <append.script >d.out 2>&1 || {
+  echo "(d) xtrdb nie zapisal przy FIFO w katalogu blokad (rc=$?; 124 = zawieszony na open)"
+  cat d.out
+  exit 1
+}
+size_d=$(file_size guarded)
+if [ "$size_d" -le "$size_b" ]; then
+  echo "(d) xtrdb nie dopisal rekordu przy FIFO w katalogu blokad"
+  exit 1
+fi
+rm -f "$FIFO"
+
+# (e) plik bez prawa odczytu: nie da sie sprawdzic - odmowa, nie "silnika brak"
+if [ "$(id -u)" -eq 0 ]; then
+  echo "POMINIETO (e): root czyta plik mimo trybu 000"
+else
+  : >"$NOACCESS"
+  chmod 000 "$NOACCESS"
+  set +e
+  xtrdb noprompt <append.script >e.out 2>&1
+  rc_e=$?
+  set -e
+  if [ "$rc_e" -eq 0 ] || ! grep -q 'cannot verify' e.out; then
+    echo "(e) xtrdb nie odmowil przy nieczytelnym pliku blokady (rc=$rc_e)"
+    cat e.out
+    exit 1
+  fi
+  if [ "$(file_size guarded)" -ne "$size_d" ]; then
+    echo "(e) xtrdb zmienil magazyn mimo odmowy"
+    exit 1
+  fi
+  rm -f "$NOACCESS"
+fi
+

@@ -16,7 +16,7 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?       # ByteID
                       | RETMEMORY_T capacity=DECIMAL                    # RetentionMemoryID
                       ;
 
-// sync types with: src/include/rdb/fldType.hpp
+// sync types with: src/include/fldType.hpp
 // INTPAIR i IDXPAIR celowo pominiete: to operandy tokenow planu, nie typy pol rekordu (#267).
 
 BYTE_T:             'BYTE';

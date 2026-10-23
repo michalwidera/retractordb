@@ -117,7 +117,8 @@ template <typename T, typename K>
 static void parse_string(const std::string &a, K &retVal) {
   using P = std::conditional_t<std::is_floating_point_v<T>, double, int>;
   P val{};
-  if (auto [p, e] = std::from_chars(a.data(), a.data() + a.size(), val); e == std::errc{}) {
+  // Liczba musi zajac CALY napis: sam prefiks ('12abc' -> 12) bylby cicha zla konwersja.
+  if (auto [p, e] = std::from_chars(a.data(), a.data() + a.size(), val); e == std::errc{} && p == a.data() + a.size()) {
     if constexpr (std::is_integral_v<T>)
       narrowIntegralTo<T>(val, retVal);
     else
@@ -225,6 +226,18 @@ std::istream &expect(std::istream &in) {
   return in;
 }
 
+// Para "a<C>b" albo sama liczba "a" (druga zostaje `second`), odczytana z CALEGO napisu. Smieci,
+// przepelnienie int albo reszta za liczba daja nullopt. Bez tej kontroli 'abc' dawalo 0/1,
+// a '99999999999' INT_MAX/1 (strumien wpisuje wtedy INT_MAX i stawia failbit).
+template <char C>
+std::optional<std::pair<int, int>> parsePair(const std::string &a, int second) {
+  std::istringstream in(a);
+  int first{0};
+  if (!(in >> first)) return std::nullopt;
+  if (!(in >> std::ws).eof() && !(in >> expect<C> >> second && (in >> std::ws).eof())) return std::nullopt;
+  return std::make_pair(first, second);
+}
+
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
 template <typename T>
 T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
@@ -295,11 +308,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                               retVal = std::make_pair(atoi(a.first.c_str()), a.second);
                             },  //
                             [&retVal](const std::string &a) {
-                              std::istringstream in(a);
-                              int first{0};
-                              int second{1};
-                              in >> first >> expect<','> >> second;
-                              retVal = std::make_pair(first, second);
+                              if (auto pair = parsePair<','>(a, 1))
+                                retVal = *pair;
+                              else
+                                retVal = std::monostate{};
                             }},
                    inVar);
       } else {
@@ -309,11 +321,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           retVal = std::any_cast<std::pair<int, int>>(inVar);
         } else if (inVar.type() == typeid(std::string)) {
-          std::istringstream in(std::any_cast<std::string>(inVar));
-          int first{0};
-          int second{1};
-          in >> first >> expect<','> >> second;
-          retVal = std::make_pair(first, second);
+          if (auto pair = parsePair<','>(std::any_cast<std::string>(inVar), 1))
+            retVal = *pair;
+          else
+            retVal = std::monostate{};
         } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
           auto pairVar = std::any_cast<std::pair<std::string, int>>(inVar);
           retVal       = std::make_pair(atoi(pairVar.first.c_str()), pairVar.second);
@@ -339,11 +350,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                               retVal = boost::rational<int>(a.second, 1);
                             },  //  first is skipped
                             [&retVal](const std::string &a) {
-                              std::istringstream in(a);
-                              int nom{0};
-                              int den{1};
-                              in >> nom >> expect<'/'> >> den;
-                              assignRationalOrNull(retVal, nom, den);
+                              if (auto pair = parsePair<'/'>(a, 1))
+                                assignRationalOrNull(retVal, pair->first, pair->second);
+                              else
+                                retVal = std::monostate{};
                             }},
                    inVar);
       } else {
@@ -363,11 +373,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           const auto pairVar = std::any_cast<std::pair<int, int>>(inVar);
           assignRationalOrNull(retVal, pairVar.first, pairVar.second);
         } else if (inVar.type() == typeid(std::string)) {
-          std::istringstream in(std::any_cast<std::string>(inVar));
-          int nom{0};
-          int den{1};
-          in >> nom >> expect<'/'> >> den;
-          assignRationalOrNull(retVal, nom, den);
+          if (auto pair = parsePair<'/'>(std::any_cast<std::string>(inVar), 1))
+            assignRationalOrNull(retVal, pair->first, pair->second);
+          else
+            retVal = std::monostate{};
         } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
           retVal = boost::rational<int>(std::any_cast<std::pair<std::string, int>>(inVar).second, 1);  //  first is skipped
         } else {

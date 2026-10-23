@@ -25,6 +25,17 @@
 #include "rdb/rationalFormat.hpp"
 #include "SOperations.hpp"
 
+namespace {
+
+// Tokeny programu czytane w miejscu - bez kopii listy do wektora w kazdym takcie.
+const token &programArg(const query &qry, const int i) { return *std::next(qry.lProgram.begin(), i); }
+
+// Nazwa zrodla przez referencje do napisu w tokenie, a nie przez getStr_(), ktore zwraca kopie:
+// nazwy substratow (STREAM_AGSE_1_25_mlii) nie mieszcza sie w SSO, wiec kazde uzycie bylo alokacja.
+const std::string &programNameArg(const query &qry, const int i) { return std::get<std::string>(programArg(qry, i).getVT()); }
+
+}  // namespace
+
 // ctest -R '^ut-dataModel' -V
 
 std::mutex core_mutex;
@@ -215,11 +226,6 @@ bool dataModel::forwardRecordAvailable(const std::string &instance, const int fo
 bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   if (qry.lProgram.empty()) return true;
 
-  // Te same akcesory co w constructInputPayload(): tokeny i nazwy zrodel przez referencje, bez kopii.
-  const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
-
-  const auto nameArg = [&arg](const int i) -> const std::string & { return std::get<std::string>(arg(i).getVT()); };
-
   const auto &operation = qry.lProgram.back();
   const auto cmd        = operation.getCommandID();
 
@@ -229,31 +235,34 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       available = forwardRecordAvailable(std::get<std::string>(operation.getVT()), logicalIndex);
       break;
     case STREAM_TIMEMOVE:
-      available = forwardRecordAvailable(nameArg(0), logicalIndex - std::get<int>(operation.getVT()));
+      available = forwardRecordAvailable(programNameArg(qry, 0), logicalIndex - std::get<int>(operation.getVT()));
       break;
     case STREAM_DEHASH_MOD:
-      available = forwardRecordAvailable(nameArg(0), Mod(arg(1).getRI(), qry.rInterval, logicalIndex));
+      available = forwardRecordAvailable(programNameArg(qry, 0), Mod(programArg(qry, 1).getRI(), qry.rInterval, logicalIndex));
       break;
     case STREAM_DEHASH_DIV:
-      available = forwardRecordAvailable(nameArg(0), Div(qry.rInterval, arg(1).getRI(), logicalIndex));
+      available = forwardRecordAvailable(programNameArg(qry, 0), Div(qry.rInterval, programArg(qry, 1).getRI(), logicalIndex));
       break;
     case STREAM_SUM:
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
-      available = forwardRecordAvailable(nameArg(0), logicalIndex);
+      available = forwardRecordAvailable(programNameArg(qry, 0), logicalIndex);
       break;
     case STREAM_SUBTRACT:
       available = forwardRecordAvailable(
-          nameArg(0), Subtract(coreInstance_.getQuery(nameArg(0)).rInterval, operation.getRI(), logicalIndex));
+          programNameArg(qry, 0),
+          Subtract(coreInstance_.getQuery(programNameArg(qry, 0)).rInterval, operation.getRI(), logicalIndex));
       break;
     case STREAM_ADD:
       available =
-          forwardRecordAvailable(nameArg(0), Add(qry.rInterval, coreInstance_.getQuery(nameArg(0)).rInterval, logicalIndex)) &&
-          forwardRecordAvailable(nameArg(1), Add(qry.rInterval, coreInstance_.getQuery(nameArg(1)).rInterval, logicalIndex));
+          forwardRecordAvailable(programNameArg(qry, 0),
+                                 Add(qry.rInterval, coreInstance_.getQuery(programNameArg(qry, 0)).rInterval, logicalIndex)) &&
+          forwardRecordAvailable(programNameArg(qry, 1),
+                                 Add(qry.rInterval, coreInstance_.getQuery(programNameArg(qry, 1)).rInterval, logicalIndex));
       break;
     case STREAM_AGSE: {
-      const auto &source        = nameArg(0);
+      const auto &source        = programNameArg(qry, 0);
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
@@ -266,8 +275,8 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
     } break;
     case STREAM_HASH: {
       int forwardIndex   = 0;
-      const auto &first  = nameArg(0);
-      const auto &second = nameArg(1);
+      const auto &first  = programNameArg(qry, 0);
+      const auto &second = programNameArg(qry, 1);
       const bool takeSecond =
           Hash(coreInstance_.getQuery(first).rInterval, coreInstance_.getQuery(second).rInterval, logicalIndex, forwardIndex);
       available = forwardRecordAvailable(takeSecond ? second : first, forwardIndex);
@@ -504,13 +513,6 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
              "dataModel::constructInputPayload: program not optimized - {} tokens for query '{}', expected < 4",
              qry.lProgram.size(), qry.id);
 
-  // Tokeny programu czytane w miejscu - bez kopii listy do wektora w kazdym takcie.
-  const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
-
-  // Nazwa zrodla przez referencje do napisu w tokenie, a nie przez getStr_(), ktore zwraca kopie:
-  // nazwy substratow (STREAM_AGSE_1_25_mlii) nie mieszcza sie w SSO, wiec kazde uzycie bylo alokacja.
-  const auto nameArg = [&arg](const int i) -> const std::string & { return std::get<std::string>(arg(i).getVT()); };
-
   // Baza ZRODLA. Zrodla ta funkcja adresuje nazwa - tu, w REDUCE i AGSE ponizej oraz przez
   // getPayload() i fetchForward() - i tak musi zostac: ich wezly jezdza przez kopie planu
   // i przezywaja do innego drzewa, wiec zapamietany uchwyt zrodla wskazywalby strukture,
@@ -542,7 +544,7 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 1, "dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
 
-      const auto &nameSrc = nameArg(0);
+      const auto &nameSrc = programNameArg(qry, 0);
 
       RDB_TRY_ASSIGN(const auto *source, getPayload(nameSrc));
       *runtime.inputPayload = *source;
@@ -553,7 +555,7 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
 
-      const auto &nameSrc   = nameArg(0);
+      const auto &nameSrc   = programNameArg(qry, 0);
       const auto timeOffset = std::get<int>(operation.getVT());
 
       // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
@@ -580,8 +582,8 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
 
-      const auto &nameSrc         = nameArg(0);
-      const auto rationalArgument = arg(1).getRI();
+      const auto &nameSrc         = programNameArg(qry, 0);
+      const auto rationalArgument = programArg(qry, 1).getRI();
 
       // Kompilator odrzuca niedodatni argument (resolveStreamIntervals). Parametr jest staly w planie,
       // wiec w Release nie sprawdzamy go dla kazdego rekordu.
@@ -610,7 +612,7 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX: {
-      const auto &nameSrc = nameArg(0);
+      const auto &nameSrc = programNameArg(qry, 0);
 
       // Wynik idzie wprost do payloadu wejsciowego - ma on juz pole wyniku (query::descriptorFrom, ta sama
       // regula reductionResultField), wiec nie budujemy co takt deskryptora i payloadu tylko po to, zeby je tu skopiowac.
@@ -622,8 +624,8 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
 
-      const auto &nameSrc         = nameArg(0);
-      const auto rationalArgument = arg(1).getRI();
+      const auto &nameSrc         = programNameArg(qry, 0);
+      const auto rationalArgument = programArg(qry, 1).getRI();
       const auto n                = logicalIndex();
       const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
@@ -637,8 +639,8 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
 
-      const auto &nameSrc1 = nameArg(0);
-      const auto &nameSrc2 = nameArg(1);
+      const auto &nameSrc1 = programNameArg(qry, 0);
+      const auto &nameSrc2 = programNameArg(qry, 1);
 
       // K24/P2 wariant A: składowe są czytane po indeksie POSTĘPUJĄCYM z Definicji sumy
       // strumieni (c_n = (a_n, b_{⌊nΔa/Δb⌋})), a nie jako bieżący payload obu składowych.
@@ -692,7 +694,7 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
 
-      const auto &nameSrc = nameArg(0);  // * INFO Sync with query.cpp
+      const auto &nameSrc = programNameArg(qry, 0);  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
       // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
@@ -710,8 +712,8 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       //
       RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
 
-      const auto &nameSrc1    = nameArg(0);
-      const auto &nameSrc2    = nameArg(1);
+      const auto &nameSrc1    = programNameArg(qry, 0);
+      const auto &nameSrc2    = programNameArg(qry, 1);
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 

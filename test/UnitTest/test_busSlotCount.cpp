@@ -106,6 +106,29 @@ TEST_F(BusRepairSeqlock, UnrecoverableMutexReportsRecoveryInstructions) {
   EXPECT_EQ(lines, 2U);
 }
 
+// Wycofanie nazw ad-hoc przy nienaprawialnym muteksie: nazwy zostaja zajete, wiec log ma je wymienic.
+TEST_F(BusRepairSeqlock, ReleaseAdditionalOnUnusableMutexLogsWhatStaysClaimed) {
+  // covers: bus.bus.16~1
+  bus::Bus candidate(name);
+  ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"old"}}).status, bus::ClaimStatus::Claimed);
+  const auto added = candidate.claimAdditional({"adhoc1"}, {"/tmp/adhoc1.dat"});
+  ASSERT_EQ(added.status, bus::ClaimStatus::Claimed);
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment = static_cast<bus::Segment *>(mapping.get_address());
+
+  dieMidWrite(segment);
+  ASSERT_FALSE(HasFatalFailure());
+  ASSERT_EQ(pthread_mutex_lock(&segment->mutex), EOWNERDEAD);
+  ASSERT_EQ(pthread_mutex_unlock(&segment->mutex), 0);
+  ASSERT_EQ(pthread_mutex_lock(&segment->mutex), ENOTRECOVERABLE);
+
+  BusLogCapture log;
+  candidate.releaseAdditional(added.addedStreams, added.addedStores);
+  const std::string line = "error: xrdbbus: cannot release adhoc1, /tmp/adhoc1.dat (bus mutex is unrecoverable";
+  EXPECT_NE(log.output.str().find(line), std::string::npos) << log.output.str();
+}
+
 // Drugi wlasciciel tez ginie przed consistent: trzeci nadal moze naprawic muteks i slot.
 TEST_F(BusRepairSeqlock, InterruptedRepairRemainsRecoverable) {
   // covers: bus.bus.13~1

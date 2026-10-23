@@ -37,6 +37,7 @@
 #include "retractor/lib/query.hpp"
 #include "retractor/lib/token.hpp"
 #include "rqlFunctions.hpp"
+#include "serviceLockDir.hpp"
 
 // covers: token.token.2~1, query.query.1~1
 static_assert(std::is_same_v<decltype(std::declval<const token &>().getVT()), const rdb::descFldVT &>);

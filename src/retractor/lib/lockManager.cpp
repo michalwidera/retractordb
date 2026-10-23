@@ -20,6 +20,7 @@
 #include "lockFile.hpp"
 #include "osPlatform.hpp"
 #include "serverName.hpp"
+#include "serviceLockDir.hpp"
 
 namespace {
 

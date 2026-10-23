@@ -133,9 +133,13 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
     }
     const ipc::responses::Owner self{
         .pid = static_cast<std::int32_t>(getpid()), .startTime = selfStartTime(), .seq = ++requestSeq};
+    // Przed wyslaniem: odpowiedz moze przyjsc, zanim ten watek wejdzie w take, a odbior innego
+    // watku tego procesu nie moze jej w tym czasie zwolnic.
+    const ipc::responses::PendingRequest pending(self.seq);
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", self.pid);
     pt_request.put("db.seq", self.seq);
+    pt_request.put("db.start", self.startTime);
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
     // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli: na obciążonej maszynie obrót trwa

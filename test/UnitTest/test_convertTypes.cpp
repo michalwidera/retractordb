@@ -717,7 +717,7 @@ TEST(cast_variant, uint_above_int_max_to_rational_is_null) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
 }
 TEST(cast_variant, negative_string_to_uint_is_null) {
-  // covers: converttypes.cast.7~1
+  // covers: converttypes.cast.7~2
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = std::string("-5");
   EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
@@ -916,7 +916,7 @@ TEST(any_to_variant_cast, unsupported_pairs_report_their_type_before_termination
 }
 
 TEST(cast_contract, string_prefixes_and_pair_parsing_match_both_interfaces) {
-  // covers: converttypes.cast.7~1, converttypes.cast.8~1, payload.payload.5~1
+  // covers: converttypes.cast.7~2, converttypes.cast.8~2, payload.payload.5~1
   const auto check = [](const std::string &input, rdb::descFld type, const rdb::descFldVT &expected) {
     SCOPED_TRACE(input);
     EXPECT_EQ(cast<rdb::descFldVT>{}(input, type), expected);
@@ -929,14 +929,25 @@ TEST(cast_contract, string_prefixes_and_pair_parsing_match_both_interfaces) {
         },
         expected);
   };
-  check("12tail", rdb::INTEGER, 12);
-  check("1.5tail", rdb::DOUBLE, 1.5);
+  check("12", rdb::INTEGER, 12);
+  check("12tail", rdb::INTEGER, std::monostate{});
+  check("1.5", rdb::DOUBLE, 1.5);
+  check("1.5tail", rdb::DOUBLE, std::monostate{});
   check("2147483648", rdb::UINT, std::monostate{});
   check("bad", rdb::INTEGER, std::monostate{});
-  check("3/4tail", rdb::RATIONAL, boost::rational<int>(3, 4));
-  check("bad", rdb::RATIONAL, boost::rational<int>(0));
-  check("3,4tail", rdb::INTPAIR, std::pair{3, 4});
-  check("bad", rdb::INTPAIR, std::pair{0, 1});
+  check("3/4", rdb::RATIONAL, boost::rational<int>(3, 4));
+  check(" 3 / 4 ", rdb::RATIONAL, boost::rational<int>(3, 4));
+  check("3", rdb::RATIONAL, boost::rational<int>(3));
+  check("3/4tail", rdb::RATIONAL, std::monostate{});
+  check("3/", rdb::RATIONAL, std::monostate{});
+  check("bad", rdb::RATIONAL, std::monostate{});
+  check("99999999999", rdb::RATIONAL, std::monostate{});
+  check("1/99999999999", rdb::RATIONAL, std::monostate{});
+  check("3,4", rdb::INTPAIR, std::pair{3, 4});
+  check("3", rdb::INTPAIR, std::pair{3, 1});
+  check("3,4tail", rdb::INTPAIR, std::monostate{});
+  check("bad", rdb::INTPAIR, std::monostate{});
+  check("99999999999,1", rdb::INTPAIR, std::monostate{});
 }
 
 TEST(cast_contract, invalid_rational_pairs_and_idxpair_targets_are_null) {

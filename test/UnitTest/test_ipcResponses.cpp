@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -108,7 +109,7 @@ TEST(IpcResponses, foreign_pid_slot_is_left_alone) {
 
 // Wlasne zadanie, na ktore klient przestal czekac: jego seq jest starsze niz biezace.
 TEST(IpcResponses, own_pid_with_foreign_seq_is_released) {
-  // covers: ipcresponses.try-take.2~1
+  // covers: ipcresponses.try-take.2~2
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "zalegla"), resp::PublishStatus::Published);
   ASSERT_EQ(resp::publish(*segment, self(2), "biezaca"), resp::PublishStatus::Published);
@@ -118,9 +119,34 @@ TEST(IpcResponses, own_pid_with_foreign_seq_is_released) {
   EXPECT_EQ(stateOf(segment->slots[1]), resp::SlotState::Free);
 }
 
+// Dwa watki jednego procesu czekaja na raz. Odbior dla seq 1 nie moze zwolnic odpowiedzi
+// dla seq 2, ktora jej watek dopiero odbierze - inaczej ten watek zglasza "server not found".
+TEST(IpcResponses, answer_of_a_concurrent_request_of_this_process_is_left_for_its_thread) {
+  // covers: ipcresponses.try-take.2~2, ipcresponses.pending-request.1~1
+  auto segment = freshSegment();
+  const resp::PendingRequest first(1);
+  const resp::PendingRequest second(2);
+  ASSERT_EQ(resp::publish(*segment, self(2), "drugiego"), resp::PublishStatus::Published);
+
+  EXPECT_EQ(resp::tryTake(*segment, self(1)), std::nullopt);
+  EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Ready) << "zwolniona odpowiedz zadania w toku";
+  EXPECT_EQ(resp::tryTake(*segment, self(2)), "drugiego");
+}
+
+// Po zakonczeniu czekania numer przestaje byc "w toku": jego zalegla odpowiedz jest zwalniana.
+TEST(IpcResponses, answer_of_a_finished_request_is_released) {
+  // covers: ipcresponses.pending-request.2~1
+  auto segment = freshSegment();
+  { const resp::PendingRequest abandoned(1); }
+  ASSERT_EQ(resp::publish(*segment, self(1), "porzucona"), resp::PublishStatus::Published);
+
+  EXPECT_EQ(resp::tryTake(*segment, self(2)), std::nullopt);
+  EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Free);
+}
+
 // Poprzedni proces o tym samym PID-ie liczyl seq od tego samego 1. Rozroznia go tylko startTime.
 TEST(IpcResponses, own_pid_with_other_start_time_is_released_not_taken) {
-  // covers: ipcresponses.try-take.2~1
+  // covers: ipcresponses.try-take.2~2
   auto segment            = freshSegment();
   resp::Owner predecessor = self(1);
   predecessor.startTime += 1;
@@ -208,7 +234,8 @@ TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
   std::stringstream stream(*text);
   boost::property_tree::ptree pt;
   read_info(stream, pt);
-  EXPECT_EQ(pt.get<std::string>("error.response", ""), "response too large (32769 B > 32768 B)");
+  EXPECT_EQ(pt.get<std::string>("error.response", ""),
+            std::format("response too large ({} B > {} B)", ipc::kResponseSlotDataSize + 1, ipc::kResponseSlotDataSize));
   EXPECT_NE(log.text().find("replaced with an error"), std::string::npos);
 }
 

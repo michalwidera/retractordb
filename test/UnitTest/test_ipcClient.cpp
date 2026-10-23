@@ -275,7 +275,7 @@ class ClientContract : public ::testing::Test {
 }  // namespace
 
 TEST_F(ClientContract, requests_from_distinct_objects_have_distinct_sequences_and_ignore_stale_replies) {
-  // covers: ipcclient.ipc-client.1~1, ipcclient.ipc-client.2~1, ipcserver.ipc-server.3~1
+  // covers: ipcclient.ipc-client.1~1, ipcclient.ipc-client.2~2, ipcserver.ipc-server.3~2
   namespace IPC = boost::interprocess;
   const ipc::responses::Mapping responses(IPC::create_only, names.shmemSegment);
   const auto queue       = ipc::security::createQueue(names.queryQueue, 2, ipc::kQueryQueueMaxMessageSize);
@@ -291,6 +291,7 @@ TEST_F(ClientContract, requests_from_distinct_objects_have_distinct_sequences_an
     EXPECT_GT(seq, previous);
     previous         = seq;
     const auto start = osplat::inspectProcess(getpid()).startTime;
+    EXPECT_EQ(request.get<std::uint64_t>("db.start", 0), start);
     using ipc::responses::publish;
     using ipc::responses::PublishStatus;
     EXPECT_EQ(publish(responses.segment(), {.pid = getpid(), .startTime = start + 1, .seq = seq}, "result wrong-start\n"),

@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -194,15 +193,6 @@ inline std::string serviceLockFile(std::string_view serviceName) {
   return std::string(serviceName) + std::string(kServiceLockSuffix);
 }
 
-/// Funkcja serviceLockDir powinna:
-/// - [constants.service-lock-dir.1~1] zwracać skonfigurowany katalog blokad instancji (paths.lock_dir), a gdy jest pusty - katalog tymczasowy procesu z std::filesystem::temp_directory_path.
-///
-/// @note Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
-inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
-  if (configuredDir.empty()) return std::filesystem::temp_directory_path();
-  return {configuredDir};
-}
-
 /// Funkcja serviceLockInstance powinna:
 /// - [constants.service-lock-instance.1~1] dla nazwy pliku, która nie zaczyna się od kServiceLockFamily albo nie kończy się kServiceLockSuffix, zwracać nullopt.
 /// - [constants.service-lock-instance.2~1] dla nazwy bez członu pomiędzy nimi zwracać pusty napis (instancja bezimienna).
@@ -241,7 +231,10 @@ constexpr std::size_t kNullTerminatorBytes = 1;
 constexpr std::size_t kResponseSlotCount = 16;
 
 // Najwieksza odpowiedz miesczaca sie w slocie (bajty). Dluzsza jest zastepowana bledem.
-constexpr std::size_t kResponseSlotDataSize = std::size_t{32} * 1024;
+// Miara jest odpowiedz 'get' (xqry -d, -s): plan kMaxPlanStreams strumieni z nazwami po 200 znakow
+// i sciezkami magazynow daje ok. 79 KB, wiec 32 KiB nie wystarczalo (#566). Segment zajmuje
+// kResponseSlotCount takich slotow w /dev/shm - patrz shmBudget.
+constexpr std::size_t kResponseSlotDataSize = std::size_t{128} * 1024;
 
 // Naglowek segmentu i naglowek slotu (bajty); sizeof obu struktur pilnuje static_assert
 // w ipcResponses.hpp.

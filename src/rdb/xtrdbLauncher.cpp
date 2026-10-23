@@ -1,10 +1,12 @@
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -33,6 +35,7 @@
 #include "constants.hpp"
 #include "ICommand.hpp"
 #include "rdb/storage.hpp"
+#include "serviceLockDir.hpp"
 #include "uxSysTermTools.hpp"
 #include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
@@ -127,8 +130,22 @@ int main(int argc, char *argv[]) {
     for (const auto &entry : std::filesystem::directory_iterator(lockDir, ec)) {
       const std::string name = entry.path().filename().string();
       if (!ipc::serviceLockInstance(name)) continue;
-      const int fd = open(entry.path().c_str(), O_RDONLY);
-      if (fd == -1) continue;
+      // Katalog jest zapisywalny dla wszystkich: O_NONBLOCK, bo podlozone FIFO zawieszalo xtrdb na
+      // open, i O_NOFOLLOW. Silnik trzyma blokade w zwyklym pliku, wiec dowiazanie, FIFO i znikniety
+      // wpis to nie silnik. Kazda inna porazka znaczy "nie da sie sprawdzic" - nie "silnika brak".
+      const int fd = open(entry.path().c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+      if (fd == -1) {
+        if (errno == ENOENT || errno == ELOOP) continue;
+        std::println(std::cerr, "cannot verify whether xretractor is running (lock {}: {}) - refusing to use xtrdb.",
+                     entry.path().string(), std::strerror(errno));
+        spdlog::shutdown();
+        return 1;
+      }
+      struct stat info{};
+      if (fstat(fd, &info) != 0 || !S_ISREG(info.st_mode)) {
+        close(fd);
+        continue;
+      }
       const bool running = (flock(fd, LOCK_SH | LOCK_NB) == -1 && (errno == EWOULDBLOCK || errno == EAGAIN));
       close(fd);
       if (running) {

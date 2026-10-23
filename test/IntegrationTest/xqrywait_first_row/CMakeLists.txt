@@ -8,7 +8,7 @@ set(TestID "it_${TestID}")
 # drogi sa rozciagane hakami diagnostycznymi, wiec test jest deterministyczny.
 
 # covers: qry.qry.3~1, launcher.xretractor.32~1, executorsm.executorsm.3~1, executorsm.executorsm.5~1, executorsm.executorsm.9~1
-# covers: ipcserver.ipc-server.3~1
+# covers: ipcserver.ipc-server.3~2
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

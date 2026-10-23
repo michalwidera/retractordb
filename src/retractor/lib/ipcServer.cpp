@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -26,6 +27,27 @@
 #include "shmBudget.hpp"
 
 namespace IPC = boost::interprocess;
+
+namespace {
+
+// Parser INFO traktuje linie, ktora po bialych znakach zaczyna sie od '#', jako dyrektywe, a
+// '#include "plik"' otwiera dowolna sciezke z prawami serwera: plik zwykly zostaje dolaczony do
+// komendy, FIFO blokuje watek komunikacyjny, a /dev/zero zjada pamiec. write_info takiej linii
+// nie pisze (kazda zaczyna sie od klucza, a '\n' w wartosci idzie jako "\\n"), wiec komenda z nia
+// nie pochodzi od klienta. Biale znaki jak is_ascii_space Boosta; '\n' konczy linie (getline).
+bool hasInfoDirective(std::string_view text) {
+  for (std::size_t lineStart = 0; lineStart < text.size();) {
+    const auto first = text.find_first_not_of(" \t\v\f\r", lineStart);
+    if (first == std::string_view::npos) return false;
+    if (text[first] == '#') return true;
+    const auto lineEnd = text.find('\n', first);
+    if (lineEnd == std::string_view::npos) return false;
+    lineStart = lineEnd + 1;
+  }
+  return false;
+}
+
+}  // namespace
 
 void IpcServer::setServerName(std::string_view serverName) { names_ = ipc::names(serverName); }
 
@@ -339,7 +361,8 @@ void IpcServer::commandLoop() const {
     bool loopRunning = true;
     while (loopRunning) {
       while (tryReceive()) {
-        message[recvd_size] = 0;
+        message[recvd_size]      = 0;
+        const bool infoDirective = hasInfoDirective(message.data());
         std::stringstream strstream;
         strstream << message.data();
         memset(message.data(), 0, message.size());
@@ -350,6 +373,11 @@ void IpcServer::commandLoop() const {
         // oslonione w commandProcessor; ten blok obejmuje to, co wokol niego: parser INFO,
         // db.id oraz serializacje odpowiedzi.
         try {
+          // Dyrektywa odrzucona PRZED parserem: read_info wykonalby ja, zanim cokolwiek sprawdzimy.
+          if (infoDirective) {
+            SPDLOG_ERROR("IPC command rejected: INFO directive ('#' line) in command text");
+            continue;
+          }
           ptree pt;
           read_info(strstream, pt);
           // db.id sprawdzane PRZED wykonaniem: komenda bez adresu zwrotnego jest odrzucana bez
@@ -363,6 +391,13 @@ void IpcServer::commandLoop() const {
           // dostaje seq 0 i nadal odbiera swoja odpowiedz, bo sam tez czeka na 0.
           std::uint64_t clientSeq = 0;
           boost::conversion::try_lexical_convert(pt.get("db.seq", "0"), clientSeq);
+          // db.start to znacznik startu, ktory klient sam odczytal ze swojego wpisu procesu - wlasny
+          // wpis jest czytelny zawsze. Serwer czytal go z wpisu klienta: przy hidepid=2 albo w innej
+          // przestrzeni PID dostawal 0 i klient odrzucal wlasna odpowiedz, a po smierci klienta
+          // i ponownym uzyciu jego PID-u przypisywal odpowiedz nowemu procesowi. Klient bez db.start
+          // (starsza binarka) dostaje znacznik odczytany przez serwer, jak dotad.
+          std::uint64_t clientStart = 0;
+          boost::conversion::try_lexical_convert(pt.get("db.start", "0"), clientStart);
           ptree pt_retval;
           try {
             pt_retval = callbacks_.onCommand(pt);
@@ -393,10 +428,10 @@ void IpcServer::commandLoop() const {
           // Sending answer
           std::stringstream response_stream;
           write_info(response_stream, pt_retval);
-          // Znacznik startu klienta czytany TERAZ, w chwili zapisu: po nim serwer rozpozna, ze
-          // wlasciciel slotu umarl, nawet jesli jego PID dostal juz inny proces.
-          const ipc::responses::Owner owner{
-              .pid = clientProcessId, .startTime = osplat::inspectProcess(clientProcessId).startTime, .seq = clientSeq};
+          // Po znaczniku startu serwer rozpozna, ze wlasciciel slotu umarl, nawet jesli jego PID
+          // dostal juz inny proces.
+          if (clientStart == 0) clientStart = osplat::inspectProcess(clientProcessId).startTime;
+          const ipc::responses::Owner owner{.pid = clientProcessId, .startTime = clientStart, .seq = clientSeq};
           ipc::responses::publish(responses.segment(), owner, response_stream.str());
         } catch (const std::exception &ex) {
           SPDLOG_ERROR("IPC message dropped: {}", ex.what());

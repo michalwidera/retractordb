@@ -146,9 +146,9 @@ sourceKind resolveDeprecatedFile(const std::string &path) {
 /// std::out_of_range jest osiagalny z tekstu RQL; std::invalid_argument - nie, lekser
 /// przepuszcza tu wylacznie cyfry i kropke.
 ///
-/// std::sto*, a nie std::from_chars: wariant zmiennoprzecinkowy from_chars pojawil sie w libc++
-/// dopiero w LLVM 20 i jest objety adnotacja dostepnosci biblioteki systemowej, a port macOS
-/// celuje w 14.4. Przy okazji kazdy literal w zakresie jest przyjmowany dokladnie jak dotad.
+/// Zachowujemy dotychczasowa konwersje literalow przez std::stoi/stof/stod; helper dodaje
+/// jedynie obsluge std::out_of_range. FLOAT nadal jest odczytywany przez stof, DOUBLE przez stod.
+/// Zmiennoprzecinkowe std::from_chars jest juz uzywane w convertTypes.cc.
 template <typename T>
 std::optional<T> parseLiteral(const std::string &text) {
   try {
