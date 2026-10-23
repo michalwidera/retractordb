@@ -173,4 +173,33 @@ TEST_F(FallbackLock, SlotWithForeignStartTimeIsFree) {
   ASSERT_EQ(instances.size(), 1U);
   EXPECT_EQ(instances[0].name, "candidate");
 }
+
+// Potomek po fork() bierze zamek pod WLASNYM biletem, nie pod biletem rodzica zapamietanym przed
+// fork(). Inaczej rodzic moglby zdjac potomkowi zamek w srodku zapisu, a smierc potomka z zamkiem
+// w reku wygladalaby jak zamek zywego rodzica - na zawsze. Zamek jest trzymany mikrosekundy, wiec
+// potomek bierze go w petli, a rodzic czeka, az zobaczy slowo wlasciciela niezerowe.
+TEST_F(FallbackLock, ForkedChildLocksUnderItsOwnTicket) {
+  // covers: bus.bus.3~1
+  bus::Bus parent(name);
+  ASSERT_TRUE(parent.attached());
+  ASSERT_EQ(parent.claim({.name = "parent", .streams = {"p"}}).status, bus::ClaimStatus::Claimed);
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment = static_cast<bus::Segment *>(mapping.get_address());
+
+  child = fork();
+  ASSERT_NE(child, -1);
+  if (child == 0) {
+    for (;;)
+      (void)parent.claimAdditional({"c"}, {});
+  }
+
+  std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
+  std::uint64_t seen  = 0;
+  const auto deadline = std::chrono::steady_clock::now() + 10s;
+  while (seen == 0 && std::chrono::steady_clock::now() < deadline)
+    seen = owner.load(std::memory_order_acquire);
+  ASSERT_NE(seen, 0U) << "potomek nie wzial zamka w 10 s";
+  EXPECT_EQ(static_cast<pid_t>(seen >> 32), child);
+}
 }  // namespace

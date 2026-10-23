@@ -446,10 +446,7 @@ struct Bus::Impl {
   /// robust, wiec proces zabity z muteksem w reku zawiesilby wszystkie pozostale). Stad
   /// wlasny zamek w segmencie -- pthread_mutex_t z atrybutem robust tam, gdzie jadro go
   /// ma, i slowo atomowe z biletem wlasciciela tam, gdzie nie ma (patrz BusMutex).
-  // Nie const, choc clang-tidy to proponuje: acquire() jest const tylko w galezi
-  // RDB_HAS_ROBUST_MUTEX, w zapasowej (Darwin) nie, i tam const by sie nie skompilowalo.
-  // NOLINTNEXTLINE(readability-make-member-function-const)
-  [[nodiscard]] bool lock(std::string *failureDetail = nullptr) {
+  [[nodiscard]] bool lock(std::string *failureDetail = nullptr) const {
     const LockOutcome outcome = acquire();
     if (!outcome.ok) {
       if (failureDetail != nullptr) *failureDetail = outcome.detail.empty() ? "bus mutex unusable" : outcome.detail;
@@ -511,17 +508,25 @@ struct Bus::Impl {
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(pid)) << 32) | static_cast<std::uint32_t>(startTime);
   }
 
-  /// Bilet TEGO procesu, ustalany raz. Odczyt wpisu procesu kosztuje wywolanie jadra,
-  /// a odpowiedz na pytanie "kim jestem" nie zmienia sie przez cale zycie procesu.
+  /// Bilet TEGO procesu. Odczyt wpisu procesu kosztuje wywolanie jadra, wiec bilet jest
+  /// zapamietany, ale tylko do fork(): potomek dziedziczy pamiec rodzica i bez wyzerowania
+  /// trzymalby zamek pod biletem rodzica - rodzic zdjalby mu go w srodku zapisu, a smierc
+  /// potomka z zamkiem w reku wygladalaby jak zamek zywego rodzica. Atomowo, bo bilet ustalaja
+  /// rownolegle watki jednego procesu (ad-hoc i wykonawca).
   [[nodiscard]] static std::uint64_t selfTicket() {
-    static const std::uint64_t retVal = [] {
+    static std::atomic<std::uint64_t> cached{0};
+    static const int atforkRc = pthread_atfork(nullptr, nullptr, [] { cached.store(0, std::memory_order_relaxed); });
+    (void)atforkRc;
+    std::uint64_t retVal = cached.load(std::memory_order_relaxed);
+    if (retVal == 0) {
       const auto self = static_cast<std::int32_t>(getpid());
-      return ticketFor(self, osplat::inspectProcess(self).startTime);
-    }();
+      retVal          = ticketFor(self, osplat::inspectProcess(self).startTime);
+      cached.store(retVal, std::memory_order_relaxed);
+    }
     return retVal;
   }
 
-  [[nodiscard]] LockOutcome acquire() {
+  [[nodiscard]] LockOutcome acquire() const {
     std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
     const std::uint64_t mine = selfTicket();
     const auto deadline      = std::chrono::steady_clock::now() + kLongLockWait;
@@ -532,7 +537,6 @@ struct Bus::Impl {
 
       if (current == 0) {
         if (owner.compare_exchange_weak(current, mine, std::memory_order_acq_rel, std::memory_order_acquire)) {
-          heldTicket = mine;
           return {.ok = true, .ownerDied = false};
         }
         continue;  // ktos byl szybszy; czytamy stan na nowo
@@ -557,7 +561,6 @@ struct Bus::Impl {
 
       if (holderDead) {
         if (owner.compare_exchange_strong(current, mine, std::memory_order_acq_rel, std::memory_order_acquire)) {
-          heldTicket = mine;
           return {.ok = true, .ownerDied = true};
         }
         continue;  // przejal go kto inny; zaczynamy od nowa
@@ -571,18 +574,17 @@ struct Bus::Impl {
   /// wlascicielu jest zwyklym compare_exchange, a nie stanem do zatwierdzenia.
   void markConsistent() const {}
 
-  void unlock() {
+  void unlock() const {
     std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
-    std::uint64_t mine = heldTicket;
+    std::uint64_t mine = selfTicket();
     // Zwalniamy PRZEZ PODMIANE swojego biletu, nie przez zwykly zapis zera. Gdyby
     // ten proces zostal uznany za martwy i zamek przejeto by w miedzyczasie, zapis
-    // zera zdjalby zamek KOMUS INNEMU w srodku jego pracy.
+    // zera zdjalby zamek KOMUS INNEMU w srodku jego pracy. Bilet z selfTicket(), nie
+    // z pola obiektu: watek konczacy unlock() zerowal pole juz po tym, jak drugi watek
+    // tego samego Bus zamek przejal, i ten nie umial go potem zwolnic.
     if (!owner.compare_exchange_strong(mine, 0, std::memory_order_acq_rel, std::memory_order_relaxed))
       SPDLOG_WARN("xrdbbus: bus lock was taken over while held by this instance; not releasing it.");
-    heldTicket = 0;
   }
-
-  std::uint64_t heldTicket{0};  ///< bilet, z ktorym ten proces trzyma zamek; 0 = nie trzyma
 
 #endif
 };
