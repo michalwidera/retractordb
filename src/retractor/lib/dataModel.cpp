@@ -306,8 +306,17 @@ rdb::Result<> dataModel::processZeroStep() {
   std::scoped_lock scoped_lock(core_mutex);
   // DEVICE nie ma kroku zerowego (#347): jego rekord jest czytany na poczatku slotu, ktory go
   // konsumuje, a nie slot wczesniej. Pierwszy rekord wnosi pierwszy nalezny slot w processRows.
+  //
+  // Zrodlo dolaczone ad-hoc PRZED tym krokiem (model jest juz opublikowany dla komend) nie ma
+  // bazy logicznej, a po uzbrojeniu tutaj nie dostaloby jej w pierwszym naleznym slocie, bo ten
+  // ustawia ja tylko zrodlu pustemu (#574). Os logiczna jeszcze nie ruszyla, wiec takie zrodlo
+  // nalezy do planu poczatkowego epoki i dostaje te sama baze co w dataModel::create.
   for (const auto &q : coreInstance_)
-    if (q.isDeclaration() && q.kind != sourceKind::device) RDB_TRY(bootstrapDeclaration(q));
+    if (q.isDeclaration() && q.kind != sourceKind::device) {
+      auto &logicalBase = streamRuntime(q.id).logicalIndexBase;
+      if (!logicalBase.has_value()) logicalBase = q.logicalOrigin;
+      RDB_TRY(bootstrapDeclaration(q));
+    }
   return {};
 }
 
