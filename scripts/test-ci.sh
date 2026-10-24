@@ -98,11 +98,12 @@ profile_user() {
     esac
 }
 
-# Sciezki doslownie takie jak `working_directory` w config.yml.
+# `working_directory: ~/retractordb` z config.yml rozwiniete dla uzytkownika
+# obrazu - job 1222 podaje /home/developer/retractordb.
 profile_work_dir() {
     case "$1" in
         make-build) echo "/home/circleci/retractordb" ;;
-        *)          echo "/home/developer/workspace/retractordb" ;;
+        *)          echo "/home/developer/retractordb" ;;
     esac
 }
 
@@ -134,7 +135,8 @@ show_help() {
     echo "                     $default_image, a dla make-build $stock_image)"
     echo "  --cpus <n>         Limit CPU kontenera (domyslnie: $default_cpus - jak resource_class: large)"
     echo "  --memory <rozmiar> Limit RAM kontenera (domyslnie: $default_memory - jak resource_class: large)"
-    echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size - domyslna wartosc dockera)"
+    echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size - zmierzone w CircleCI)"
+    echo "  --ctest-jobs <n>   Rownoleglosc ctest (domyslnie: $default_ctest_jobs - nproc zmierzone w CircleCI)"
     echo "  --pull             Wymus pobranie obrazu przed uruchomieniem"
     echo "  --keep             Nie usuwaj kontenera po zakonczeniu (do grzebania recznie)"
     echo "  --reuse-build      Zachowaj katalog build/ miedzy przebiegami (szybko, ale NIE jak CI)"
@@ -153,17 +155,26 @@ default_image="micwide/buildenv-retractordb:latest"
 stock_image="cimg/base:current"
 default_cpus="4"
 default_memory="8g"
-# /dev/shm: 64 MiB to domyslna wartosc dockera i tyle samo ma executor
-# dockerowy CircleCI. Wielkosc jest istotna, bo silnik trzyma tam segment
-# magistrali i kolejki odpowiedzi (patrz src/retractor/lib/shmBudget.hpp) -
-# podniesienie jej tutaj ukryloby odmowe, ktora w CI wystapi.
-default_shm_size="64m"
+# /dev/shm: 48 GiB, zmierzone krokiem `Test resources` w jobie CircleCI 1222
+# (2026-10-24, executor `large`: size=50331648k). Wczesniejsze zalozenie 64 MiB
+# (domyslna wartosc dockera) bylo bledne: ctest -j $(nproc) w samym starcie
+# przebiegu zajmuje do ~63 MiB (kazdy serwer ~5,1 MiB), wiec profil dawal
+# kilkadziesiat odmow, ktorych CI nie ma. Wielkosc jest istotna, bo silnik trzyma
+# tam segment magistrali i kolejki odpowiedzi (src/retractor/lib/shmBudget.hpp);
+# praktyczny limit i tak wyznacza --memory, bo strony tmpfs obciazaja cgroup.
+default_shm_size="48g"
+# ctest -j: krok testow w config.yml bierze `$(nproc)`, a `nproc` w kontenerze
+# podaje rdzenie HOSTA, nie przydzial cgroup. W CircleCI to 36 (job 1222, ten sam
+# executor `large`), lokalnie tyle, ile ma maszyna - wiec liczba idzie tu wprost,
+# zeby przesubskrypcja 4 vCPU byla taka sama jak w CI.
+default_ctest_jobs="36"
 
 profile="commit"
 image=""
 cpus="$default_cpus"
 memory="$default_memory"
 shm_size="$default_shm_size"
+ctest_jobs="$default_ctest_jobs"
 out_dir="$repo_root/build/test-ci"
 keep_container=0
 force_pull=0
@@ -178,6 +189,7 @@ while [ $# -gt 0 ]; do
         --cpus)     cpus="${2:?--cpus wymaga liczby}"; shift 2 ;;
         --memory)   memory="${2:?--memory wymaga rozmiaru}"; shift 2 ;;
         --shm-size) shm_size="${2:?--shm-size wymaga rozmiaru}"; shift 2 ;;
+        --ctest-jobs) ctest_jobs="${2:?--ctest-jobs wymaga liczby}"; shift 2 ;;
         --pull)        force_pull=1; shift ;;
         --keep)        keep_container=1; shift ;;
         --reuse-build) reuse_build=1; shift ;;
@@ -256,7 +268,10 @@ container="rdb-test-ci-${profile}-$$"
 # wylacznie przy budowie od zera tu nie wyjdzie. Do sprawdzenia "czy przejdzie
 # na CI" przed pushem - tak; jako dowod przed zgloszeniem czegokolwiek - nie.
 build_volume="rdb-test-ci-build-${profile}"
-run_opts=(--cpus "$cpus" --memory "$memory" --memory-swap "$memory" --shm-size "$shm_size")
+# CI i CIRCLECI jak w kroku `Preparing environment variables` joba CircleCI,
+# TERM jak w kroku `Test resources` joba 1224.
+run_opts=(--cpus "$cpus" --memory "$memory" --memory-swap "$memory" --shm-size "$shm_size"
+    --env CI=true --env CIRCLECI=true --env TERM=xterm)
 if [ "$reuse_build" -eq 1 ]; then
     if [ "$reset_build" -eq 1 ]; then
         echo "-- Kasuje zachowany katalog build/ profilu $profile"
@@ -277,7 +292,7 @@ trap cleanup EXIT
 echo "== test-ci: profil $profile"
 echo "   job CI:  $(profile_job "$profile")"
 echo "   obraz:   $image"
-echo "   zasoby:  --cpus $cpus --memory $memory --shm-size $shm_size"
+echo "   zasoby:  --cpus $cpus --memory $memory --shm-size $shm_size, ctest -j $ctest_jobs"
 echo "   wyniki:  $out_dir/$profile"
 if [ "$reuse_build" -eq 1 ]; then
     echo "   build:   wolumen $build_volume - przebudowa inkrementalna, NIE jak czysty checkout CI"
@@ -312,7 +327,7 @@ docker exec "$container" mkdir -p "$work_dir"
 # run-test z config.yml.
 rc=0
 docker exec --interactive "$container" bash -s -- \
-    "$profile" "$build_type" "$work_dir" "$build_tool" << 'INSIDE' || rc=$?
+    "$profile" "$build_type" "$work_dir" "$build_tool" "$ctest_jobs" << 'INSIDE' || rc=$?
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -321,6 +336,7 @@ profile="$1"
 build_type="$2"
 work_dir="$3"
 build_tool="$4"
+ctest_jobs="$5"
 
 cd "$work_dir"
 
@@ -351,6 +367,23 @@ prep_env_ci() {
     scripts/buildrdb.sh validate
 }
 
+# Odpowiednik `prep-env` z `use_ninja: true`, ktory wola kazdy job na obrazie
+# projektu: pelny toolchain (moze podniesc pip i przypiety cmake w ~/.venv),
+# walidacja i generator Ninja w profilu conana. stdin z /dev/null, bo stdin tej
+# powloki to heredoc ze skryptem - apt albo sudo zjadlyby jego reszte. Bez
+# ponownego activate_venv: venv obrazu jest juz aktywny, a drugie `activate`
+# przywraca PATH sprzed pierwszego, czyli gubi ~/.local/bin.
+prep_env() {
+    step "Install toolchain (C++23 verified)"
+    scripts/buildrdb.sh toolchain conan < /dev/null
+
+    step "Validate installed toolchain"
+    scripts/buildrdb.sh validate
+
+    step "Configure Ninja generator"
+    scripts/buildrdb.sh ninja
+}
+
 conan_install() {
     step "Conan install ($build_type)"
     conan source .
@@ -378,13 +411,26 @@ package() {
     (cd "build/$build_type" && "$build_tool" packages)
 }
 
-# ctest z `-j $(nproc)` doslownie jak w config.yml. W kontenerze `nproc` podaje
-# rdzenie HOSTA, nie przydzial cgroup - dokladnie tak samo jak w CI, wiec i
-# przesubskrybowanie jest to samo. Kod wyjscia wraca po zebraniu raportu.
+# ctest z `-j $ctest_jobs` - wartosc, ktora `$(nproc)` z config.yml daje w CI
+# (patrz default_ctest_jobs). Pod terminalem z `script`, bo krok CircleCI ma pty:
+# ctest koloruje tam wyjscie, a dzieci widza terminal na stdin (klasa awarii
+# z zablakanym bajtem, it_tty_keystroke_immunity). stdin z /dev/null z tego
+# samego powodu co w prep_env. Kod wyjscia wraca po zebraniu raportu.
 run_tests() {
+    # Odpowiednik kroku `Test resources` z config.yml.
+    step "Test resources"
+    echo "nproc=$(nproc) ctest_jobs=$ctest_jobs"
+    df -k /dev/shm || true
+    grep ' /dev/shm ' /proc/mounts || true
+    cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2> /dev/null || true
+    # Pod `script`, czyli tak, jak terminal widzi ctest nizej.
+    script -qefc 't0=no; t1=no; [ -t 0 ] && t0=yes; [ -t 1 ] && t1=yes
+        echo "TERM=${TERM-unset} stdin_tty=$t0 stdout_tty=$t1"' /dev/null < /dev/null
+
     step "Integration & Unit test"
     local rc=0
-    (cd "build/$build_type/test" && ctest -j "$(nproc)" -V -LE valgrind --output-junit test_results.xml) || rc=$?
+    (cd "build/$build_type/test" && script -qefc \
+        "ctest -j $ctest_jobs -V -LE valgrind --output-junit test_results.xml" /dev/null < /dev/null) || rc=$?
     python3 scripts/collect-test-failures.py "build/$build_type" --ctest-status "$rc"
     return "$rc"
 }
@@ -394,7 +440,8 @@ run_valgrind() {
     step "Valgrind (manual-nightly-full, Debug)"
     local rc=0
     mkdir -p build/Debug/test/valgrind-results
-    (cd build/Debug/test && ctest -j 4 -V -L valgrind --output-junit valgrind-results/test_results.xml) || rc=$?
+    (cd build/Debug/test && script -qefc \
+        "ctest -j 4 -V -L valgrind --output-junit valgrind-results/test_results.xml" /dev/null < /dev/null) || rc=$?
     python3 scripts/collect-test-failures.py build/Debug --ctest-status "$rc"
     return "$rc"
 }
@@ -444,6 +491,7 @@ ablation_build() {
 status=0
 case "$profile" in
     commit|nightly-debug|release)
+        prep_env
         conan_install
         conan_build
         smoke_test
@@ -466,16 +514,19 @@ case "$profile" in
         fi
         ;;
     ablation-all-off)
+        prep_env
         conan_install
         ablation_build OFF OFF OFF OFF OFF OFF
         run_tests || status=$?
         ;;
     ablation-probe-on)
+        prep_env
         conan_install
         ablation_build ON ON ON ON ON ON
         run_tests || status=$?
         ;;
     gate)
+        prep_env
         conan_install
         step "Configure Release tree (gate in strict mode)"
         cmake \
