@@ -11,6 +11,7 @@
 #include <fstream>
 #include <optional>
 #include <sstream>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -268,20 +269,34 @@ bool FlockServiceGuard::writeLockInfo() const {
   return true;
 }
 
-SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir) {
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir,
+                                    const std::string &busSegment) {
   SweepReport retVal;
   retVal.serviceLocks = lockfile::sweep(serviceLockDir, isServiceLockName, [](std::string_view) {});
+  // Segmenty przed tozsamosciami: czytelnik ponizej, wychodzac jako ostatni, skasowalby segment
+  // bez zywych slotow z pominieciem licznika busSegments.
+  retVal.busSegments = bus::sweepAbandonedSegments(machineLockDir);
   // Porzucona blokada tozsamosci dowodzi, ze zaden zywy serwer nie uzywa obiektow tego czlonu:
-  // serwer zajmuje ja przed ich utworzeniem i zwalnia dopiero po ich skasowaniu. Kolejek
-  // odpowiedzi klientow nie da sie tu wyliczyc bez listowania /dev/shm, wiec zostaja - usuwa je
-  // serwer przy wyjsciu, a klient, ktory dostanie ten sam identyfikator, zaklada je od nowa.
+  // serwer zajmuje ja przed ich utworzeniem i zwalnia dopiero po ich skasowaniu - o ile jej plik
+  // jest tym, ktory serwer trzyma. Plik w /tmp moze jednak zniknac spod zywego serwera (czyszczenie
+  // wedlug wieku), a pod ta sciezka zostac plik instancji zabitej w trakcie startu; dlatego czlon
+  // zywy na magistrali zachowuje obiekty. Kolejek odpowiedzi klientow nie da sie tu wyliczyc bez
+  // listowania /dev/shm, wiec zostaja - usuwa je serwer przy wyjsciu, a klient, ktory dostanie ten
+  // sam identyfikator, zaklada je od nowa.
+  std::vector<std::string> liveTokens;
+  {
+    const bus::Bus reader(busSegment, false, machineLockDir);
+    for (const auto &instance : reader.instances())
+      liveTokens.push_back(ipc::serverNameToken(instance.name));
+  }
   retVal.ipcIdentities = lockfile::sweep(
       std::string(machineLockDir), [](std::string_view file) { return ipcTokenOf(file).has_value(); },
-      [](std::string_view file) {
-        const ipc::ServerNames names = ipc::namesForToken(*ipcTokenOf(file));
+      [&liveTokens](std::string_view file) {
+        const std::string_view token = *ipcTokenOf(file);
+        if (std::ranges::find(liveTokens, token) != liveTokens.end()) return;
+        const ipc::ServerNames names = ipc::namesForToken(token);
         ipc::security::removeOwned(names.shmemSegment);
         ipc::security::removeOwned(names.queryQueue);
       });
-  retVal.busSegments = bus::sweepAbandonedSegments(machineLockDir);
   return retVal;
 }

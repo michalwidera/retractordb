@@ -190,6 +190,10 @@ std::string executorsm::validatePlanText(const std::string &planText) {
         // Nieosiagalne z tego samego powodu co w getAdHoc: reservePlan nie dotyka maski trybow.
         FatalError("executorsm::validatePlanText: bus reported a service mode conflict");
         break;
+      case bus::ClaimStatus::NameConflict:
+        // Nieosiagalne: nazwa instancji trafia do slotu wylacznie w claim().
+        FatalError("executorsm::validatePlanText: bus reported an instance name conflict");
+        break;
       case bus::ClaimStatus::NotReserved:
         // Nieosiagalne: ten status zwraca wylacznie activateReservedPlan().
         FatalError("executorsm::validatePlanText: bus reported a missing plan reservation");

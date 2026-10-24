@@ -289,6 +289,10 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
         // w claim(); claimAdditional dopisuje nazwy strumieni i maski trybow nie oglada.
         FatalError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
         break;
+      case bus::ClaimStatus::NameConflict:
+        // Nieosiagalne: nazwa instancji trafia do slotu wylacznie w claim().
+        FatalError("executorsm::getAdHoc: bus reported an instance name conflict for an adhoc query");
+        break;
       case bus::ClaimStatus::NotReserved:
         // Nieosiagalne: ten status zwraca wylacznie activateReservedPlan().
         FatalError("executorsm::getAdHoc: bus reported a missing plan reservation for an adhoc query");

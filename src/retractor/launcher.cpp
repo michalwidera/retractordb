@@ -954,6 +954,15 @@ int main(int argc, char *argv[]) try {
       SPDLOG_ERROR("Refused: a service instance is already running as {} (pid {}).", owner, claimed.ownerPid);
       return system::errc::device_or_resource_busy;
     }
+    case bus::ClaimStatus::NameConflict: {
+      // Blokada tozsamosci IPC przepuscila start, bo jej plik zniknal spod zywego serwera (czyszczenie
+      // /tmp) albo lezy w innym PrivateTmp; slot magistrali jest drugim dowodem i ten sam kod wyjscia.
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: " << owner << " is already running (pid " << claimed.ownerPid << ")\n"
+                << "xretractor: use --name <name> to run a second, independent instance\n";
+      SPDLOG_ERROR("Refused: {} is already running (pid {}).", owner, claimed.ownerPid);
+      return system::errc::no_lock_available;
+    }
     case bus::ClaimStatus::TooLarge:
     case bus::ClaimStatus::NoFreeSlot:
       std::cerr << "xretractor: cannot register on the xrdbbus bus: " << claimed.detail << '\n';

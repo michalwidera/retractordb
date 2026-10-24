@@ -42,6 +42,13 @@ namespace bus {
 /// dwie instancje koncza na DWOCH segmentach, kazda widzac tylko siebie; blokada obecnosci go
 /// zamyka, a regule sprawdzania i-wezla po zajeciu blokady opisuje lockFile.hpp.
 ///
+/// Blokada obecnosci nie wystarcza sama (A2 M3, #565): plik w /tmp kasuje czyszczenie wedlug wieku
+/// (systemd-tmpfiles, periodic na macOS), a PrivateTmp daje procesom rozne pliki przy wspolnym
+/// /dev/shm. Serwer zostaje wtedy z blokada na i-wezle bez nazwy, a nastepny uczestnik zajmuje nowy
+/// plik pod ta sama sciezka. Dlatego ten, kto zajal LOCK_EX, kasuje segment dopiero, gdy zaden slot
+/// nie nalezy do zywej instancji. Bez ochrony slotu zostaja procesy, ktore mapuja segment, a slotu
+/// nie maja: czytelnicy (xqry --bus) i serwer miedzy podlaczeniem a claim().
+///
 /// NAZWA NIESIE WERSJE UKLADU i przy KAZDEJ zmianie ukladu slotu musi isc w gore razem
 /// z kLayoutVersion. Powod jest wdrozeniowy: segment o starym ukladzie zostaje w /dev/shm po
 /// podmianie binarki, a instancja, ktora odmowi sie do niego podlaczyc, startuje BEZ egzekwowania
@@ -75,7 +82,7 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 [[nodiscard]] std::vector<std::string> segmentNames();
 
 /// Funkcja sweepAbandonedSegments powinna:
-/// - [bus.sweep-abandoned-segments.1~1] przez lockfile::sweep w machineLockDir zajmować porzucone pliki obecności segmentów bieżącej wersji układu (nazwy jak w segmentNames), pod tą blokadą usuwać segment o nazwie pliku bez ".lock" przez ipc::security::removeOwned, a potem plik obecności.
+/// - [bus.sweep-abandoned-segments.1~2] przez lockfile::sweep w machineLockDir zajmować porzucone pliki obecności segmentów bieżącej wersji układu (nazwy jak w segmentNames), pod tą blokadą usuwać segment o nazwie pliku bez ".lock" przez ipc::security::removeOwned, o ile segment nie ma slotu żywej instancji, a potem plik obecności.
 /// - [bus.sweep-abandoned-segments.2~1] nie ruszać plików obecności innych wersji, plików trzymanych przez kogokolwiek ani plików innych kont.
 ///   Zakres testow: `BusPresence.SweepLeavesOtherLayoutVersions`, `BusPresence.SweepRemovesOnlyUnmappedSegments`; pliki innych kont bez przypadku - wymagaja drugiego konta (root i chown), pomijanie innego UID nalezy do lockfile::sweep.
 /// - [bus.sweep-abandoned-segments.3~1] zwracać liczbę usuniętych plików obecności, także tych, przy których removeOwned odmówił usunięcia segmentu.
@@ -259,6 +266,7 @@ enum class ClaimStatus : std::uint8_t {
   CounterConflict,  ///< plik licznika :ROTATION jest juz uzywany przez zywa instancje
   StoreConflict,    ///< plik magazynu strumienia jest juz zapisywany przez zywa instancje
   ServiceConflict,  ///< zywa instancja pracuje juz w trybie uslugowym; usluga jest dokladnie jedna
+  NameConflict,     ///< zywa instancja ma juz te tozsamosc (czlon nazwy obiektow IPC)
   TooLarge,         ///< plan przekracza pojemnosc slotu
   NoFreeSlot,       ///< wszystkie sloty zajete przez zywe instancje
   Unavailable,      ///< magistrali nie da sie uzyc; start bez egzekwowania rozlacznosci
@@ -333,10 +341,13 @@ struct ClaimRequest {
 ///   Zakres testow: `BusFixture.ClaimPublishesInstance`, `BusFixture.ZombieSlotIsFreeAgain`, `FallbackLock.InstancesSkipSlotMidWriteWithoutTakingLock` (ut_busFallback; odczyt wspolny dla obu galezi zamka).
 /// - [bus.bus.13~1] po przejęciu muteksu porzuconego przez zmarłego właściciela unieważniać sloty przerwane w trakcie zapisu przed oznaczeniem stanu jako spójnego.
 ///   Zakres testow: `BusRepairSeqlock.RepairPublishesFreshEvenSequence` (ut_busSlotCount i ut_busFallback), `BusRepairSeqlock.InterruptedRepairRemainsRecoverable` (ut_busSlotCount), `FallbackLock.DeadOwnerIsRecoveredAndInterruptedSlotInvalidated`, `BusRepairSeqlock.InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent` (ut_busSlotCount, przechwycenie pthread_mutex_consistent bez haka w produkcji).
-/// - [bus.bus.14~1] przy zniszczeniu zwalniać slot i odwzorowanie, a segment i plik obecności usuwać wyłącznie wtedy, gdy uda się zająć wyłączną blokadę obecności, czyli segmentu nie mapuje nikt inny.
+/// - [bus.bus.14~2] przy zniszczeniu zwalniać slot i odwzorowanie, plik obecności usuwać wyłącznie wtedy, gdy uda się zająć na nim wyłączną blokadę, a ścieżka nadal wskazuje ten i-węzeł, i w tym samym przypadku usuwać segment, o ile żaden slot poza własnym nie należy do żywej instancji.
+///   Zakres testow: `BusPresence.LastMapperRemovesSegment`, `BusFixture.ReleaseFreesTheName`, `BusPresence.SegmentOfLiveServerSurvivesLostPresenceFile`; slot w trakcie zapisu po zabitym pisarzu (wlasciciel czytany wprost) - `BusRepairSeqlock.*` w ut_busSlotCount, ktore bez tego zostawialy segment z nienaprawialnym muteksem.
 /// - [bus.bus.15~1] uniemożliwiać kopiowanie obiektu.
 /// - [bus.bus.16~1] gdy w releaseAdditional muteksu magistrali nie da się użyć, logować błąd z nazwami strumieni i ścieżkami magazynów, które zostają zajęte, zamiast wracać bez śladu.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_bus.cpp - static_assert(!std::is_copy_constructible_v<bus::Bus> && !std::is_copy_assignable_v<bus::Bus>).
+/// - [bus.bus.19~1] w claim odmawiać slotu ze statusem NameConflict, nazwą i pid właściciela, gdy żywa instancja ma ten sam człon ipc::serverNameToken nazwy (także pusty), po kontroli trybu usługowego, a przed kontrolą strumieni.
+/// - [bus.bus.20~1] trzymać plik obecności w katalogu machineLockDir podanym przy konstrukcji, domyślnie ipc::kMachineLockDir.
 class Bus {
  public:
   /// Podlacza sie do segmentu, tworzac go, gdy jeszcze nie istnieje. Niepowodzenie nie jest
@@ -351,7 +362,11 @@ class Bus {
   /// createIfMissing = false to tryb CZYTELNIKA (xqry). Klient nie ma prawa zakladac
   /// magistrali: pusty segment nie niesie zadnej informacji, a jego brak znaczy dokladnie
   /// tyle, ze zaden serwer jeszcze nie wystartowal -- czyli stan normalny, nie awaria.
-  explicit Bus(std::string_view segmentName, bool createIfMissing = true);
+  ///
+  /// machineLockDir to katalog pliku obecnosci; inny niz domyslny podaja tylko testy - patrz
+  /// ipc::kMachineLockDir.
+  explicit Bus(std::string_view segmentName, bool createIfMissing = true,
+               std::string_view machineLockDir = ipc::kMachineLockDir);
   ~Bus();
 
   Bus(const Bus &)            = delete;

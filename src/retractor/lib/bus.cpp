@@ -208,6 +208,52 @@ bool snapshot(Slot &slot, Slot &out) {
   return false;
 }
 
+/// Naglowek zgodny z ta binarka: opublikowany magic i ten sam uklad slotow.
+bool layoutMatches(Segment &segment) {
+  return std::atomic_ref<std::uint64_t>(segment.magic).load(std::memory_order_acquire) == kMagic &&
+         segment.layoutVersion == kLayoutVersion && segment.slotCount == kMaxSlots && segment.slotSize == sizeof(Slot);
+}
+
+/// Czy ktorykolwiek slot nalezy do zywej instancji - drugi warunek kasowania segmentu obok blokady
+/// obecnosci (bus.hpp, kSegmentName).
+///
+/// Slot, ktorego migawki nie da sie zrobic, zostawil zwykle pisarz zabity w polowie zapisu (#282);
+/// jego wlasciciela czytamy wtedy wprost. Uznanie go za zywy na stale trzymaloby w /dev/shm segment
+/// z nienaprawialnym muteksem. Odczyt rozdarty przez zywego pisarza moze wygladac na martwy, ale
+/// wolajacy dochodzi tu dopiero z LOCK_EX na pliku obecnosci, a ten dostaje tylko wtedy, gdy pisarz
+/// stracil takze swoj plik.
+///
+/// skipSlot to slot wolajacego obiektu Bus, ktory wlasnie znika: przy nienaprawialnym muteksie
+/// release() nie zdolal go wyczyscic, a pid nadal zyje.
+bool hasLiveSlot(Segment &segment, int skipSlot = -1) {
+  const auto scratch = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
+  for (std::size_t i = 0; i < kMaxSlots; ++i) {
+    if (std::cmp_equal(i, skipSlot)) continue;
+    Slot &slot       = segment.slots[i];
+    const bool alive = snapshot(slot, *scratch)
+                           ? isProcessAlive(scratch->pid, scratch->startTime)
+                           : isProcessAlive(std::atomic_ref<std::int32_t>(slot.pid).load(std::memory_order_relaxed),
+                                            std::atomic_ref<std::uint64_t>(slot.startTime).load(std::memory_order_relaxed));
+    if (alive) return true;
+  }
+  return false;
+}
+
+/// hasLiveSlot dla segmentu, ktorego wolajacy nie mapuje (sprzatacz). Segmentu, ktory nie istnieje,
+/// nie da sie odwzorowac albo ma obcy uklad, nie uzywa zadna instancja tej wersji.
+bool segmentHasLiveSlot(const std::string &name) {
+  try {
+    const IPC::shared_memory_object shm = ipc::security::openMemory(name, IPC::read_write);
+    IPC::offset_t size{0};
+    if (!shm.get_size(size) || std::cmp_less(size, sizeof(Segment))) return false;
+    const IPC::mapped_region region(shm, IPC::read_write);
+    auto &segment = *static_cast<Segment *>(region.get_address());
+    return layoutMatches(segment) && hasLiveSlot(segment);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
 std::optional<std::string> collidingStream(const Slot &slot, const std::vector<std::string> &streams) {
   const auto findCollision = [&](const auto &ownedStreams, std::uint32_t count) -> std::optional<std::string> {
     for (std::uint32_t s = 0; s < std::min(count, static_cast<std::uint32_t>(kMaxStreams)); ++s) {
@@ -282,8 +328,8 @@ void clearSlot(Slot &slot) {
 
 /// Plik obecnosci segmentu: LOCK_SH trzyma kazdy, kto segment mapuje; LOCK_EX oznacza, ze nie
 /// mapuje go nikt i wolno go skasowac. Katalog wspolny dla maszyny, bo segment tez jest wspolny.
-std::string presencePath(std::string_view segment) {
-  return std::string(ipc::kMachineLockDir) + "/" + std::string(segment) + ".lock";
+std::string presencePath(std::string_view segment, std::string_view machineLockDir = ipc::kMachineLockDir) {
+  return std::string(machineLockDir) + "/" + std::string(segment) + ".lock";
 }
 
 std::optional<std::string> segmentFromPresence(std::string_view file) {
@@ -351,7 +397,9 @@ std::size_t sweepAbandonedSegments(std::string_view machineLockDir) {
   const auto isSegmentPresence = [](std::string_view file) { return segmentFromPresence(file).has_value(); };
   return lockfile::sweep(std::string(machineLockDir), isSegmentPresence, [](std::string_view file) {
     const std::string segment(file.substr(0, file.size() - 5));
-    ipc::security::removeOwned(segment);
+    // Plik obecnosci mogl zniknac spod zywego serwera (czyszczenie /tmp, PrivateTmp) - wtedy ten
+    // jest cudzy, a serwer trzyma blokade na i-wezle bez nazwy. Jego slot mowi, ze segment zyje.
+    if (!segmentHasLiveSlot(segment)) ipc::security::removeOwned(segment);
   });
 }
 
@@ -593,14 +641,14 @@ struct Bus::Impl {
 #endif
 };
 
-Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_unique<Impl>()) {
+Bus::Bus(std::string_view segmentName, bool createIfMissing, std::string_view machineLockDir) : impl(std::make_unique<Impl>()) {
   const std::string name(segmentName);
 
   // Obecnosc PRZED otwarciem segmentu: od tej chwili nikt go nie skasuje, az jej nie zwolnimy.
   // Bez niej odwzorowanie nie jest bezpieczne, wiec magistrala zostaje niedostepna - tak samo
   // glosno jak przy kazdej innej przyczynie ponizej.
   impl->segmentName  = name;
-  impl->presenceFile = presencePath(name);
+  impl->presenceFile = presencePath(name, machineLockDir);
   if (lockfile::acquire(impl->presenceFile, false, false, impl->presenceFd) != lockfile::Result::Acquired) {
     if (createIfMissing)
       SPDLOG_WARN("xrdbbus: cannot mark presence on bus segment '{}' ({}): {}", name, impl->presenceFile, std::strerror(errno));
@@ -730,8 +778,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     }
   }
 
-  if (magic.load(std::memory_order_acquire) != kMagic || impl->segment->layoutVersion != kLayoutVersion ||
-      impl->segment->slotCount != kMaxSlots || impl->segment->slotSize != sizeof(Slot)) {
+  if (!layoutMatches(*impl->segment)) {
     SPDLOG_ERROR(
         "xrdbbus: segment '{}' has a foreign or incompatible layout (version {}, {} slots of {} B); "
         "remove IPC object '{}' to repair. Running without the bus.",
@@ -741,17 +788,25 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
 }
 
 Bus::~Bus() {
+  const int ownSlot = impl->slotIndex;
   release();
-  impl->segment = nullptr;
+  // Ostatni wychodzacy sprzata. Blokada wylaczna na pliku obecnosci znaczy, ze segmentu nie mapuje
+  // juz nikt, kto trzyma TEN plik, a kto zechce go otworzyc, najpierw poczeka na nasze zwolnienie
+  // i sprawdzi i-wezel pliku. Nie dowodzi jednak, ze nie mapuje go nikt: plik mogl zniknac spod
+  // zywego serwera (czyszczenie /tmp wedlug wieku, PrivateTmp), ktory trzyma blokade na i-wezle bez
+  // nazwy. Dlatego segment kasujemy dopiero, gdy zaden slot nie nalezy do zywej instancji - stad
+  // zajecie blokady jeszcze przed zamknieciem odwzorowania. Nieudana zamiana LOCK_SH na LOCK_EX
+  // moze zdjac nasza LOCK_SH - bez znaczenia, bo ponizej odwzorowanie i tak zamykamy.
+  const bool last = impl->presenceFd != -1 && ::flock(impl->presenceFd, LOCK_EX | LOCK_NB) == 0 &&
+                    lockfile::stillLinked(impl->presenceFd, impl->presenceFile);
+  // Segment o obcym ukladzie (impl->segment == nullptr) nie ma slotow zadnej instancji tej wersji.
+  const bool occupied = last && impl->segment != nullptr && hasLiveSlot(*impl->segment, ownSlot);
+  impl->segment       = nullptr;
   impl->region.reset();
   impl->shm.reset();
   if (impl->presenceFd == -1) return;
-  // Ostatni wychodzacy sprzata. Blokada wylaczna na pliku obecnosci znaczy, ze segmentu nie mapuje
-  // juz nikt inny, a kto zechce go otworzyc, najpierw poczeka na nasze zwolnienie i sprawdzi
-  // i-wezel pliku. Nieudana zamiana LOCK_SH na LOCK_EX moze zdjac nasza LOCK_SH - bez znaczenia,
-  // bo odwzorowanie jest juz zamkniete.
-  if (::flock(impl->presenceFd, LOCK_EX | LOCK_NB) == 0 && lockfile::stillLinked(impl->presenceFd, impl->presenceFile)) {
-    if (impl->trustedObject) ipc::security::removeOwned(impl->segmentName);
+  if (last) {
+    if (impl->trustedObject && !occupied) ipc::security::removeOwned(impl->segmentName);
     lockfile::removeAndRelease(impl->presenceFile, impl->presenceFd);
   } else {
     ::close(impl->presenceFd);
@@ -832,6 +887,17 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
     // uslugi nie obejdzie zmiana nazw strumieni.
     if ((request.modes & mode::kService) != 0U && (scratch->modes & mode::kService) != 0U) {
       retVal.status    = ClaimStatus::ServiceConflict;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
+
+    // Tozsamosc to czlon nazw obiektow IPC: dwie instancje o tym samym czlonie kasowalyby sobie
+    // nawzajem kolejke komend. Pilnuje tego blokada tozsamosci, ale jej plik w /tmp moze zniknac
+    // spod zywego serwera (czyszczenie wedlug wieku) albo lezec w innym PrivateTmp; slot nie.
+    if (ipc::serverNameToken(loadString(scratch->name, kInstanceNameSize)) == ipc::serverNameToken(request.name)) {
+      retVal.status    = ClaimStatus::NameConflict;
       retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
       retVal.ownerPid  = scratch->pid;
       impl->unlock();
