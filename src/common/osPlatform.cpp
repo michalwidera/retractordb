@@ -7,7 +7,13 @@
 #include <string>
 #include <string_view>
 
+#include <boost/interprocess/detail/workaround.hpp>
+
 #include "platformConfig.h"
+
+#if RDB_HAS_BOOST_POSIX_SHM != defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
+#error "RDB_HAS_BOOST_POSIX_SHM nie zgadza sie z Boost.Interprocess; rekonfiguruj build."
+#endif
 
 #if RDB_HAS_PROCFS
 #include <csignal>
@@ -242,7 +248,7 @@ ServiceIdentity detectServiceIdentity() {
 }
 
 std::string sharedMemoryBackingPath() {
-#if RDB_OS_DARWIN
+#if !RDB_HAS_BOOST_POSIX_SHM
   // Boost.Interprocess NIE uzywa tu shm_open. macOS ustawia
   // _POSIX_SHARED_MEMORY_OBJECTS na wartosc ujemna, wiec
   // BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS nie jest zdefiniowane i

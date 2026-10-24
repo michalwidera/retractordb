@@ -24,6 +24,21 @@ std::uint64_t qTree::nextPlanRevision() {
   return dispenser.fetch_add(1, std::memory_order_relaxed);
 }
 
+qTree::qTree(qTree &&other) noexcept { *this = std::move(other); }
+
+qTree &qTree::operator=(qTree &&other) noexcept {
+  if (this == &other) return *this;
+  std::vector<query>::operator=(std::move(other));
+  visited_      = std::move(other.visited_);
+  adj_          = std::move(other.adj_);
+  ans_          = std::move(other.ans_);
+  maxCapacity   = std::move(other.maxCapacity);
+  variables     = std::move(other.variables);
+  planRevision_ = other.planRevision_;
+  other.clear();
+  return *this;
+}
+
 void qTree::push_back(const query &node) {
   std::vector<query>::push_back(node);
   planRevision_ = nextPlanRevision();

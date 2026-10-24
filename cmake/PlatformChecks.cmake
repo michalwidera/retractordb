@@ -16,16 +16,17 @@
 # RDB_OS_DARWIN ustawiane nizej z CMAKE_SYSTEM_NAME.
 
 include(CheckCXXSourceCompiles)
-include(CheckCXXSymbolExists)
 include(CheckIncludeFileCXX)
+include(CMakePushCheckState)
+cmake_push_check_state()
 
 # Probe kompilacyjne musza widziec rozszerzenia POSIX-owe glibc
 # (sched_getaffinity, PTHREAD_MUTEX_ROBUST, MCL_ONFAULT). Bez _GNU_SOURCE czesc
 # z nich jest ukryta i probe wyszedlby FALSZYWIE ujemny na Linuksie.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+  list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
 endif()
-set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+list(APPEND CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 
 # Na Apple SDK deklaruje takze funkcje NOWSZE niz cel wdrozenia
 # (CMAKE_OSX_DEPLOYMENT_TARGET; bez jawnego ustawienia clang bierze wersje
@@ -36,8 +37,8 @@ set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 # -Werror=unguarded-availability-new zamienia to ostrzezenie w blad kompilacji
 # proby, dzieki czemu probe odpowiada na pytanie "czy WOLNO to wywolac", a nie
 # "czy naglowek o tym wie".
-if(APPLE)
-  set(CMAKE_REQUIRED_FLAGS "-Werror=unguarded-availability-new")
+if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  string(APPEND CMAKE_REQUIRED_FLAGS " -Werror=unguarded-availability-new")
 endif()
 
 # check_* nie powtarza proby, ktorej wynik jest juz w pamieci podrecznej - nawet
@@ -45,7 +46,7 @@ endif()
 # Istniejacy katalog build trzymalby wtedy odpowiedz udzielona INNEMU buildowi.
 # Podpis wejsc prob kasuje zapamietane wyniki przy kazdej ich zmianie.
 set(_rdb_probe_signature
-    "${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_VERSION}|${CMAKE_CXX_FLAGS}|${CMAKE_CXX_STANDARD}|${CMAKE_CXX_EXTENSIONS}|${CMAKE_EXE_LINKER_FLAGS}|${CMAKE_REQUIRED_DEFINITIONS}|${CMAKE_REQUIRED_FLAGS}|${CMAKE_REQUIRED_LIBRARIES}|${CMAKE_OSX_DEPLOYMENT_TARGET}|${CMAKE_OSX_SYSROOT}"
+    "callable-v2|${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_VERSION}|${CMAKE_CXX_FLAGS}|${CMAKE_CXX_STANDARD}|${CMAKE_CXX_EXTENSIONS}|${CMAKE_EXE_LINKER_FLAGS}|${CMAKE_REQUIRED_DEFINITIONS}|${CMAKE_REQUIRED_FLAGS}|${CMAKE_REQUIRED_LIBRARIES}|${CMAKE_REQUIRED_INCLUDES}|${CMAKE_REQUIRED_LINK_OPTIONS}|${CMAKE_OSX_DEPLOYMENT_TARGET}|${CMAKE_OSX_SYSROOT}"
 )
 if(NOT _rdb_probe_signature STREQUAL RDB_PLATFORM_PROBE_SIGNATURE)
   foreach(
@@ -81,13 +82,34 @@ foreach(
 endforeach()
 
 # --- czas ---------------------------------------------------------------
-check_cxx_symbol_exists(clock_nanosleep "ctime" RDB_HAS_CLOCK_NANOSLEEP)
+check_cxx_source_compiles(
+  "#include <ctime>
+   int main() {
+     timespec deadline{};
+     return clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, nullptr);
+   }"
+  RDB_HAS_CLOCK_NANOSLEEP)
 check_include_file_cxx("mach/mach_time.h" RDB_HAS_MACH_TIME_H)
 
 # --- szeregowanie czasu rzeczywistego -----------------------------------
-check_cxx_symbol_exists(sched_setscheduler "sched.h" RDB_HAS_SCHED_SETSCHEDULER)
-check_cxx_symbol_exists(sched_getaffinity "sched.h" RDB_HAS_SCHED_AFFINITY)
-check_cxx_symbol_exists(mlockall "sys/mman.h" RDB_HAS_MLOCKALL)
+check_cxx_source_compiles(
+  "#include <sched.h>
+   int main() {
+     sched_param parameters{};
+     return sched_setscheduler(0, SCHED_FIFO, &parameters);
+   }"
+  RDB_HAS_SCHED_SETSCHEDULER)
+check_cxx_source_compiles(
+  "#include <sched.h>
+   int main() {
+     cpu_set_t cpus{};
+     return sched_getaffinity(0, sizeof(cpus), &cpus);
+   }"
+  RDB_HAS_SCHED_AFFINITY)
+check_cxx_source_compiles(
+  "#include <sys/mman.h>
+   int main() { return mlockall(MCL_CURRENT); }"
+  RDB_HAS_MLOCKALL)
 check_cxx_source_compiles("#include <sys/mman.h>
    int main() { return MCL_ONFAULT; }" RDB_HAS_MCL_ONFAULT)
 check_cxx_source_compiles(
@@ -139,11 +161,12 @@ check_cxx_source_compiles(
 # wstrzykiwania EINTR w pread i write. Opcja jest rozszerzeniem GNU ld/lld; ld64
 # Apple'a odrzuca ja bledem "unknown option", wiec te trzy binaria trzeba tam
 # zlozyc inaczej - patrz test/UnitTest/syscallWrap.hpp.
-set(CMAKE_REQUIRED_LINK_OPTIONS "-Wl,--wrap=rdb_wrap_probe")
+cmake_push_check_state()
+list(APPEND CMAKE_REQUIRED_LINK_OPTIONS "-Wl,--wrap=rdb_wrap_probe")
 check_cxx_source_compiles(
   "int rdb_wrap_probe() { return 0; }\nint main() { return rdb_wrap_probe(); }"
   RDB_HAS_LD_WRAP)
-unset(CMAKE_REQUIRED_LINK_OPTIONS)
+cmake_pop_check_state()
 
 # --- rozne --------------------------------------------------------------
 # Budzet pamieci dzielonej wymaga obu funkcji: statvfs dla sciezki zapasowej
@@ -158,9 +181,7 @@ check_cxx_source_compiles(
 # Stary wynik dla samego statvfs nie moze przeslonic proby obu wywolan.
 set(RDB_HAS_STATVFS "${RDB_HAS_STATVFS_CALLABLE}")
 
-unset(CMAKE_REQUIRED_DEFINITIONS)
-unset(CMAKE_REQUIRED_LIBRARIES)
-unset(CMAKE_REQUIRED_FLAGS)
+cmake_pop_check_state()
 
 # --- narzedzia zewnetrzne wolane w czasie dzialania ---------------------
 # boost::stacktrace z zapleczem ADDR2LINE uruchamia ten program przy kazdym

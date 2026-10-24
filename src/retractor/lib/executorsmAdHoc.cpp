@@ -132,22 +132,22 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // wiec zalozenie "slowo kluczowe zawsze rozpoznane" bylo prawdziwe tylko dlatego, ze blad
   // parsowania zabijal serwer, zanim zdazyla je sprawdzic (patrz exit(EPERM) w RQLParser.cpp).
   if (parseOut != "OK") {
-    ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
+    ptRetval.put(std::string("db"), "Fail parse: " + parseOut);
     SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
     return ptRetval;
   }
 
   if (first_keyword == "UNRECOGNIZED") {
-    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with SELECT");
+    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with SELECT, DECLARE or RULE");
     SPDLOG_ERROR("Unrecognized command in AdHoc query");
     return ptRetval;
   }
 
   // Parser przyjmuje caly program RQL. Kanal ad-hoc publikuje jednak jedna transakcje
-  // SELECT albo DECLARE; sprawdzenie tylko pierwszego slowa pozwalalo ukryc zakazana
+  // SELECT, DECLARE albo RULE; sprawdzenie tylko pierwszego slowa pozwalalo ukryc zakazana
   // instrukcje jako drugi element programu zaczynajacego sie od SELECT.
   if (statementKeywords.size() != 1) {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc accepts exactly one SELECT or DECLARE statement");
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc accepts exactly one SELECT, DECLARE or RULE statement");
     SPDLOG_ERROR("Parse adhoc query failed: expected one statement, got {}", statementKeywords.size());
     return ptRetval;
   }

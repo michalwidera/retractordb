@@ -78,7 +78,7 @@ void purgeStaleResetTransfers(std::chrono::steady_clock::time_point now) {
 std::string executorsm::validatePlanText(const std::string &planText) {
   qTree candidate;
   const PlanSource loaded = parsePlanText(candidate, planText);
-  if (loaded.status != "OK") return "Fail parse:" + loaded.status;
+  if (loaded.status != "OK") return "Fail parse: " + loaded.status;
 
   // --- DO SYSTEM nie przechodzi kanalem `reset` ---
   //

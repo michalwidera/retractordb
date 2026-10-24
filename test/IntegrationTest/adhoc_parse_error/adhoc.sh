@@ -156,7 +156,7 @@ if [ "$multi_rc" -eq 0 ]; then
   exit 1
 fi
 case "$multi_out" in
-  *"exactly one SELECT or DECLARE"*) ;;
+  *"exactly one SELECT, DECLARE or RULE"*) ;;
   *)
     echo "nieoczekiwana odpowiedz na wieloinstrukcyjny ad-hoc: $multi_out"
     exit 1
@@ -252,7 +252,7 @@ expect_parse_rejected "SELECT $wide_list STREAM wide FROM core0" \
 # w jednym zapytaniu jest dwiema instrukcjami. Zadna z odmow nie zmienia planu serwera.
 expect_parse_rejected "LET X = 1" "'LET' is not supported"
 expect_parse_rejected "SELECT core0[?X] STREAM letref FROM core0" "line 1:13: constant ?X in field index is not declared"
-expect_parse_rejected $'LET X = 0\nSELECT core0[?X] STREAM letpair FROM core0' "exactly one SELECT or DECLARE"
+expect_parse_rejected $'LET X = 0\nSELECT core0[?X] STREAM letpair FROM core0' "exactly one SELECT, DECLARE or RULE"
 if xqry -d | grep -Eq 'letref|letpair'; then
   echo "odrzucone zapytanie z LET zmienilo plan serwera"
   xqry -d
@@ -264,7 +264,7 @@ fi
 # zostaje bez zmian. Odczyt i zapis zmiennych planu w kanale ad-hoc sprawdza it_var_adhoc.
 expect_parse_rejected "VAR X = 1" "'VAR' is not supported"
 expect_parse_rejected "SELECT core0[0] * ?X STREAM varref FROM core0" "line 1:18: constant ?X in expression is not declared"
-expect_parse_rejected $'VAR X = 0\nSELECT core0[0] * ?X STREAM varpair FROM core0' "exactly one SELECT or DECLARE"
+expect_parse_rejected $'VAR X = 0\nSELECT core0[0] * ?X STREAM varpair FROM core0' "exactly one SELECT, DECLARE or RULE"
 # Akcja DO SET (#531, D7): cel to zmienna VAR, a plan nie deklaruje ?X - odmowa parsowania, regula
 # nie dochodzi do planu.
 expect_parse_rejected "RULE varset ON dst WHEN 1 = 1 DO SET ?X = 1" "line 1:37: variable ?X in DO SET is not declared"

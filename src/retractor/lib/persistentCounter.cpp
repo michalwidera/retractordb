@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <system_error>
 
@@ -86,7 +87,8 @@ PersistentCounter::Reading PersistentCounter::read(const std::string &filename) 
     --last;
   int value{};
   const auto [ptr, err] = std::from_chars(first, last, value);
-  if (err != std::errc() || ptr != last || value < 0)
+  // INT_MAX nie zostawia miejsca na rezerwacje nastepnego numeru sesji.
+  if (err != std::errc() || ptr != last || value < 0 || value == std::numeric_limits<int>::max())
     return {.state  = Reading::State::Invalid,
             .detail = std::to_string(text.size()) + " bytes: '" + text.substr(0, kErrorPreviewBytes) + "'"};
   return {.state = Reading::State::Value, .value = value};
@@ -116,7 +118,8 @@ rdb::Result<> PersistentCounter::load() {
           rdb::Errc::IO,
           fmt::format(
               "Rotation counter file '{}' is unreadable ({}); refusing to start. A guessed rotation number could overwrite "
-              "archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart rotation from 0 "
+              "archives of previous sessions. Repair the file (an integer from 0 to INT_MAX-1), or delete it to restart "
+              "rotation from 0 "
               "- existing .old<N> archives will then be overwritten.",
               persistentCounterFilename_, reading.detail),
           EIO);

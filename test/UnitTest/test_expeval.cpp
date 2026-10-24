@@ -402,26 +402,41 @@ TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
   }
 }
 
-// Para dzieli sie po skladowych, wiec zero w KTOREJKOLWIEK skladowej dzielnika robi NULL z calej
-// pary - tak jak dla int i rational. Do #267 straznik polykal pary catch-allem, a zero w skladowej
-// konczylo proces sygnalem SIGFPE na x86-64. Asercja wykonuje sie tylko wtedy, gdy proces zyje.
-TEST(xExpressionEval, divide_intpair_by_zero_component_yields_null) {
-  // covers: expressionevaluator.expression-evaluator.10~1
-  for (const auto &divisor : {std::pair<int, int>(3, 0), std::pair<int, int>(0, 2)}) {
-    std::list<token> program;
-    program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<int, int>(6, 4)));
-    program.emplace_back(PUSH_VAL, rdb::descFldVT(divisor));
-    program.emplace_back(DIVIDE);
-
-    expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))))
-        << divisor.first << "," << divisor.second;
+// INTPAIR przenosi dwie liczby, lecz nie definiuje arytmetyki. Blad typu ma poprzedzac
+// promocje i propagacje NULL, takze dla zerowych skladowych i wartosci granicznych int.
+TEST(xExpressionEval, intpair_arithmetic_is_rejected_before_promotion_or_null_propagation) {
+  // covers: expressionevaluator.expression-evaluator.10~2, expressionevaluator.expression-evaluator.18~1
+  using value = rdb::descFldVT;
+  using pair  = std::pair<int, int>;
+  expressionEvaluator evaluator;
+  const std::vector<value> operands{pair{6, 4},
+                                    pair{3, 0},
+                                    pair{0, 2},
+                                    pair{std::numeric_limits<int>::max(), std::numeric_limits<int>::min()},
+                                    uint8_t{2},
+                                    2,
+                                    2U,
+                                    boost::rational<int>(2),
+                                    2.0F,
+                                    2.0,
+                                    std::string("text"),
+                                    std::pair<std::string, int>{"index", 2},
+                                    std::monostate{}};
+  for (const auto &other : operands) {
+    for (const auto op : {ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER}) {
+      SCOPED_TRACE(static_cast<int>(op));
+      for (const auto &args : {std::pair<value, value>{pair{6, 4}, other}, std::pair<value, value>{other, pair{6, 4}}})
+        EXPECT_RDB_ERROR(evaluator.eval({token(PUSH_VAL, args.first), token(PUSH_VAL, args.second), token(op)}), rdb::Errc::Eval,
+                         "INTPAIR");
+    }
   }
+  for (const auto &input : {pair{6, 4}, pair{std::numeric_limits<int>::min(), 0}})
+    EXPECT_RDB_ERROR(evaluator.eval({token(PUSH_VAL, input), token(NEGATE)}), rdb::Errc::Eval, "INTPAIR");
 }
 
 // IDXPAIR dzieli tylko skladowa liczbowa - napisu nikt nie dzieli, wiec o NULL decyduje zero w `second`.
 TEST(xExpressionEval, divide_idxpair_by_zero_index_yields_null) {
-  // covers: expressionevaluator.expression-evaluator.10~1
+  // covers: expressionevaluator.expression-evaluator.10~2
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("a", 6)));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("b", 0)));
@@ -2418,21 +2433,16 @@ TEST(xExpressionEval, three_valued_truth_tables_cover_both_operand_orders) {
 
 TEST(xExpressionEval, pair_arithmetic_and_refusals_preserve_the_contract) {
   // covers: expressionevaluator.expression-evaluator.4~1, expressionevaluator.expression-evaluator.8~1
-  // covers: expressionevaluator.expression-evaluator.10~1, expressionevaluator.expression-evaluator.11~1
+  // covers: expressionevaluator.expression-evaluator.10~2, expressionevaluator.expression-evaluator.11~1
   // covers: expressionevaluator.expression-evaluator.18~1
   using integers = std::pair<int, int>;
   using indexed  = std::pair<std::string, int>;
   expressionEvaluator evaluator;
-  for (const auto &[op, expected] :
-       std::vector<std::pair<command_id, integers>>{{ADD, {8, 12}}, {SUBTRACT, {4, 4}}, {MULTIPLY, {12, 32}}, {DIVIDE, {3, 2}}})
-    EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, integers{6, 8}), token(PUSH_VAL, integers{2, 4}), token(op)})),
-              rdb::descFldVT(expected));
   for (const auto &[op, expected] : std::vector<std::pair<command_id, indexed>>{
            {ADD, {"leftright", 10}}, {SUBTRACT, {"?? -", 6}}, {MULTIPLY, {"?? *", 16}}, {DIVIDE, {"?? /", 4}}})
     EXPECT_EQ(
         rdbtest::ok(evaluator.eval({token(PUSH_VAL, indexed{"left", 8}), token(PUSH_VAL, indexed{"right", 2}), token(op)})),
         rdb::descFldVT(expected));
-  EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, integers{6, 8}), token(NEGATE)})), rdb::descFldVT(integers{-6, -8}));
   EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, indexed{"left", 8}), token(NEGATE)})),
             rdb::descFldVT(indexed{"-left", -8}));
   for (const auto &value : std::vector<rdb::descFldVT>{integers{1, 2}, indexed{"x", 2}}) {

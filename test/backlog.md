@@ -80,12 +80,7 @@ Indeksy `B-NNN` są kolejne i nigdy nie są używane ponownie. Wpisu się nie us
 ## B-005 - Automatyczna naprawa segmentu magistrali po śmierci twórcy
 
 - **Data:** 2026-09-18
-- **Status:** pomysł - do decyzji
-- **Źródło:** plan wieloserwerowości, etap 2b („Czego 2b nie objęło"); plan w `paper-arXiv/debs/done/multiserver_plan.md`.
-- **Stan obecny:** `src/retractor/lib/bus.cpp` - twórca segmentu publikuje `magic` na końcu inicjalizacji, a podłączający się czeka `kInitWaitLimit` (2 s). Gdy `magic` się nie pojawi, instancja startuje bez magistrali (fail-open: rozłączność nazw nie jest egzekwowana), a log mówi „remove /dev/shm/<segment> to repair". Twórca, który sam wykryje porażkę przed publikacją `magic`, kasuje swój segment (komentarz przy tej ścieżce w `bus.cpp`), ale twórca zabity w oknie między `create_only` a zapisem `magic` zostawia segment martwy do ręcznego usunięcia. Okno trwa mikrosekundy.
-- **Pomysł na realizację:** plik blokady obok segmentu (np. w katalogu blokad) trzymany `flock`-iem przez całą inicjalizację. Czekający po upływie limitu próbuje wziąć ten `flock`; jeżeli go dostaje, a `magic` nadal nie ma, twórca na pewno nie żyje (jądro zwalnia `flock` przy śmierci procesu), więc można pod tą samą blokadą skasować segment i założyć go od nowa.
-- **Do rozstrzygnięcia:** to jest „drugi protokół wzajemnego wykluczania nad tym samym segmentem", który plan świadomie odrzucił. Kasowanie przy żywych odwzorowaniach prowadzi do dwóch segmentów i cichej utraty rozłączności (etap 2e, „Wersja w nazwie segmentu"), więc blokada musi obejmować każde podłączenie, nie tylko inicjalizację. Koszt: dodatkowy plik i `flock` przy każdym starcie oraz przy każdym odczycie magistrali przez `xqry`.
-- **Gotowe gdy:** test z hakiem zabijającym twórcę między `create_only` a zapisem `magic` pokazuje, że kolejna instancja sama odtwarza segment i egzekwuje rozłączność; `test_bus` zielony pod valgrindem; `it_multiserver_*` zielone.
+- **Status:** przeniesione do [#570](https://github.com/michalwidera/retractordb/issues/570) (decyzja człowieka 2026-10-24: treść wpisu należy do zgłoszenia, nie do repozytorium)
 
 ## B-006 - Budżet `/dev/shm` na subskrybenta konfigurowany per instancja
 
