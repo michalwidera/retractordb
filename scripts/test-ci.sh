@@ -422,6 +422,9 @@ run_tests() {
     df -k /dev/shm || true
     grep ' /dev/shm ' /proc/mounts || true
     cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2> /dev/null || true
+    # Pod `script`, czyli tak, jak terminal widzi ctest nizej.
+    script -qefc 't0=no; t1=no; [ -t 0 ] && t0=yes; [ -t 1 ] && t1=yes
+        echo "TERM=${TERM-unset} stdin_tty=$t0 stdout_tty=$t1"' /dev/null < /dev/null
 
     step "Integration & Unit test"
     local rc=0

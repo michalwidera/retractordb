@@ -405,6 +405,8 @@ commands:
             df -k /dev/shm || true
             grep ' /dev/shm ' /proc/mounts || true
             cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2> /dev/null || true
+            t0=no; t1=no; [ -t 0 ] && t0=yes; [ -t 1 ] && t1=yes
+            echo "TERM=${TERM-unset} stdin_tty=$t0 stdout_tty=$t1"
       # Diagnostyka porazki jest w TYM SAMYM kroku co ctest, zeby kolektor dostal jego
       # prawdziwy kod wyjscia. Powod: 2026-09-04 `it_agse_array` oblal tutaj, a jedynym
       # sladem byl wpis w test_results.xml z pustym <system-out/> - czyli wiadomo bylo,
