@@ -44,6 +44,8 @@ class Descriptor {
   // Slot plaski: pozycja w deskryptorze (wpis, indeks w tablicy) oraz szerokosc i typ slotu.
   // Szerokosc i typ sa tu dla operator==, ktory payload::operator= wola przy kazdej kopii
   // rekordu - bez nich kazde porownanie przechodzilo przez wpis deskryptora i flatSlotSize().
+
+  /// @requirements-exempt FlatSlot: Prywatny agregat danych cache mapowania pol; logike realizuje Descriptor.
   struct FlatSlot {
     std::pair<int, int> position;
     int slotSize;
