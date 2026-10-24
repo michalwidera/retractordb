@@ -252,9 +252,7 @@ rdb::descFldVT evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bPara
                  [&retVal](double a, double b) { retVal = a + b; },                                                        //
                  [&retVal](float a, float b) { retVal = a + b; },                                                          //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::add(a, b)); },  //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   retVal = std::make_pair(a.first + b.first, a.second + b.second);
-                 },
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "Operator '+' not defined for INTPAIR operands"; },
                  [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
                    retVal = std::make_pair(a.first + b.first, a.second + b.second);
                  },
@@ -285,9 +283,7 @@ rdb::descFldVT evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &
           [&retVal](double a, double b) { retVal = a - b; },                                                               //
           [&retVal](float a, float b) { retVal = a - b; },                                                                 //
           [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::sub(a, b)); },         //
-          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-            retVal = std::make_pair(a.first - b.first, a.second - b.second);
-          },
+          [&error](std::pair<int, int>, std::pair<int, int>) { error = "Operator '-' not defined for INTPAIR operands"; },
           [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
             retVal = std::make_pair(/* TODO? define str-str */ "?? -", a.second - b.second);
           },
@@ -318,9 +314,7 @@ rdb::descFldVT evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &
           [&retVal](double a, double b) { retVal = a * b; },                                                               //
           [&retVal](float a, float b) { retVal = a * b; },                                                                 //
           [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::mul(a, b)); },         //
-          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-            retVal = std::make_pair(a.first * b.first, a.second * b.second);
-          },
+          [&error](std::pair<int, int>, std::pair<int, int>) { error = "Operator '*' not defined for INTPAIR operands"; },
           [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
             retVal = std::make_pair(/* TODO? define str*str */ "?? *", a.second * b.second);
           },
@@ -339,17 +333,15 @@ rdb::descFldVT evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bP
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, DIVIDE);
 
-  // Para to dwie niezalezne liczby, nie ulamek - dzieli sie po skladowych, wiec zero w ktorejkolwiek
-  // dzielonej skladowej nie ma ilorazu. Napis IDXPAIR nie jest dzielony. Bez catch-allu: nowa
+  // INTPAIR nie ma arytmetyki, wiec zero skladowej nie jest dzielnikiem. Napis IDXPAIR nie jest dzielony. Bez catch-allu: nowa
   // alternatywa wariantu ma byc tu bledem kompilacji, nie cichym `false` (#267).
-  const bool divisorIsZero =
-      std::visit(Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
-                          [](double v) { return v == 0.0; }, [](float v) { return v == 0.0F; },
-                          [](boost::rational<int> v) { return v == boost::rational<int>(0); },
-                          [](std::pair<int, int> v) { return v.first == 0 || v.second == 0; },
-                          [](const std::pair<std::string, int> &v) { return v.second == 0; },
-                          [](const std::string &) { return false; }, [](std::monostate) { return false; }},
-                 b);
+  const bool divisorIsZero = std::visit(
+      Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
+               [](double v) { return v == 0.0; }, [](float v) { return v == 0.0F; },
+               [](boost::rational<int> v) { return v == boost::rational<int>(0); }, [](std::pair<int, int>) { return false; },
+               [](const std::pair<std::string, int> &v) { return v.second == 0; }, [](const std::string &) { return false; },
+               [](std::monostate) { return false; }},
+      b);
 
   if (divisorIsZero) {
     // Dzielenie przez zero nie ma wyniku w zbiorze wartości, więc jest wartością POCHŁANIAJĄCĄ -
@@ -375,14 +367,7 @@ rdb::descFldVT evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bP
           [&retVal](double a, double b) { retVal = a / b; },                                                               //
           [&retVal](float a, float b) { retVal = a / b; },                                                                 //
           [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::div(a, b)); },         //
-          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-            const auto first  = checkedArith::div(a.first, b.first);
-            const auto second = checkedArith::div(a.second, b.second);
-            if (first && second)
-              retVal = std::make_pair(*first, *second);
-            else
-              retVal = std::monostate{};
-          },  //
+          [&error](std::pair<int, int>, std::pair<int, int>) { error = "Operator '/' not defined for INTPAIR operands"; },
           [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
             const auto second = checkedArith::div(a.second, b.second);
             if (second)
@@ -724,14 +709,14 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = std::monostate{}; },                            //
-                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                         // xor ?
-                 [&retVal](int a) { retVal = orNull(checkedArith::neg(a)); },                         //
-                 [&retVal](unsigned a) { retVal = (~a); },                                            // xor ?
-                 [&retVal](boost::rational<int> a) { retVal = orNull(checkedArith::neg(a)); },        //
-                 [&retVal](float a) { retVal = -a; },                                                 //
-                 [&retVal](double a) { retVal = -a; },                                                //
-                 [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },  //
+                 [&retVal](std::monostate) { retVal = std::monostate{}; },                      //
+                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                   // xor ?
+                 [&retVal](int a) { retVal = orNull(checkedArith::neg(a)); },                   //
+                 [&retVal](unsigned a) { retVal = (~a); },                                      // xor ?
+                 [&retVal](boost::rational<int> a) { retVal = orNull(checkedArith::neg(a)); },  //
+                 [&retVal](float a) { retVal = -a; },                                           //
+                 [&retVal](double a) { retVal = -a; },                                          //
+                 [&error](std::pair<int, int>) { error = "Operator 'negate' not defined for INTPAIR operands"; },
                  [&retVal](const std::pair<std::string, int> &a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
                  [&error](const std::string &) { error = "Operator 'negate' not defined for string operands"; }           //
              },
@@ -905,6 +890,11 @@ rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &pr
       case MULTIPLY:
       case DIVIDE:
       case POWER:
+        if (!pop(a) || !pop(b)) return evalError("Invalid expression: missing operand for binary operator");
+        // Sprawdzamy przed promocja: INTPAIR z liczba, napisem lub NULL tez jest bledem typu.
+        if (std::holds_alternative<std::pair<int, int>>(a) || std::holds_alternative<std::pair<int, int>>(b))
+          return evalError("Arithmetic operators are not defined for INTPAIR operands");
+        break;
       case CMP_EQUAL:
       case CMP_NOT_EQUAL:
       case CMP_LT:

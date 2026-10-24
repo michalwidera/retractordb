@@ -33,7 +33,7 @@
 ///   zwracają INTEGER 0 lub 1; INTPAIR i IDXPAIR w porównaniach odrzucać błędem Errc::Eval,
 /// - [expressionevaluator.expression-evaluator.9~1] wykonywać NEGATE: dla INTEGER, RATIONAL, FLOAT i DOUBLE zmieniać znak, dla BYTE i UINT odwracać
 ///   bity; BIT_NOT (~) dopuszczać wyłącznie dla BYTE i UINT; oba operatory przepuszczają NULL,
-/// - [expressionevaluator.expression-evaluator.10~1] dla INTPAIR wykonywać +, -, *, / po obu składowych i NEGATE przez zmianę obu znaków; dla IDXPAIR
+/// - [expressionevaluator.expression-evaluator.10~2] dla INTPAIR odrzucać ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER i NEGATE błędem Errc::Eval, także z operandem innego typu lub NULL; dla IDXPAIR
 ///   ADD łączy napisy i dodaje drugie składowe, SUBTRACT/MULTIPLY/DIVIDE zwracają pierwszą składową
 ///   odpowiednio "?? -"/"?? *"/"?? /" i wykonują działanie na drugich składowych, NEGATE dodaje prefiks
 ///   "-" do napisu i zmienia znak drugiej składowej; POWER dla obu rodzajów par odrzucać błędem Errc::Eval,

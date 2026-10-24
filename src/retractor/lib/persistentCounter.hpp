@@ -19,7 +19,7 @@
 */
 
 /// Obiekt klasy PersistentCounter powinien:
-/// - [persistentcounter.persistent-counter.1~1] przez read rozróżniać brak pliku (Missing), wartość (Value), plik, którego nie da się sprawdzić, otworzyć lub odczytać (Unreadable) oraz treść, która po obcięciu końcowych białych znaków nie jest w całości nieujemną liczbą całkowitą (Invalid), podając w detail przyczynę albo rozmiar i początek treści.
+/// - [persistentcounter.persistent-counter.1~2] przez read rozróżniać brak pliku (Missing), wartość (Value), plik, którego nie da się sprawdzić, otworzyć lub odczytać (Unreadable) oraz treść, która po obcięciu końcowych białych znaków nie jest w całości liczbą całkowitą z zakresu [0, INT_MAX) (Invalid), podając w detail przyczynę albo rozmiar i początek treści; INT_MAX odrzucać przed rezerwacją N+1.
 /// - [persistentcounter.persistent-counter.2~1] traktować brak pliku jako numer rotacji 0 wyłącznie wtedy, gdy brak został potwierdzony, a nie gdy samo sprawdzenie istnienia się nie powiodło.
 /// - [persistentcounter.persistent-counter.3~1] w create wczytywać numer N bieżącej sesji i przed zwróceniem obiektu zapisywać N+1, tak aby numer był zarezerwowany przed powstaniem pierwszego archiwum.
 /// - [persistentcounter.persistent-counter.4~1] zwracać z create Errc::IO dla pliku Unreadable lub Invalid oraz dla nieudanej rezerwacji N+1, nie zastępując numeru wartością zgadniętą.

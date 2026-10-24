@@ -350,8 +350,8 @@ CounterCheck checkRotationCounter(const qTree &plan) {
   }
   return {.refusal = std::format(
               "rotation counter file '{}' is unreadable ({}); a guessed rotation number could overwrite archives of previous "
-              "sessions - repair the file (a non-negative integer), or delete it to restart rotation from 0 (existing .old<N> "
-              "archives will then be overwritten)",
+              "sessions - repair the file (an integer from 0 to INT_MAX-1), or delete it to restart rotation from 0 (existing "
+              ".old<N> archives will then be overwritten)",
               path, reading.detail)};
 }
 

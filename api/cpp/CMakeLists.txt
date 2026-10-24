@@ -14,13 +14,16 @@ endif()
 # Sondy lokalne: API musi dzialac takze bez konfiguracji silnika.
 include(CheckCXXSourceCompiles)
 include(CheckCXXSymbolExists)
+include(CheckIncludeFileCXX)
+include(CMakePushCheckState)
+cmake_push_check_state()
 
 # Patrz cmake/PlatformChecks.cmake: na Apple SDK deklaruje takze funkcje nowsze
 # niz cel wdrozenia, a konsolidator dowiazuje je SLABO. Bez tego probe pipe2
 # wychodzi dodatni pod SDK 27, a binarium uruchomione pod macOS 26 skacze pod
 # NULL i ginie na SIGSEGV - tak padaly st_api_fake i st_api_real.
-if(APPLE)
-  set(CMAKE_REQUIRED_FLAGS "-Werror=unguarded-availability-new")
+if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  string(APPEND CMAKE_REQUIRED_FLAGS " -Werror=unguarded-availability-new")
 endif()
 # Prawdziwe WYWOLANIE, a nie sam adres symbolu: diagnostyka dostepnosci Apple
 # odpala sie pewnie dopiero na uzyciu.
@@ -34,7 +37,8 @@ check_cxx_source_compiles(
   RDB_API_HAS_PIPE2_CALLABLE)
 check_cxx_symbol_exists(POSIX_SPAWN_CLOEXEC_DEFAULT "spawn.h"
                         RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT)
-unset(CMAKE_REQUIRED_FLAGS)
+check_include_file_cxx("crt_externs.h" RDB_API_HAS_CRT_EXTERNS_H)
+cmake_pop_check_state()
 # Osobna nazwa w pamieci podrecznej: wpis RDB_API_HAS_PIPE2=1 zapisany przez
 # konfiguracje sprzed tej poprawki nie ma jak przeslonic nowej proby.
 if(RDB_API_HAS_PIPE2_CALLABLE)

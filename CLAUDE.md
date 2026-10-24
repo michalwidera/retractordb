@@ -65,6 +65,7 @@ CI: CircleCI. A push runs only the `commit` workflow, and only on branches `mast
 
 - **C++23**, clang-format Google style, 129-col limit, 2-space indent. Run `ninja cformat` before commit.
 - Source comments in Polish - intentional.
+- **Polish diacritics in comments are allowed** (human decision of 2026-10-24): `ą ć ę ł ń ó ś ź ż` may appear in comments and requirement bullets. Files written in ASCII Polish stay as they are; an edited comment follows the spelling of its surroundings and never strips diacritics from a comment that has them. The decision concerns comments only.
 - **Dashes:** Prefer the ASCII hyphen-minus (`-`, U+002D) in repository text. Use a typographic dash only when preserving an exact quotation or when the character itself is semantically significant.
 
 **Include order (5 blocks, blank-line separated):**

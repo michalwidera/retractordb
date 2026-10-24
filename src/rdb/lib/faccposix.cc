@@ -97,8 +97,8 @@ auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 Result<size_t> posixBinaryFile::count() {
   if (recordSize_ == 0) return fail(Errc::IO, initializationError_);
-  // Pojedynczy stat(). ENOENT to zwykly brak pliku - magazyn jeszcze nie zapisany albo
-  // po purge, ktory plik kasuje; stad 0 rekordow. Kazdy inny blad wraca jako Errc::IO, bo cicha
+  // Pojedynczy stat(). ENOENT to zwykly brak pliku przed pierwszym zapisem; stad 0 rekordow.
+  // purge oproznia istniejacy plik w miejscu. Kazdy inny blad wraca jako Errc::IO, bo cicha
   // wartosc jest tu grozniejsza od zatrzymania: 0 znaczy "magazyn pusty", wiec
   // storage::write zaczyna dopisywac od indeksu 0 po istniejacych danych.
   struct stat stat_buf;

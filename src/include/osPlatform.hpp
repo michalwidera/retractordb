@@ -82,7 +82,7 @@ struct ServiceIdentity {
 [[nodiscard]] ServiceIdentity detectServiceIdentity();
 
 /// Funkcja sharedMemoryBackingPath powinna:
-/// - [osplatform.shared-memory-backing-path.1~1] zwracać ścieżkę systemu plików, który niesie obiekty pamięci dzielonej procesu: "/dev/shm" na Linuksie i "/tmp" na Darwinie.
+/// - [osplatform.shared-memory-backing-path.1~2] zwracać ścieżkę zapasowego pomiaru nośnika obiektów IPC według RDB_HAS_BOOST_POSIX_SHM: "/dev/shm" dla backendu POSIX i "/tmp" dla backendu plikowego Boost.Interprocess.
 ///
 /// @note To, co trzeba zmierzyc, pytajac "ile zostalo miejsca na kolejki IPC". Na Darwinie Boost.Interprocess nie
 ///       uzywa shm_open (`_POSIX_SHARED_MEMORY_OBJECTS` jest ujemne), wiec segmenty sa zwyklymi plikami pod /tmp,

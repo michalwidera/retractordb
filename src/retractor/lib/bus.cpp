@@ -40,15 +40,6 @@ namespace {
 // wiec jego obecnosc jest dowodem, ze naglowek i muteks sa juz zainicjowane.
 constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 
-// Numer ukladu slotu. Niezgodnosc => odmowa podlaczenia (praca bez magistrali), bo dwie
-// instancje o roznym ukladzie czytalyby swoje sloty jako smiec.
-//
-// Pierwsza linia obrony jest jednak WERSJA W NAZWIE SEGMENTU (kSegmentName): binarki o roznych
-// ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
-// Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
-// przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 7;  // 7: pojemnosc slotu 148 strumieni i magazynow (kMaxPlanStreams)
-
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy
 // sa buforem na obciazona maszyne, nie oczekiwanym czasem.
@@ -123,6 +114,19 @@ struct BusMutex {
   std::uint64_t owner;
 };
 #endif
+
+// Numer ukladu slotu. Niezgodnosc => odmowa podlaczenia (praca bez magistrali), bo dwie
+// instancje o roznym ukladzie czytalyby swoje sloty jako smiec.
+//
+// Pierwsza linia obrony jest jednak WERSJA W NAZWIE SEGMENTU (kSegmentName): binarki o roznych
+// ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
+// Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
+// przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
+
+// Starsze bity rozrozniaja rodzaj i rozmiar zamka: oba zmieniaja przesuniecie slotow.
+// Sam rozmiar slotu nie wykrywa roznicy miedzy zamkiem atomowym a pthread_mutex_t.
+constexpr std::uint32_t kLayoutVersion =
+    7U | (RDB_HAS_ROBUST_MUTEX ? 0x100U : 0x200U) | (static_cast<std::uint32_t>(sizeof(BusMutex)) << 16);
 
 /// @requirements-exempt Segment: Uklad pamieci grupujacy naglowek, stan zamka i sloty magistrali.
 struct Segment {
@@ -482,7 +486,7 @@ struct Bus::Impl {
     if (rc == EOWNERDEAD) return {.ok = true, .ownerDied = true};
     if (rc == ENOTRECOVERABLE) {
       const std::string detail =
-          "bus mutex is unrecoverable (ENOTRECOVERABLE); remove /dev/shm/" + segmentName + " once no instance maps it";
+          "bus mutex is unrecoverable (ENOTRECOVERABLE); remove IPC object '" + segmentName + "' once no instance maps it";
       if (!unrecoverableReported.exchange(true)) SPDLOG_ERROR("xrdbbus: {}. Running WITHOUT name uniqueness.", detail);
       return {.detail = detail};
     }
@@ -555,7 +559,7 @@ struct Bus::Impl {
           !holder.unreadable &&
           (!holder.found || holder.zombie || (holderStart != 0 && static_cast<std::uint32_t>(holder.startTime) != holderStart));
       if (!holderDead && !warned && std::chrono::steady_clock::now() > deadline) {
-        SPDLOG_WARN("xrdbbus: still waiting for bus lock held by live pid {} after {} s.", holderPid, kLongLockWait.count());
+        SPDLOG_ERROR("xrdbbus: still waiting for bus lock held by live pid {} after {} s.", holderPid, kLongLockWait.count());
         warned = true;
       }
 
@@ -657,8 +661,8 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     IPC::offset_t size{0};
     while (impl->shm->get_size(size) && std::cmp_less(size, sizeof(Segment))) {
       if (std::chrono::steady_clock::now() > deadline) {
-        SPDLOG_WARN("xrdbbus: segment '{}' stayed undersized ({} B, expected {} B); remove /dev/shm/{} to repair.", name, size,
-                    sizeof(Segment), name);
+        SPDLOG_WARN("xrdbbus: segment '{}' stayed undersized ({} B, expected {} B); remove IPC object '{}' to repair.", name,
+                    size, sizeof(Segment), name);
         impl->shm.reset();
         removeUnpublishedSegment(creator, name);
         return;
@@ -718,7 +722,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
         // Tworca segmentu zginal miedzy create_only a zapisem magic. Tutaj segmentu nie kasujemy:
         // mapujemy go my i byc moze inni. Skasuje go ostatni wychodzacy albo sprzatacz, gdy nikt
         // juz go nie mapuje (protokol obecnosci, bus.hpp).
-        SPDLOG_ERROR("xrdbbus: segment '{}' was never initialized; remove /dev/shm/{} to repair.", name, name);
+        SPDLOG_ERROR("xrdbbus: segment '{}' was never initialized; remove IPC object '{}' to repair.", name, name);
         impl->segment = nullptr;
         return;
       }
@@ -730,7 +734,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
       impl->segment->slotCount != kMaxSlots || impl->segment->slotSize != sizeof(Slot)) {
     SPDLOG_ERROR(
         "xrdbbus: segment '{}' has a foreign or incompatible layout (version {}, {} slots of {} B); "
-        "remove /dev/shm/{} to repair. Running without the bus.",
+        "remove IPC object '{}' to repair. Running without the bus.",
         name, impl->segment->layoutVersion, impl->segment->slotCount, impl->segment->slotSize, name);
     impl->segment = nullptr;
   }
@@ -790,7 +794,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   // czy sciezki licznika. Obciecie ma byc jednak glosne, bo `xqry --bus` pokaze wtedy napis
   // krotszy niz rzeczywisty i operator zobaczy przyciety identyfikator bez zadnego wyjasnienia.
   if (request.unit.size() >= kUnitNameSize)
-    SPDLOG_WARN("Systemd unit name is longer than {} characters and will be truncated in the bus slot: {}", kUnitNameSize - 1,
+    SPDLOG_WARN("Service unit name is longer than {} characters and will be truncated in the bus slot: {}", kUnitNameSize - 1,
                 request.unit);
   if (request.queryFile.size() >= kQueryFileSize)
     SPDLOG_WARN("Query file path is longer than {} characters and will be truncated in the bus slot: {}", kQueryFileSize - 1,

@@ -44,7 +44,7 @@ def wait_for_stream(stream):
 shutil.rmtree("temp", ignore_errors=True)
 Path("temp").mkdir()
 Path("data.txt").write_text("1\n", encoding="ascii")
-base = "STORAGE 'temp'\nDECLARE a INTEGER STREAM src, 0.05 FILE 'data.txt'\n"
+base = "STORAGE 'temp'\nDECLARE a INTEGER STREAM src, 0.05 TEXTFILE 'data.txt'\n"
 Path("query.rql").write_text(base + "SELECT a+1 STREAM alpha FROM src\n", encoding="ascii")
 Path("reset.rql").write_text(base + "SELECT a+3 STREAM beta FROM src\n", encoding="ascii")
 
@@ -69,7 +69,8 @@ try:
     # Staly prefiks v7: magic, layoutVersion, slotCount, slotSize, reserved.
     # Nie kopiujemy ukladu Slot ani zaleznego od platformy pthread_mutex_t.
     magic, version, count, slot_size, _ = struct.unpack_from("=QIIII", mapping)
-    assert magic == 0x5852444242555300 and version == 7 and count == 32
+    assert magic == 0x5852444242555300 and version & 0xFF == 7 and count == 32
+    assert (version >> 8) & 0xFF in (1, 2) and version >> 16 > 0
     assert slot_size > 0 and len(mapping) >= 24 + count * slot_size
     struct.pack_into("=I", mapping, 12, 4096)
 

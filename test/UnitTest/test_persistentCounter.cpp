@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -309,12 +310,12 @@ TEST_F(PersistentCounterTest, trailing_newline_is_accepted) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, read_missing_file_is_missing) {
-  // covers: persistentcounter.persistent-counter.1~1
+  // covers: persistentcounter.persistent-counter.1~2
   EXPECT_EQ(PersistentCounter::read(counterPath()).state, PersistentCounter::Reading::State::Missing);
 }
 
 TEST_F(PersistentCounterTest, read_valid_file_is_value_and_reserves_nothing) {
-  // covers: persistentcounter.persistent-counter.1~1
+  // covers: persistentcounter.persistent-counter.1~2
   std::ofstream(counterPath()) << "7\n";
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Value);
@@ -327,7 +328,7 @@ TEST_F(PersistentCounterTest, read_valid_file_is_value_and_reserves_nothing) {
 
 // Odczytana w calosci tresc, ktora nie jest liczba, to wadliwy stan planu (K2), nie srodowisko.
 TEST_F(PersistentCounterTest, read_empty_file_is_invalid) {
-  // covers: persistentcounter.persistent-counter.1~1
+  // covers: persistentcounter.persistent-counter.1~2
   std::ofstream(counterPath()).close();
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Invalid);
@@ -338,7 +339,7 @@ TEST_F(PersistentCounterTest, read_empty_file_is_invalid) {
 // zero bajtow, wiec awaria odczytu udawala pusty plik - czyli blad planu zamiast srodowiska.
 // Katalog, a nie chmod 000, bo uprawnienia nie zatrzymuja roota w kontenerze CI.
 TEST_F(PersistentCounterTest, read_directory_is_unreadable_not_invalid) {
-  // covers: persistentcounter.persistent-counter.1~1
+  // covers: persistentcounter.persistent-counter.1~2
   std::filesystem::create_directory(counterPath());
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);
@@ -465,7 +466,7 @@ TEST_F(PersistentCounterTest, directory_sync_failure_logs_but_keeps_the_complete
 }
 
 TEST_F(PersistentCounterTest, read_retries_interrupted_and_short_reads_without_reserving) {
-  // covers: persistentcounter.persistent-counter.1~1
+  // covers: persistentcounter.persistent-counter.1~2
   std::ofstream(counterPath()) << "98\n";
   interruptCounterRead = true;
   const auto value     = PersistentCounter::read(counterPath());
@@ -477,7 +478,7 @@ TEST_F(PersistentCounterTest, read_retries_interrupted_and_short_reads_without_r
 }
 
 TEST_F(PersistentCounterTest, existence_failure_is_unreadable_instead_of_missing) {
-  // covers: persistentcounter.persistent-counter.1~1, persistentcounter.persistent-counter.2~1
+  // covers: persistentcounter.persistent-counter.1~2, persistentcounter.persistent-counter.2~1
   std::filesystem::create_symlink(counterFile, counterPath());
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);
@@ -486,4 +487,21 @@ TEST_F(PersistentCounterTest, existence_failure_is_unreadable_instead_of_missing
   ASSERT_RDB_ERROR(result, rdb::Errc::IO);
   EXPECT_EQ(result.error().err(), EIO);
   EXPECT_TRUE(std::filesystem::is_symlink(counterPath()));
+}
+
+TEST_F(PersistentCounterTest, exhausted_counter_is_rejected_without_overwriting_the_file) {
+  // covers: persistentcounter.persistent-counter.1~2, persistentcounter.persistent-counter.4~1
+  const auto exhausted = std::to_string(std::numeric_limits<int>::max());
+  std::ofstream(counterPath()) << exhausted;
+  EXPECT_EQ(PersistentCounter::read(counterPath()).state, PersistentCounter::Reading::State::Invalid);
+  EXPECT_RDB_ERROR(PersistentCounter::create(counterPath()), rdb::Errc::IO);
+  EXPECT_EQ(counterBytes(counterPath()), exhausted);
+
+  std::ofstream(counterPath()) << std::numeric_limits<int>::max() - 1;
+  auto last = PersistentCounter::create(counterPath());
+  ASSERT_RDB_OK(last);
+  EXPECT_EQ((*last)->getCount(), std::numeric_limits<int>::max() - 1);
+  EXPECT_EQ(counterBytes(counterPath()), exhausted);
+  EXPECT_RDB_ERROR(PersistentCounter::create(counterPath()), rdb::Errc::IO);
+  EXPECT_EQ(counterBytes(counterPath()), exhausted);
 }

@@ -10,7 +10,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/interprocess/detail/workaround.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/rational.hpp>
 
@@ -24,12 +23,6 @@
 #include <sys/statvfs.h>
 #else
 #error "Budzet pamieci dzielonej wymaga statvfs i fstatvfs; brak zaimplementowanego zamiennika."
-#endif
-
-// Galaz sondy wybiera proba z CMakeLists.txt; ten plik sprawdza, ze widzi to samo makro Boosta.
-// Rozjazd znaczylby, ze proba kompilowala sie z innymi naglowkami niz silnik.
-#if RDB_HAS_BOOST_POSIX_SHM != defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
-#error "RDB_HAS_BOOST_POSIX_SHM nie zgadza sie z makrem Boost.Interprocess; rekonfiguruj build."
 #endif
 
 namespace {

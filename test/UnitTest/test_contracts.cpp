@@ -517,7 +517,7 @@ TEST(RequirementContractsDeathTest, oversized_from_and_unknown_fields_are_invari
 }
 
 TEST(RequirementContracts, catalogue_fallback_values_and_process_snapshot) {
-  // covers: osplatform.inspect-process.1~1, osplatform.inspect-process.2~1, osplatform.shared-memory-backing-path.1~1
+  // covers: osplatform.inspect-process.1~1, osplatform.inspect-process.2~1, osplatform.shared-memory-backing-path.1~2
   // covers: rqlfunctions.find-rql-function.1~1, rqlfunctions.find-rql-function.2~1, converttypes.null-fallback-value.2~1
   const auto canonical = rdb::findRqlFunction("To_InTeGeR");
   ASSERT_TRUE(canonical.has_value());
@@ -535,7 +535,7 @@ TEST(RequirementContracts, catalogue_fallback_values_and_process_snapshot) {
   EXPECT_FALSE(self.unreadable);
   EXPECT_FALSE(self.zombie);
   EXPECT_NE(self.startTime, 0U);
-  EXPECT_EQ(osplat::sharedMemoryBackingPath(), RDB_OS_LINUX ? "/dev/shm" : "/tmp");
+  EXPECT_EQ(osplat::sharedMemoryBackingPath(), RDB_HAS_BOOST_POSIX_SHM ? "/dev/shm" : "/tmp");
 }
 
 TEST(RequirementContracts, storage_descriptor_keeps_schema_and_source_or_output_configuration) {

@@ -156,3 +156,26 @@ TEST_P(BusSlotCount, NewAttachmentStillRejectsIncompatibleHeader) {
 }
 
 INSTANTIATE_TEST_SUITE_P(CorruptedHeader, BusSlotCount, ::testing::Values(0U, 4096U));
+
+TEST(BusLayout, MutexVariantAndSizeArePartOfTheCompatibilityVersion) {
+  // covers: bus.bus.17~1
+  const std::string name = "rdb_mutex_layout_" + std::to_string(getpid());
+  bus::Bus owner(name);
+  ASSERT_TRUE(owner.attached());
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment                 = static_cast<bus::Segment *>(mapping.get_address());
+  const auto native             = segment->layoutVersion;
+  const std::uint32_t otherKind = RDB_HAS_ROBUST_MUTEX ? 0x200U : 0x100U;
+  const std::uint32_t otherSize = RDB_HAS_ROBUST_MUTEX ? sizeof(std::uint64_t) : sizeof(pthread_mutex_t);
+  const std::uint32_t foreign   = 7U | otherKind | (otherSize << 16);
+  EXPECT_NE(native, foreign);
+  for (const auto version : {foreign, std::uint32_t{7}}) {
+    segment->layoutVersion = version;
+    bus::Bus incompatible(name, false);
+    EXPECT_FALSE(incompatible.attached());
+  }
+  segment->layoutVersion = native;
+  bus::Bus compatible(name, false);
+  EXPECT_TRUE(compatible.attached());
+}

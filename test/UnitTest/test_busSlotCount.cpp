@@ -87,7 +87,7 @@ TEST_F(BusRepairSeqlock, UnrecoverableMutexReportsRecoveryInstructions) {
 
   BusLogCapture log;
   const std::string expected =
-      "bus mutex is unrecoverable (ENOTRECOVERABLE); remove /dev/shm/" + name + " once no instance maps it";
+      "bus mutex is unrecoverable (ENOTRECOVERABLE); remove IPC object '" + name + "' once no instance maps it";
   const auto check = [&](const bus::ClaimResult &result) {
     EXPECT_EQ(result.status, bus::ClaimStatus::Unavailable);
     EXPECT_EQ(result.detail, expected);

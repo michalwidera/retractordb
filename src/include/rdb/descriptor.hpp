@@ -124,6 +124,7 @@ class Descriptor {
     fieldMappingsDirty_       = other.fieldMappingsDirty_;
     other.dropFieldMappings();
     fields_ = std::move(other.fields_);
+    other.fields_.clear();
     return *this;
   }
 

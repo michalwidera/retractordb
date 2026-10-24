@@ -493,3 +493,41 @@ TEST(qTree, replaceAll_preserves_capacity_and_copy_assignment_carries_revision) 
   EXPECT_NE(copy.planRevision(), plan.planRevision());
   EXPECT_EQ(plan.size(), 1U);
 }
+
+TEST(qTree, move_transfers_revision_and_restamps_the_emptied_source) {
+  // covers: qtree.q-tree.11~1
+  qTree source;
+  source.push_back(makeQuery("source"));
+  source.maxCapacity["source"] = 42;
+  source.variables.push_back({"gain", 7, 1});
+  const auto revision = source.planRevision();
+  qTree copy          = source;
+  qTree target(std::move(source));
+  EXPECT_EQ(target.planRevision(), revision);
+  ASSERT_EQ(target.size(), 1U);
+  EXPECT_EQ(target[0].id, "source");
+  EXPECT_EQ(target.maxCapacity.at("source"), 42);
+  ASSERT_EQ(target.variables.size(), 1U);
+  EXPECT_EQ(target.variables[0].name, "gain");
+  EXPECT_TRUE(source.empty());
+  EXPECT_NE(source.planRevision(), revision);
+  EXPECT_EQ(copy.planRevision(), revision);
+  source.push_back(makeQuery("reused"));
+  EXPECT_NE(source.planRevision(), target.planRevision());
+
+  qTree destination;
+  destination.push_back(makeQuery("replaced"));
+  destination = std::move(target);
+  EXPECT_EQ(destination.planRevision(), revision);
+  EXPECT_EQ(destination[0].id, "source");
+  EXPECT_EQ(destination.maxCapacity.at("source"), 42);
+  ASSERT_EQ(destination.variables.size(), 1U);
+  EXPECT_EQ(destination.variables[0].name, "gain");
+  EXPECT_TRUE(target.empty());
+  EXPECT_NE(target.planRevision(), revision);
+  auto *self  = &destination;
+  destination = std::move(*self);
+  EXPECT_EQ(destination.planRevision(), revision);
+  ASSERT_EQ(destination.size(), 1U);
+  EXPECT_EQ(destination[0].id, "source");
+}

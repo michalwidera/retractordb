@@ -27,9 +27,8 @@
 // niego przez _NSGetEnviron() z <crt_externs.h>. Ten kod jest dzis budowany jako
 // biblioteka STATYCZNA, wiec deklaracja `extern` by wystarczyla - ale przelaczenie
 // celu na SHARED zamienialoby to w blad linkowania, i to jedyny moment, w ktorym
-// dalo by sie o tym dowiedziec. Rozroznienie jest tu po nazwie systemu, a nie po
-// probie, bo _NSGetEnviron jest interfejsem Apple'a, a nie opcjonalna funkcja POSIX.
-#if defined(__APPLE__) && defined(__MACH__)
+// dalo by sie o tym dowiedziec. Obecnosc naglowka sprawdza lokalna sonda CMake.
+#if RDB_API_HAS_CRT_EXTERNS_H
 #include <crt_externs.h>
 #define environ (*_NSGetEnviron())
 #else

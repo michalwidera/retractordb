@@ -20,6 +20,7 @@
 
 #include "busRepairSeqlockTests.hpp"
 #include "busSlotCountTests.hpp"
+#include "logCapture.hpp"
 #include "unreadableProcess.hpp"
 
 namespace {
@@ -60,13 +61,14 @@ class FallbackLock : public ::testing::Test {
 };
 
 TEST_F(FallbackLock, LiveStoppedOwnerKeepsLockBeyondDiagnosticDeadline) {
-  // covers: bus.bus.3~1
+  // covers: bus.bus.3~1, bus.bus.18~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
   IPC::mapped_region mapping(object, IPC::read_write);
   auto *segment = static_cast<bus::Segment *>(mapping.get_address());
   stopOwner(segment);
+  LogCapture log;
   auto claimant = std::async(std::launch::async, [&] { return candidate.claim({.name = "candidate", .streams = {"dst"}}); });
   // Stary kod po 10 s przejmowal zamek i zerowal niedokonczony slot zywego procesu.
   EXPECT_EQ(claimant.wait_for(11s), std::future_status::timeout);
@@ -75,6 +77,8 @@ TEST_F(FallbackLock, LiveStoppedOwnerKeepsLockBeyondDiagnosticDeadline) {
   waitpid(child, nullptr, 0);
   child = -1;
   EXPECT_EQ(claimant.get().status, bus::ClaimStatus::Claimed);
+  EXPECT_NE(log.text().find("[error]"), std::string::npos);
+  EXPECT_NE(log.text().find("still waiting for bus lock held by live pid"), std::string::npos);
 }
 
 // Wlasciciel zamka, ktorego wpisu nie da sie odczytac (hidepid / ProtectProc), nie jest martwy:

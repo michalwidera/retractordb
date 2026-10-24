@@ -806,7 +806,7 @@ int main(int argc, char *argv[]) try {
           const bool userScope = peer.scope == FlockServiceGuard::PeerInfo::Scope::User;
           const int rc         = servicecontrol::restartService(userScope, peer.unit);
           if (rc != 0) {
-            std::cerr << "Failed to restart service unit '" << peer.unit << "' (systemctl rc=" << rc << ").";
+            std::cerr << "Failed to restart service unit '" << peer.unit << "' (service manager rc=" << rc << ").";
             if (!userScope) std::cerr << " A system unit restart requires privileges (run with sudo).";
             std::cerr << '\n';
             return system::errc::operation_not_permitted;

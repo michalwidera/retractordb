@@ -95,8 +95,8 @@ struct FileInterface {
   /// @brief Liczba rekordów w magazynie.
   ///
   /// Kontrakt awarii należy do interfejsu, nie do implementacji: liczba nie ma wartości
-  /// oznaczającej błąd. Magazyn, którego nośnika jeszcze nie ma - plik nieutworzony albo
-  /// usunięty przez purge - jest magazynem pustym i zwraca 0. Każda inna awaria odczytu
+  /// oznaczającej błąd. Magazyn, którego pliku jeszcze nie ma, albo opróżniony w miejscu
+  /// przez purge jest pusty i zwraca 0. Każda inna awaria odczytu
   /// rozmiaru wraca jako błąd Errc::IO - nigdy jako liczba.
   ///
   /// Trzeciej odpowiedzi nie ma, bo wywołujący czyta tę liczbę wyłącznie jako rozmiar.

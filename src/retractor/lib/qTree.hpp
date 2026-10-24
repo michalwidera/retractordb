@@ -48,6 +48,7 @@ struct planVariable {
 /// - [qtree.q-tree.8~1] przez getDelta zwracać interwał wskazanego strumienia.
 /// - [qtree.q-tree.9~1] przez getAvailableTimeIntervals zwracać zbiór interwałów wszystkich węzłów poza dyrektywami, traktując zerowy interwał węzła niebędącego dyrektywą jako naruszenie niezmiennika.
 /// - [qtree.q-tree.10~1] przez dumpCore wypisywać tabelę z pozycją, interwałem, pojemnością i nazwą każdego węzła.
+/// - [qtree.q-tree.11~1] przy przeniesieniu przekazywać zawartość i rewizję do celu, opróżniać źródło i nadawać mu nową rewizję; samoprzypisanie przenoszące pozostawia drzewo bez zmian.
 class qTree : private std::vector<query> {
   /* Topological sort vars */
   std::map<std::string, bool> visited_;
@@ -65,6 +66,12 @@ class qTree : private std::vector<query> {
   std::uint64_t planRevision_{nextPlanRevision()};
 
  public:
+  qTree()                         = default;
+  qTree(const qTree &)            = default;
+  qTree &operator=(const qTree &) = default;
+  qTree(qTree &&other) noexcept;
+  qTree &operator=(qTree &&other) noexcept;
+
   // Powierzchnia wektora wystawiona jawnie - lista uzywana przez drzewo, nic ponadto.
   // Odczyt:
   using std::vector<query>::at;
