@@ -474,6 +474,46 @@ TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
   EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
 }
 
+// Po #512 budowa instancji zwraca Result. Porazka DRUGIEJ instancji musi
+// usunac takze pierwsza, juz zbudowana lokalnie, zanim cokolwiek trafi do qSet.
+TEST_F(xschema, addQueriesToModel_second_construction_failure_is_all_or_nothing) {
+  // covers: datamodel.data-model.3~1
+  const auto directory = std::filesystem::absolute("second_pass_rollback");
+  std::filesystem::remove_all(directory);
+  std::filesystem::create_directory(directory);
+  struct Cleanup {
+    std::filesystem::path path;
+    ~Cleanup() { std::filesystem::remove_all(path); }
+  } cleanup{directory};
+  std::ofstream(directory / "blocked") << "not a directory";
+  query first     = coreInstance["str2"];
+  first.id        = "rollback_first";
+  first.filename  = (directory / "good").string();
+  query second    = first;
+  second.id       = "rollback_second";
+  second.filename = (directory / "blocked" / "out").string();
+  coreInstance.push_back(first);
+  coreInstance.push_back(second);
+  const auto sizeBefore = dataArea->qSet.size();
+  const auto *existing  = dataArea->qSet.at("str2").get();
+
+  const auto refusal = dataArea->addQueriesToModel({first.id, second.id});
+  EXPECT_NE(refusal.find(second.id), std::string::npos) << refusal;
+  EXPECT_TRUE(std::filesystem::exists(directory / "good")) << "pierwsza instancja nie zostala zbudowana";
+  EXPECT_FALSE(dataArea->qSet.contains(first.id));
+  EXPECT_FALSE(dataArea->qSet.contains(second.id));
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+  EXPECT_EQ(dataArea->qSet.at("str2").get(), existing);
+
+  // Ta sama para po naprawie katalogu ma przejsc: stale odmawianie nie jest wycofaniem.
+  std::filesystem::remove(directory / "blocked");
+  std::filesystem::create_directory(directory / "blocked");
+  ASSERT_EQ(dataArea->addQueriesToModel({first.id, second.id}), "");
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore + 2);
+  EXPECT_TRUE(dataArea->qSet.contains(first.id));
+  EXPECT_TRUE(dataArea->qSet.contains(second.id));
+}
+
 // ============================================================
 // Pozycja splaszczona okna AGSE poza zakresem int
 // ============================================================

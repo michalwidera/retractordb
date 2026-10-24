@@ -384,9 +384,10 @@ TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
   // Polityke przywracamy ZAWSZE i przed asercja: gdyby test zostawil watek
   // testowy pod SCHED_FIFO, kazdy nastepny test w tym binarium biegl by z
   // priorytetem czasu rzeczywistego.
-  pthread_setschedparam(pthread_self(), policyBefore, &paramBefore);
+  ASSERT_EQ(pthread_setschedparam(pthread_self(), policyBefore, &paramBefore), 0);
 
-  if (activated) EXPECT_EQ(policyAfter, SCHED_FIFO);
+  if (!activated) GTEST_SKIP() << "jadro odmowilo rzeczywistej aktywacji RT; kontrakt sprawdza ut_executor_rt_pthread";
+  EXPECT_EQ(policyAfter, SCHED_FIFO);
 }
 
 #endif
@@ -406,15 +407,15 @@ TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
 
 TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
   // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1, executorrt.rt-keep-thread-off-rt-cpus.2~1
-  // covers: executorrt.rt-keep-thread-off-rt-cpus.3~1
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.3~2, executorrt.rt-keep-thread-off-rt-cpus.5~1
   struct Restore {
     ~Restore() { mockAffinity = false; }
   } restore;
   mockAffinity = true;
-  for (int scenario = 0; scenario < 5; ++scenario) {
+  for (int scenario = 0; scenario < 6; ++scenario) {
     SCOPED_TRACE(scenario);
     affinityReadError  = scenario == 1 ? EPERM : 0;
-    affinityWriteError = scenario == 3 ? EINVAL : 0;
+    affinityWriteError = scenario == 3 ? EPERM : scenario == 5 ? EINVAL : 0;
     affinityOnline     = scenario == 2 ? 0 : 3;
     affinityWrites     = 0;
     CPU_ZERO(&callingMask);
@@ -428,7 +429,7 @@ TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
     const bool moved  = rtKeepThreadOffRtCpus(thread);
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(moved, scenario == 0);
-    EXPECT_EQ(affinityWrites, scenario == 0 || scenario == 3 ? 1 : 0);
+    EXPECT_EQ(affinityWrites, scenario == 0 || scenario == 3 || scenario == 5 ? 1 : 0);
     if (scenario == 0) {
       EXPECT_TRUE(pthread_equal(writtenThread, thread));
       EXPECT_EQ(CPU_COUNT(&writtenMask), 2);
@@ -437,8 +438,8 @@ TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
       EXPECT_TRUE(CPU_ISSET(2, &writtenMask));
       EXPECT_TRUE(output.contains("[INFO]"));
       EXPECT_TRUE(output.contains("auxiliary cores: 2"));
-    } else if (scenario == 4) {
-      EXPECT_TRUE(output.empty());
+    } else if (scenario == 4 || scenario == 5) {
+      EXPECT_TRUE(output.empty()) << output;
     } else {
       EXPECT_TRUE(output.contains("[WARN]"));
       const char *reason = scenario == 1 ? "read RT thread affinity" : scenario == 2 ? "online cores" : "move the comms thread";
@@ -449,16 +450,18 @@ TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
 
 TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
   // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1
-  if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
-
   cpu_set_t original;
   CPU_ZERO(&original);
   ASSERT_EQ(sched_getaffinity(0, sizeof(original), &original), 0);
+  if (CPU_COUNT(&original) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch dozwolonych rdzeni";
+  int rtCpu = 0;
+  while (!CPU_ISSET(rtCpu, &original))
+    ++rtCpu;
 
   // Udajemy wątek RT przypięty do jednego rdzenia - to konfiguracja kampanii.
   cpu_set_t pinned;
   CPU_ZERO(&pinned);
-  CPU_SET(0, &pinned);
+  CPU_SET(rtCpu, &pinned);
   ASSERT_EQ(sched_setaffinity(0, sizeof(pinned), &pinned), 0);
 
   std::atomic<bool> stop{false};
@@ -482,7 +485,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
 
   ASSERT_TRUE(moved) << "watek pomocniczy nie zostal przeniesiony poza przypiety rdzen RT";
   ASSERT_EQ(rc, 0);
-  EXPECT_FALSE(CPU_ISSET(0, &auxMask)) << "watek pomocniczy nadal dzieli rdzen z watkiem RT";
+  EXPECT_FALSE(CPU_ISSET(rtCpu, &auxMask)) << "watek pomocniczy nadal dzieli rdzen z watkiem RT";
   EXPECT_GT(CPU_COUNT(&auxMask), 0) << "watek pomocniczy zostal bez zadnego rdzenia";
 }
 
@@ -496,12 +499,22 @@ TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
   cpu_set_t original;
   CPU_ZERO(&original);
   ASSERT_EQ(sched_getaffinity(0, sizeof(original), &original), 0);
+  if (CPU_COUNT(&original) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch dozwolonych rdzeni";
 
   cpu_set_t all;
   CPU_ZERO(&all);
   for (long cpu = 0; cpu < online && cpu < CPU_SETSIZE; ++cpu)
     CPU_SET(static_cast<int>(cpu), &all);
   if (sched_setaffinity(0, sizeof(all), &all) != 0) GTEST_SKIP() << "brak prawa do rozszerzenia powinowactwa";
+  // Cpuset przycina maske po cichu i zwraca sukces; watek RT bylby wtedy przypiety,
+  // a test przechodzilby przez odmowe przeniesienia zamiast przez brak przypiecia.
+  cpu_set_t widened;
+  CPU_ZERO(&widened);
+  ASSERT_EQ(sched_getaffinity(0, sizeof(widened), &widened), 0);
+  if (!CPU_EQUAL(&widened, &all)) {
+    ASSERT_EQ(sched_setaffinity(0, sizeof(original), &original), 0);
+    GTEST_SKIP() << "powinowactwa nie da sie rozszerzyc na wszystkie rdzenie online";
+  }
 
   std::atomic<bool> stop{false};
   std::thread aux([&stop] {

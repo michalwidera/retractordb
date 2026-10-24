@@ -336,6 +336,9 @@ bool rtKeepThreadOffRtCpus([[maybe_unused]] pthread_t handle) {
   }
 
   if (const int rc = pthread_setaffinity_np(handle, sizeof(auxCpus), &auxCpus); rc != 0) {
+    // Maska jest niepusta, wiec EINVAL znaczy, ze cpuset nie dopuszcza zadnego rdzenia
+    // dopelnienia: watek RT widzi wszystkie dozwolone rdzenie - jak przy pustym dopelnieniu.
+    if (rc == EINVAL) return false;
     std::cout << "[WARN] RT: could not move the comms thread off the RT cores: " << strerror(rc) << "\n";
     return false;
   }

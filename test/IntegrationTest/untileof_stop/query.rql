@@ -4,5 +4,5 @@
 
 STORAGE 'temp'
 
-DECLARE a INTEGER STREAM src, 1/2 FILE 'data.txt'
+DECLARE a INTEGER STREAM src, 1/2 TEXTFILE 'data.txt'
 SELECT a*2 STREAM dst FROM src

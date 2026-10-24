@@ -11,3 +11,11 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
+
+# covers: executorsm.executorsm.13~1
+add_test(
+  NAME ${TestID}-throw
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash run_throw.sh)
+
+set_tests_properties(${TestID}-throw PROPERTIES TIMEOUT 60)

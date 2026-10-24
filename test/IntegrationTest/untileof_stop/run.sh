@@ -45,7 +45,7 @@ d2=$(file_size two/d2)
 
 echo "d1=${d1} B  d2=${d2} B"
 
-if [ "$d1" != "$d2" ]; then
+if [ "$d1" -ne 12 ] || [ "$d2" -ne 12 ]; then
   echo "FAIL: przebieg mial sie zatrzymac na krotszym zrodle (d1=${d1} B, d2=${d2} B)"
   exit 1
 fi

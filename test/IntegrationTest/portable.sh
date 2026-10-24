@@ -16,7 +16,7 @@
 # Rozmiar pliku w bajtach. Zastepuje `stat -c %s` (GNU) i `stat -f %z` (BSD)
 # jednym wywolaniem, ktore jest w POSIX-ie. `tr -d ' '` jest konieczne: BSD `wc`
 # wyrownuje liczbe spacjami, a `test "  16" -gt 8` nie jest liczba dla `test`.
-# Plik nieistniejacy daje 0, dokladnie jak dotychczasowe `|| echo 0`.
+# Plik nieistniejacy daje 0, wiec sama rownosc rozmiarow nie dowodzi istnienia plikow.
 file_size() {
   [ -f "$1" ] || { echo 0; return 0; }
   wc -c <"$1" | tr -d ' '

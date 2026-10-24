@@ -4,7 +4,7 @@
 # i wobec wyroczni niezaleznej oracle.py (czy wynik jest POPRAWNY wedlug modelu jezyka).
 #
 # Wypis `<plan>.out`: rekordy kazdego strumienia SELECT przez `xtrdb list`, typy pol z `.desc`
-# i lista plikow zrzutu - reguly korpusu nie maja prawa odpalic.
+# i lista plikow zrzutu. Wyrocznia czyta tez binarne wartosci FLOAT/DOUBLE i zawartosc DUMP.
 set -e
 . "$(dirname "$0")/../portable.sh"
 export LC_ALL=C
@@ -44,6 +44,6 @@ for rql in "${plans[@]}"; do
     (cd temp && find . -name '*_dump*' | sort)
   } > "$plan.out"
   bash ../compare.sh --ignore-eol "$plan.pattern" "$plan.out" || status=1
-  python3 oracle.py "$rql" "$plan.out" || status=1
+  python3 oracle.py "$rql" "$plan.out" temp || status=1
 done
 exit $status

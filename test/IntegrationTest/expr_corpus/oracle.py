@@ -4,7 +4,9 @@
 Liczy kazde pole kazdego rekordu planu z definicji jezyka, nie z kodu silnika: czyta plan
 `.rql` i dane `.txt`, parsuje wyrazenia wlasnym parserem i liczy je w Pythonie na modelu
 typow RQL. Potem porownuje z tym, co silnik zapisal (wypis `xtrdb` zebrany przez run.sh),
-razem z typem kazdego pola z `.desc`.
+razem z typem kazdego pola z `.desc`. FLOAT/DOUBLE sprawdza tez bezposrednio z bajtow
+magazynu, bo wypis xtrdb z szescioma cyframi znaczacymi gubi precyzje. DUMP porownuje
+z zakresem rekordow wskazanym przez ostatnie prawdziwe wyzwolenie reguly.
 
 Model typow (kontrakt, nie implementacja):
 
@@ -501,8 +503,8 @@ def load_plan(plan_path):
         streams[m.group(2)] = read_rows(base / m.group(3), types)
     for m in re.finditer(r"^SELECT\s+(.*?)\s+STREAM\s+(\w+)\s+FROM\s+(AVG\s*\(\s*\w+\s*\)|\S+)\s*$", text, re.M):
         selects.append((m.group(2), split_top(m.group(1)), m.group(3)))
-    for m in re.finditer(r"^RULE\s+(\w+)\s+ON\s+(\w+)\s+WHEN\s+(.*?)\s+DO\b", text, re.M):
-        rules.append((m.group(1), m.group(2), m.group(3)))
+    for m in re.finditer(r"^RULE\s+(\w+)\s+ON\s+(\w+)\s+WHEN\s+(.*?)\s+DO\s+DUMP\s+(-?\d+)\s+TO\s+(-?\d+)\s*$", text, re.M):
+        rules.append((m.group(1), m.group(2), m.group(3), int(m.group(4)), int(m.group(5))))
     for keyword, count in (("DECLARE", len(streams)), ("SELECT", len(selects)), ("RULE", len(rules))):
         if len(re.findall(rf"^\s*{keyword}\b", text, re.M)) != count:
             raise ValueError(f"{plan_path}: nierozpoznane lub powtorzone polecenie {keyword}")
@@ -567,11 +569,53 @@ def matches(expected, text):
     if expected.type in (FLOAT, DOUBLE):
         if math.isnan(expected.val):
             return text.lstrip("-") == "nan"
+        # Tylko wypis szesciocyfrowy; check_binary_floats osobno sprawdza wartosc magazynu.
         return math.isclose(float(text), expected.val, rel_tol=1e-5, abs_tol=1e-6)
     return text == expected.val
 
 
-def check_plan(plan_path, out_path):
+def storage_layout(directory, name):
+    descriptor = (directory / (name + ".desc")).read_text()
+    fields = re.findall(r"\b(BYTE|INTEGER|UINT|RATIONAL|FLOAT|DOUBLE|STRING)\s+\w+(?:\[(\d+)\])?", descriptor)
+    sizes = {"BYTE": 1, "INTEGER": 4, "UINT": 4, "RATIONAL": 8, "FLOAT": 4, "DOUBLE": 8, "STRING": 1}
+    offsets, width = [], 0
+    for kind, count in fields:
+        offsets.append(width)
+        width += sizes[kind] * int(count or 1)
+    if not width:
+        raise ValueError(f"{name}: brak ukladu rekordu binarnego")
+    return fields, offsets, width
+
+
+def check_binary_floats(directory, name, expected, errors, copies=()):
+    """Kopia pola wejscia (`src[k]`) ma bity wyroczni; wyrazenie liczone - 4 epsilon typu."""
+    fields, offsets, width = storage_layout(directory, name)
+    content = (directory / name).read_bytes()
+    if len(content) != width * len(expected):
+        raise ValueError(f"{name}: rozmiar binarny {len(content)}, oczekiwane {width * len(expected)}")
+    for i, row in enumerate(expected):
+        if len(row) != len(fields):
+            raise ValueError(f"{name}: rozna szerokosc schematu i wyroczni")
+        for k, value in enumerate(row):
+            if value.type not in (FLOAT, DOUBLE):
+                continue
+            kind = TYPE_NAMES[value.type]
+            if fields[k] != (kind, ""):
+                raise ValueError(f"{name}: niezgodny typ binarny pola {k}: {fields[k]}")
+            fmt, epsilon = ("f", 2**-23) if value.type == FLOAT else ("d", 2**-52)
+            actual = struct.unpack_from("=" + fmt, content, i * width + offsets[k])[0]
+            if math.isnan(value.val):
+                equal = math.isnan(actual)
+            elif k in copies:
+                equal = struct.pack("=" + fmt, actual) == struct.pack("=" + fmt, value.val)
+            else:
+                equal = math.isclose(actual, value.val, rel_tol=4*epsilon, abs_tol=0)
+            if not equal:
+                errors.append(f"{name}[{i}].{k}: bajty {actual!r}, wyrocznia {value}")
+
+
+def check_plan(plan_path, out_path, storage=None):
+    storage = Path(storage) if storage is not None else Path(out_path).parent / "temp"
     streams, selects, rules = load_plan(plan_path)
     records, types, dumps = read_output(out_path)
     errors, checked = [], 0
@@ -620,14 +664,27 @@ def check_plan(plan_path, out_path):
                 errors.append(f"{name}.{k} ({exprs[k]}): wyrocznia daje rozne typy w roznych wierszach {sorted(concrete)}")
             elif concrete and concrete != {declared[k]}:
                 errors.append(f"{name}.{k} ({exprs[k]}): typ w .desc {declared[k]}, wyrocznia {concrete.pop()}")
+        if any(value.type in (FLOAT, DOUBLE) for row in expected for value in row):
+            copies = {k for k, e in enumerate(exprs) if re.fullmatch(r"\w+\[\d+\]", e.strip())}
+            check_binary_floats(storage, name, expected, errors, copies)
 
-    for rule, on, cond_text in rules:
+    expected_dumps = set()
+    for rule, on, cond_text, start, stop in rules:
         cond = parse_condition(cond_text)
         fired = [i for i, row in enumerate(streams[on]) if rule_truth(cond, row)]
-        if fired:
-            errors.append(f"regula {rule}: warunek prawdziwy w wierszach {fired[:5]} - plan zaklada, ze nie odpala")
-        if any(f"_{rule}_dump" in d for d in dumps):
-            errors.append(f"regula {rule}: silnik ja odpalil ({[d for d in dumps if rule in d]})")
+        if not fired:
+            continue
+        filename = f"{on}_{rule}_dump.tmp"
+        expected_dumps.add("./" + filename)
+        first, last = fired[-1] + start, fired[-1] + stop
+        if not 0 <= first < last <= len(streams[on]):
+            raise ValueError(f"regula {rule}: zakres DUMP poza istniejacymi rekordami")
+        _, _, width = storage_layout(storage, on)
+        expected_bytes = (storage / on).read_bytes()[first*width:last*width]
+        if (storage / filename).read_bytes() != expected_bytes:
+            errors.append(f"regula {rule}: DUMP nie zawiera rekordow [{first}, {last})")
+    if set(dumps) != expected_dumps:
+        errors.append(f"pliki DUMP {sorted(dumps)}, oczekiwane {sorted(expected_dumps)}")
 
     if checked == 0:
         errors.append("brak sprawdzonych wartosci w planie")
@@ -640,13 +697,13 @@ def check_plan(plan_path, out_path):
     return 0
 
 
-def main(plan_path, out_path):
+def main(plan_path, out_path, storage=None):
     try:
-        return check_plan(plan_path, out_path)
+        return check_plan(plan_path, out_path, storage)
     except (OSError, ValueError, SyntaxError, KeyError, IndexError, EvalError) as error:
         print(f"WYROCZNIA: blad w {Path(plan_path).name}: {error}")
         return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1], sys.argv[2]))
+    sys.exit(main(*sys.argv[1:]))

@@ -16,18 +16,18 @@ import pytest
 from test_engine import doubling_plan, write_source
 
 
-def snapshot(locks: Path, runtime: Path) -> dict:
-    paths = list(Path("/dev/shm").iterdir())
-    paths += list(Path("/tmp").glob("xrdbbus*.lock"))
-    paths += list(Path("/tmp").glob("xretractor_ipc.*.lock"))
+def snapshot(locks: Path, runtime: Path, namespace: str) -> dict:
+    # Z obiektow globalnych tylko te z przestrzenia testu: RDB_NAMESPACE rozdziela komplet zasobow
+    # maszyny, a sasiedzi z rownoleglego ctest tworza i kasuja w /dev/shm i /tmp wlasne.
+    paths = [path for path in Path("/dev/shm").iterdir() if namespace in path.name]
+    paths += [path for path in Path("/tmp").glob("xrdbbus*.lock") if namespace in path.name]
+    paths += [path for path in Path("/tmp").glob("xretractor_ipc.*.lock") if namespace in path.name]
     paths += list(locks.glob("*.lock")) + list(runtime.glob("xretractor_service*.lock"))
     result = {}
     for path in paths:
         info = path.lstat()
-        # Spis obejmuje cale /dev/shm; tresc obcych obiektow (np. IDE) moze zmieniac inny proces.
-        retractor_object = path.parent != Path("/dev/shm") or path.name.startswith(("xrdb", "Retractor", "xretractor"))
         try:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest() if retractor_object and path.is_file() else None
+            digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
         except PermissionError:
             digest = "unreadable"
         result[str(path)] = (info.st_ino, info.st_mode, info.st_uid, info.st_gid, info.st_size, digest)
@@ -41,7 +41,8 @@ def phase(child: subprocess.Popen, expected: str) -> None:
 
 
 def exercise_child(module_root: Path, body: str, environment: dict, locks: Path, runtime: Path, kill: bool) -> None:
-    before = snapshot(locks, runtime)
+    namespace = environment["RDB_NAMESPACE"]
+    before = snapshot(locks, runtime, namespace)
     program = (f"import sys; sys.path.insert(0, {str(module_root)!r})\nimport retractordb as rdb\n"
                "engine = rdb.Engine()\n"
                f"engine.compile({body!r})\nprint('compiled', flush=True)\ninput()\n"
@@ -52,11 +53,11 @@ def exercise_child(module_root: Path, body: str, environment: dict, locks: Path,
                                  stdout=subprocess.PIPE, stderr=errors, text=True)
         try:
             phase(child, "compiled")
-            assert snapshot(locks, runtime) == before, "compile changed bus/presence state"
+            assert snapshot(locks, runtime, namespace) == before, "compile changed bus/presence state"
             child.stdin.write("\n")
             child.stdin.flush()
             phase(child, "ran")
-            assert snapshot(locks, runtime) == before, "run changed bus/presence state"
+            assert snapshot(locks, runtime, namespace) == before, "run changed bus/presence state"
             if kill:
                 child.kill()
                 assert child.wait(timeout=10) == -9
@@ -64,11 +65,11 @@ def exercise_child(module_root: Path, body: str, environment: dict, locks: Path,
                 child.stdin.write("\n")
                 child.stdin.flush()
                 phase(child, "closed")
-                assert snapshot(locks, runtime) == before, "close changed bus/presence state"
+                assert snapshot(locks, runtime, namespace) == before, "close changed bus/presence state"
                 child.stdin.write("\n")
                 child.stdin.flush()
                 assert child.wait(timeout=10) == 0
-            assert snapshot(locks, runtime) == before, "process exit changed bus/presence state"
+            assert snapshot(locks, runtime, namespace) == before, "process exit changed bus/presence state"
         finally:
             if child.poll() is None:
                 child.kill()

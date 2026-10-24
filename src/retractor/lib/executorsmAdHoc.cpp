@@ -11,6 +11,7 @@
 #include <print>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -344,11 +345,14 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
         // imporcie do zywego planu: status z addQueriesToModel (pozny blad open() magazynu,
         // wymuszany bramka RDB_FAULT_ADHOC_OPEN_GATE) albo ten hak, ktory podaje status bez
         // dotykania modelu. Raz na proces, zeby test mogl po nim powtorzyc to samo zapytanie i
-        // sprawdzic, ze plan je przyjmuje.
+        // sprawdzic, ze plan je przyjmuje. Wartosc "throw" rzuca zamiast tego wyjatek - droga
+        // catch (...) ponizej (it_adhoc_register_rollback-throw).
         static bool registerFaultFired = false;
-        if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
+        if (const char *fault = std::getenv("RDB_FAULT_ADHOC_REGISTER"); !registerFaultFired && fault != nullptr) {
           registerFaultFired = true;
-          addFailedId        = "RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu";
+          if (std::string_view(fault) == "throw")
+            throw std::runtime_error("RDB_FAULT_ADHOC_REGISTER: wstrzykniety wyjatek rejestracji ad-hoc w modelu");
+          addFailedId = "RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu";
         } else {
           addFailedId = pProc->addQueriesToModel(mergedIds);
         }
