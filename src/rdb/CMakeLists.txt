@@ -21,8 +21,13 @@ set(SOURCES_RDB
 # appConfig.cpp dokladana zrodlowo, tak samo jak w xqry: straznik "silnik
 # dziala" czyta katalog blokad (paths.lock_dir) z tej samej konfiguracji co
 # silnik. Plik zalezy wylacznie od toml++ i spdlog, wiec biblioteka `rdb` nie
-# dostaje zaleznosci od biblioteki `retractor`.
-add_executable(${PROJECT_NAME} ${SOURCES_RDB} ../retractor/lib/appConfig.cpp)
+# dostaje zaleznosci od biblioteki `retractor`. bus.cpp, lockFile.cpp i
+# serverName.cpp dochodza tak samo jak w xqry: drugi dowod zycia silnika to slot
+# na magistrali (#573), niezalezny od pliku blokady w /tmp.
+add_executable(
+  ${PROJECT_NAME}
+  ${SOURCES_RDB} ../retractor/lib/appConfig.cpp ../retractor/lib/bus.cpp
+  ../retractor/lib/lockFile.cpp ../retractor/lib/serverName.cpp)
 
 target_include_directories(${PROJECT_NAME}
                            PRIVATE ${CMAKE_SOURCE_DIR}/src/retractor/lib)

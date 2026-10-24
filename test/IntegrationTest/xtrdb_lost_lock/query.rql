@@ -1,0 +1,2 @@
+DECLARE v INTEGER STREAM lostsrc, 1 TEXTFILE 'data.txt'
+SELECT lostsrc[0]+1 STREAM lostdst FROM lostsrc

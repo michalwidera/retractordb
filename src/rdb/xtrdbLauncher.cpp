@@ -24,6 +24,7 @@
 #include <boost/program_options.hpp>
 
 #include "appConfig.hpp"
+#include "bus.hpp"
 #include "cmdDropFile.hpp"
 #include "cmdFieldAccess.hpp"
 #include "cmdMeta.hpp"
@@ -153,6 +154,19 @@ int main(int argc, char *argv[]) {
         spdlog::shutdown();
         return 1;
       }
+    }
+    // Drugi dowod zycia (#573): plik blokady w /tmp kasuje czyszczenie wedlug wieku, a PrivateTmp
+    // chowa go przed xtrdb, wiec bez niego zywy silnik wygladalby na zatrzymany. Slot na magistrali
+    // wlasnej przestrzeni RDB_NAMESPACE od pliku nie zalezy. Segmentu brak albo nie da sie go
+    // podlaczyc - wtedy decyduje sam plik, bo silnik startuje w tym stanie bez magistrali.
+    const std::string segment = bus::segmentName();
+    const bus::Bus reader(segment, false);
+    if (const auto live = reader.instances(); !live.empty()) {
+      const auto &owner = live.front();
+      std::println(std::cerr, "xretractor is running (pid {}, instance '{}', bus {}) - stop it before using xtrdb.", owner.pid,
+                   owner.name, segment);
+      spdlog::shutdown();
+      return 1;
     }
   }
 
