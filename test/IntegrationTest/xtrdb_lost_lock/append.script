@@ -1,0 +1,4 @@
+open guarded { INTEGER v }
+set v 7
+append
+quit
