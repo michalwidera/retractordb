@@ -7,6 +7,7 @@
 #   -run     obie kolejnosci skladnikow wobec wzorca (szczegoly w run.sh)
 #   -vg-run  to samo pod valgrindem
 #   -adhoc   ten sam przeplot zgloszony przez `xqry -a` do dzialajacego serwera
+#   -adhoc-zero-step  zrodlo ad-hoc dolaczone przed krokiem ZERO (bramka -x, #574)
 # Do 2026-09-27 plan przechodzil `-c`, a przebieg konczyl sie w pierwszym slocie FatalError-em
 # `payload: descriptor not empty before assign - schema mismatch`; para INTEGER/DOUBLE liczyla
 # po cichu bajty inta nalozone na bajty poprzedniego double'a.
@@ -30,5 +31,10 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash adhoc.sh)
 
+add_test(
+  NAME ${TestID}-adhoc-zero-step
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash adhoc-zero-step.sh)
+
 set_tests_properties(${TestID}-run ${TestID}-vg-run ${TestID}-adhoc
-                     PROPERTIES TIMEOUT 120)
+                     ${TestID}-adhoc-zero-step PROPERTIES TIMEOUT 120)
