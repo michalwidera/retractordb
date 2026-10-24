@@ -395,6 +395,16 @@ commands:
             xretractor -h
             xqry -h
             xtrdb -h
+      # Zasoby, na ktorych biegnie ctest: rownoleglosc (`nproc`), rozmiar /dev/shm i limity
+      # cgroup. Powod (#574): lokalny profil test-ci zakladal 64 MiB /dev/shm, a zadna
+      # dokumentacja CircleCI ani log joba tego nie podawaly. scripts/test-ci.sh wypisuje to samo.
+      - run:
+          name: Test resources
+          command: |
+            echo "nproc=$(nproc)"
+            df -k /dev/shm || true
+            grep ' /dev/shm ' /proc/mounts || true
+            cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2> /dev/null || true
       # Diagnostyka porazki jest w TYM SAMYM kroku co ctest, zeby kolektor dostal jego
       # prawdziwy kod wyjscia. Powod: 2026-09-04 `it_agse_array` oblal tutaj, a jedynym
       # sladem byl wpis w test_results.xml z pustym <system-out/> - czyli wiadomo bylo,

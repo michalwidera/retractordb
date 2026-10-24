@@ -382,6 +382,13 @@ package() {
 # rdzenie HOSTA, nie przydzial cgroup - dokladnie tak samo jak w CI, wiec i
 # przesubskrybowanie jest to samo. Kod wyjscia wraca po zebraniu raportu.
 run_tests() {
+    # Odpowiednik kroku `Test resources` z config.yml.
+    step "Test resources"
+    echo "nproc=$(nproc)"
+    df -k /dev/shm || true
+    grep ' /dev/shm ' /proc/mounts || true
+    cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2> /dev/null || true
+
     step "Integration & Unit test"
     local rc=0
     (cd "build/$build_type/test" && ctest -j "$(nproc)" -V -LE valgrind --output-junit test_results.xml) || rc=$?
