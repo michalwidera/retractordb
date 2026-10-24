@@ -172,6 +172,16 @@ foreach(item ${V_GLOB})
                ut_${TEST_SHORT} TIMEOUT ${RDB_UT_TIMEOUT})
   if(PROG_VALGRIND)
     add_test(
+      NAME ut_${TEST_SHORT}-valgrind-setup
+      WORKING_DIRECTORY
+        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
+      COMMAND bash -c "rm -f *.meta *.desc")
+    set_tests_properties(
+      ut_${TEST_SHORT}-valgrind-setup
+      PROPERTIES LABELS valgrind FIXTURES_SETUP
+                 ut_${TEST_SHORT}-valgrind-fixture RESOURCE_LOCK
+                 ut_${TEST_SHORT})
+    add_test(
       NAME ut_${TEST_SHORT}-valgrind
       WORKING_DIRECTORY
         ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
@@ -179,8 +189,13 @@ foreach(item ${V_GLOB})
               ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
     set_tests_properties(
       ut_${TEST_SHORT}-valgrind
-      PROPERTIES LABELS valgrind FIXTURES_REQUIRED ut_${TEST_SHORT}-fixture
-                 RESOURCE_LOCK ut_${TEST_SHORT})
+      PROPERTIES LABELS valgrind FIXTURES_REQUIRED
+                 ut_${TEST_SHORT}-valgrind-fixture RESOURCE_LOCK
+                 ut_${TEST_SHORT})
+    # W pelnym ctest druga oprawa sprzata dopiero po zwyklym tescie, a nie przed
+    # nim. Sam RESOURCE_LOCK daje wylacznosc, ale nie ustala kolejnosci.
+    set_tests_properties(ut_${TEST_SHORT}-valgrind-setup
+                         PROPERTIES DEPENDS ut_${TEST_SHORT})
   endif()
 endforeach()
 

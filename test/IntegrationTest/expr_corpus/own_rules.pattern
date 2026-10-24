@@ -1,0 +1,27 @@
+== cpy
+{ cpy_0:1 cpy_1:0.1 cpy_2:0.1 cpy_3:0 }
+{ cpy_0:2 cpy_1:1 cpy_2:1 cpy_3:2147483647 }
+{ cpy_0:3 cpy_1:1 cpy_2:1 cpy_3:4294967295 }
+{ cpy_0:4 cpy_1:0.1 cpy_2:0.1 cpy_3:4294967294 }
+{ cpy_0:5 cpy_1:-0.1 cpy_2:-0.1 cpy_3:4294967295 }
+{ cpy_0:6 cpy_1:null cpy_2:null cpy_3:null }
+== desc cpy
+{	INTEGER cpy_0
+	FLOAT cpy_1
+	DOUBLE cpy_2
+	UINT cpy_3
+}
+== real_values
+{ real_values_0:0.2 real_values_1:0.2 }
+{ real_values_0:2 real_values_1:2 }
+{ real_values_0:2 real_values_1:2 }
+{ real_values_0:0.2 real_values_1:0.2 }
+{ real_values_0:-0.2 real_values_1:-0.2 }
+{ real_values_0:null real_values_1:null }
+== desc real_values
+{	FLOAT real_values_0
+	DOUBLE real_values_1
+}
+== dumps
+./cpy_cmp_real_dump.tmp
+./cpy_cmp_uint_dump.tmp

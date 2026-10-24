@@ -6,11 +6,11 @@
 # przebudowywal tablice uchwytow (refreshStreamHandles), trafial na brak i konczyl proces.
 # Klient dostawal blad, a chwile pozniej serwera juz nie bylo.
 #
-# Porazka po imporcie ma dwie drogi wycofania i test przechodzi obie. Wyjatek wymusza
+# Po #512 porazki rdzenia wracaja statusem, nie wyjatkiem. Syntetyczna odmowe wymusza
 # jednorazowy hak RDB_FAULT_ADHOC_REGISTER - tej drogi zadne znane RQL nie wywoluje. Status
 # daje pozny blad open() magazynu: bramka RDB_FAULT_ADHOC_OPEN_GATE zatrzymuje serwer miedzy
 # kontrola wstepna FILE a otwarciem pliku, a test w tym czasie podmienia katalog na zwykly plik.
-# Dla obu drog test sprawdza odmowe z powodem, zycie serwera, brak nowej nazwy w planie i na
+# Dla obu odmow test sprawdza powod, zycie serwera, brak nowej nazwy w planie i na
 # magistrali (#303) oraz - wada lustrzana - to, ze to samo zapytanie powtorzone bez awarii
 # przechodzi i daje dane. Bez ostatniej kontroli naprawa "odmawiaj zawsze" tez bylaby zielona.
 # Na poczatku stoi jeszcze odmowa samej kontroli wstepnej, jeszcze przed roszczeniem nazw.

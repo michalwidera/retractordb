@@ -68,9 +68,10 @@ bool rtAbsoluteSleep(const struct timespec &anchor, long interval_ms);
 /// Funkcja rtKeepThreadOffRtCpus powinna:
 /// - [executorrt.rt-keep-thread-off-rt-cpus.1~1] przy maskach powinowactwa ustawiać wątkowi handle dopełnienie maski powinowactwa wątku wołającego w obrębie rdzeni online, wypisywać na stdout komunikat [INFO] z liczbą rdzeni pomocniczych i zwracać true.
 /// - [executorrt.rt-keep-thread-off-rt-cpus.2~1] nic nie zmieniać i zwracać false, gdy dopełnienie jest puste, bo wątek wołający widzi wszystkie rdzenie.
-/// - [executorrt.rt-keep-thread-off-rt-cpus.3~1] przy błędzie odczytu maski, liczby rdzeni online albo ustawienia powinowactwa wypisywać [WARN] na stdout i zwracać false.
+/// - [executorrt.rt-keep-thread-off-rt-cpus.3~2] przy błędzie odczytu maski, liczby rdzeni online albo ustawienia powinowactwa innym niż EINVAL wypisywać [WARN] na stdout i zwracać false.
 /// - [executorrt.rt-keep-thread-off-rt-cpus.4~1] na jądrach bez masek powinowactwa zawsze zwracać false, wypisując na stdout jeden komunikat [INFO] na proces.
 ///   Ograniczenie: ta galaz jest skompilowana wylacznie bez masek powinowactwa; wykonanie linuksowe jej nie weryfikuje.
+/// - [executorrt.rt-keep-thread-off-rt-cpus.5~1] traktować EINVAL z ustawienia powinowactwa (cpuset nie dopuszcza żadnego rdzenia dopełnienia) jak puste dopełnienie: nic nie wypisywać i zwracać false.
 ///
 /// @note Wolac po `rtActivate`, z uchwytem watku, ktory MUSI byc szeregowany mimo obciazenia watku RT. Watek
 ///       komunikacyjny powstaje przed rtActivate i zostaje SCHED_OTHER; przy `taskset -c 3` i obciazeniu ponad

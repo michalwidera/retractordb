@@ -14,15 +14,20 @@ import sys
 xretractor, xqry = sys.argv[1:3]
 ns = os.environ["RDB_NAMESPACE"]
 tmpdir = Path(os.environ["TMPDIR"])
-SHM = Path("/dev/shm")
-QUERY = "DECLARE a BYTE STREAM src, 0.1 FILE '/dev/urandom'\nSELECT src[0] STREAM dst FROM src\n"
-
-if not SHM.is_dir():
-    print("SKIP IPC object checks: no /dev/shm on this platform - only lock files are checked", flush=True)
+portable = Path(__file__).resolve().parents[1] / "portable.sh"
+SHM = Path(subprocess.run(["bash", "-c", '. "$1" && shm_dir', "bash", str(portable)],
+                          check=True, capture_output=True, text=True).stdout.strip())
+QUERY = "DECLARE a BYTE STREAM src, 0.1 DEVICE '/dev/urandom'\nSELECT src[0] STREAM dst FROM src\n"
 
 
 def env_for(namespace):
     return dict(os.environ, RDB_NAMESPACE=namespace)
+
+
+def ipc_objects(name):
+    bus = re.compile(r"xrdbbus_v\d+_" + re.escape(name))
+    return [p for p in SHM.glob("**/*") if p.is_file() and
+            (p.name.endswith("." + name) or p.name.startswith("brcdbr." + name + ".") or bus.fullmatch(p.name))]
 
 
 def leftovers(name):
@@ -31,8 +36,7 @@ def leftovers(name):
                          Path("/tmp") / f"xretractor_ipc.RetractorQueryQueue.{name}.lock") if p.exists()]
     bus = re.compile(r"xrdbbus_v\d+_" + re.escape(name) + r"(\.lock)?")
     found += [p for p in Path("/tmp").iterdir() if bus.fullmatch(p.name)]
-    if SHM.is_dir():
-        found += [p for p in SHM.iterdir() if p.name.endswith("." + name) or bus.fullmatch(p.name)]
+    found += ipc_objects(name)
     return sorted(str(p) for p in found)
 
 
@@ -76,6 +80,7 @@ servers = []
 dead = ns + "k"
 try:
     server = start(ns)
+    assert len(ipc_objects(ns)) >= 3, f"a running server has no complete set of IPC objects under {SHM}"
     assert leftovers(ns), "a running server shows none of its resources - the checks would prove nothing"
     stop(server, ns)
     assert leftovers(ns) == [], f"normal exit left: {leftovers(ns)}"

@@ -3,16 +3,19 @@
 
 Korpus sa plany `<plan>.rql` z danymi `<plan>*.txt`, zapisane w tym katalogu. Test ich nie
 generuje - czyta pliki z repozytorium. Generator jest po to, zeby korpus dalo sie odtworzyc
-i rozbudowac: stale ziarno, wiec ponowne uruchomienie daje te same bajty.
+i rozbudowac: stale ziarno odtwarza bajty planow `own_*` i ich danych. Czesc `rehost_*`
+zalezy dodatkowo od biezacej listy i tresci sledzonych plikow `.rql` w repozytorium;
+jej odtworzenie wymaga takze tej samej rewizji i niezmienionych plikow roboczych.
+Wzorce `.pattern` sa osobno sprawdzanymi migawkami silnika, generator ich nie zapisuje.
 
 Dwie czesci:
 
 * plany wlasne `own_*` - po jednym na typ (INTEGER, UINT, BYTE, FLOAT, DOUBLE, RATIONAL z
   reduktora), typy mieszane w obu kierunkach promocji, napisy dluzsze niz SSO, gleboki
   program i ogon stalych (`own_tail`, regula B w exprSimplify). Porownania zyja tylko
-  w RULE WHEN, wiec kazdy plan poza `own_deep` i `own_tail` ma regule na strumieniu-kopii
+  w RULE WHEN, wiec podstawowe plany typow maja regule na strumieniu-kopii
   z warunkiem, ktory nie jest prawdziwy dla zadnego wiersza - liczy sie w kazdym slocie, a
-  akcja nie odpala;
+  akcja nie odpala. `own_rules` osobno sprawdza warunki prawdziwe i falszywe oraz zrzuty;
 * plany `rehost_*` - wyrazenia z list SELECT planow testow systemowych (pliki `.rql` sledzone
   przez git), przeniesione na wspolne zrodlo: `nazwa[k]` -> `src[k mod 3]`, goly identyfikator
   pola -> kolejne `src[i]`. Pomijane sa ksztalty, ktorych nie da sie przeniesc bez kontekstu
@@ -189,6 +192,25 @@ SELECT ratio[0], (ratio[0]+1)-1 STREAM rational_result FROM ratio
     write("own_overflow_rat.txt", "1\n-1\n0\n2147483647\n-2147483648\nNULL")
 
 
+def issue567_rules():
+    write("own_rules.rql", """# Warunki prawdziwe i falszywe, pelna precyzja FLOAT/DOUBLE i granice UINT.
+STORAGE 'temp'
+DECLARE i INTEGER, f FLOAT, d DOUBLE, u UINT STREAM src, 1 TEXTFILE 'own_rules.txt'
+SELECT src[0], src[1], src[2], src[3] STREAM cpy FROM src
+SELECT src[1]+src[1], src[2]+src[2] STREAM real_values FROM src
+RULE cmp_uint ON cpy WHEN cpy[3] > 2147483647 AND cpy[0] = 3 OR cpy[0] = 5 DO DUMP -1 TO 0
+RULE cmp_real ON cpy WHEN cpy[1] > 0.1 AND cpy[2] < 1.0 AND cpy[0] = 4 DO DUMP -1 TO 0
+RULE cmp_false ON cpy WHEN cpy[0] < 0 DO DUMP -1 TO 0
+""")
+    write("own_rules.txt", """1 0.1 0.10000000000000001 0
+2 1.0000001192092896 1.0000000000000002 2147483647
+3 1.000000238418579 0.9999999999999998 4294967295
+4 0.10000000894069672 0.10000000000000002 4294967294
+5 -0.1 -0.10000000000000002 4294967295
+6 NULL NULL NULL
+""")
+
+
 def main():
     rng = random.Random(20260926)
 
@@ -285,6 +307,7 @@ SELECT {tail} STREAM tail FROM src
                                      for u in range(ROWS)))
 
     issue327_boundaries()
+    issue567_rules()
 
     exprs = system_expressions()
     rng_sys = random.Random(289)

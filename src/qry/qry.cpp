@@ -46,6 +46,13 @@ bool qry::adhoc(const std::string &sAdhoc) {
   }
   ptree pt = netClient("adhoc", sAdhoc);
 
+  // Powod awarii handlera albo transportu siedzi w wezle potomnym, ktorego petla nizej nie
+  // czyta - bez tej galezi klient wypisywal pusty "bad rcv:", jak 'show' przed 2026-09-04.
+  if (const auto reason = pt.get_optional<std::string>("error.response")) {
+    SPDLOG_ERROR("server rejected the 'adhoc' command: {}", *reason);
+    return true;
+  }
+
   std::string rcv("fail.");
   for (auto &[first, second] : pt) {
     rcv = second.get<std::string>("");

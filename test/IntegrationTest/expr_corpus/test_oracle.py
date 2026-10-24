@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Kontrole wyroczni #325: uszkodzony lub pusty dowod nie moze byc zielony."""
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
@@ -17,13 +18,17 @@ OUTPUT = ROWS + DESC + "== dumps\n"
 
 
 class OracleControls(unittest.TestCase):
-    def run_oracle(self, plan=PLAN, data="1 2\n3 4\n", output=OUTPUT):
+    def run_oracle(self, plan=PLAN, data="1 2\n3 4\n", output=OUTPUT, artifacts=None):
         with tempfile.TemporaryDirectory(prefix="oracle-control-") as directory:
             base = Path(directory)
             (base / "plan.rql").write_text(plan)
             (base / "data.txt").write_text(data)
             (base / "result.out").write_text(output)
-            return subprocess.run([sys.executable, str(ORACLE), str(base / "plan.rql"), str(base / "result.out")],
+            storage = base / "temp"
+            storage.mkdir()
+            for name, content in (artifacts or {}).items():
+                (storage / name).write_bytes(content)
+            return subprocess.run([sys.executable, str(ORACLE), str(base / "plan.rql"), str(base / "result.out"), str(storage)],
                                   capture_output=True, text=True, timeout=10)
 
     def assert_rejected(self, diagnostic, **kwargs):
@@ -120,6 +125,41 @@ class OracleControls(unittest.TestCase):
         result = self.run_oracle(plan=plan, output=output)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("zgodny, 2 wartosci", result.stdout)
+
+    def test_binary_float_precision_survives_six_digit_printing(self):
+        for kind, fmt in (("FLOAT", "f"), ("DOUBLE", "d")):
+            with self.subTest(kind=kind):
+                plan = f"DECLARE x {kind} STREAM src, 1 TEXTFILE 'data.txt'\nSELECT src[0] STREAM dst FROM src\n"
+                descriptor = f"{{ {kind} dst_0 }}"
+                output = "== dst\n{ dst_0:1 }\n== desc dst\n" + descriptor + "\n== dumps\n"
+                artifacts = {"dst.desc": descriptor.encode(), "dst": struct.pack("=" + fmt, 1.000004)}
+                args = dict(plan=plan, data="1.000004\n", output=output, artifacts=artifacts)
+                result = self.run_oracle(**args)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                artifacts["dst"] = struct.pack("=" + fmt, 1.0)
+                self.assert_rejected("bajty 1.0", **args)
+                artifacts["dst"] = artifacts["dst"][:-1]
+                self.assert_rejected("rozmiar binarny", **args)
+                del artifacts["dst"]
+                self.assert_rejected("WYROCZNIA: blad", **args)
+
+    def test_true_rule_requires_the_right_dump_records(self):
+        plan = PLAN + "RULE cmp ON dst WHEN dst[0] = 3 DO DUMP -1 TO 0\n"
+        filename = "dst_cmp_dump.tmp"
+        artifacts = {"dst.desc": b"{ INTEGER dst_0 INTEGER dst_1 }", "dst": struct.pack("=iiii", 1, 2, 3, 4),
+                     filename: struct.pack("=ii", 1, 2)}
+        args = dict(plan=plan, output=OUTPUT + "./" + filename + "\n", artifacts=artifacts)
+        result = self.run_oracle(**args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_rejected("pliki DUMP", **dict(args, output=OUTPUT))
+        artifacts[filename] = struct.pack("=ii", 3, 4)
+        self.assert_rejected("DUMP nie zawiera rekordow", **args)
+        del artifacts[filename]
+        self.assert_rejected("WYROCZNIA: blad", **args)
+
+    def test_false_rule_refuses_an_unexpected_dump(self):
+        self.assert_rejected("pliki DUMP", plan=PLAN + "RULE cmp ON dst WHEN dst[0] < 0 DO DUMP -1 TO 0\n",
+                             output=OUTPUT + "./dst_cmp_dump.tmp\n")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from test_engine import doubling_plan, write_source
 CORPUS = REPO_ROOT / "test/IntegrationTest/expr_corpus"
 COMMON = ("own_tail", "own_overflow", "own_deep", "rehost_integer", "rehost_double")
 EXCLUDED = {name: "RULE DO DUMP requires service state" for name in (
-    "own_byte", "own_uint", "own_int", "own_float", "own_double", "own_rational", "own_string", "own_mixed",
+    "own_byte", "own_uint", "own_int", "own_float", "own_double", "own_rational", "own_string", "own_mixed", "own_rules",
 )}
 SYNTHETIC = ("doubling", "tripled", "double_source", "nullable", "arrays", "history_average", "uint",
              "binary_nonfinite", "mean", "wrapping", "disposable", "delayed", "multirate",

@@ -1,0 +1,8 @@
+# Warunki prawdziwe i falszywe, pelna precyzja FLOAT/DOUBLE i granice UINT.
+STORAGE 'temp'
+DECLARE i INTEGER, f FLOAT, d DOUBLE, u UINT STREAM src, 1 TEXTFILE 'own_rules.txt'
+SELECT src[0], src[1], src[2], src[3] STREAM cpy FROM src
+SELECT src[1]+src[1], src[2]+src[2] STREAM real_values FROM src
+RULE cmp_uint ON cpy WHEN cpy[3] > 2147483647 AND cpy[0] = 3 OR cpy[0] = 5 DO DUMP -1 TO 0
+RULE cmp_real ON cpy WHEN cpy[1] > 0.1 AND cpy[2] < 1.0 AND cpy[0] = 4 DO DUMP -1 TO 0
+RULE cmp_false ON cpy WHEN cpy[0] < 0 DO DUMP -1 TO 0

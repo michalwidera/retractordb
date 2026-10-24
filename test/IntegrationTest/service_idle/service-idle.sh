@@ -62,6 +62,10 @@ if [ "$info_active" = "1" ]; then
     grep -qE '^<6>\[I\] ' stderr.txt
   else
     grep -qE '^\[I\] ' stderr.txt
-    grep -qv '^<' stderr.txt
+    # Jawne exit: `set -e` nie przerywa skryptu na poleceniu poprzedzonym `!`.
+    if grep -q '^<' stderr.txt; then
+      echo "FAIL: linia z przedrostkiem sd-daemon poza systemd"
+      exit 1
+    fi
   fi
 fi

@@ -112,6 +112,7 @@ TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
        {std::pair<std::uint64_t, std::uint64_t>{100, 1024}, std::pair<std::uint64_t, std::uint64_t>{1000, 1000},
         std::pair<std::uint64_t, std::uint64_t>{250, 1024}}) {
     const std::uint64_t real = realQueueBytes(messages, size);
+    ASSERT_TRUE(!RDB_OS_LINUX || real != 0) << "Linux: nie znaleziono utworzonego segmentu kolejki";
     if (real == 0)
       GTEST_SKIP() << "segmentu kolejki nie da sie znalezc w systemie plikow na tej platformie; "
                       "pomiar odniesienia nie powstal, a wzoru nie ma z czym porownac";

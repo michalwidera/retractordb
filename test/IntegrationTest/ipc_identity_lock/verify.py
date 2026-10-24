@@ -9,7 +9,7 @@
 Test oblewal rzadko i tylko w rownoleglym przebiegu calego zestawu, a z samego komunikatu
 asercji nie dalo sie odczytac, KTO skasowal obiekty ani czy serwer wtedy zyl. Dlatego kazda
 kontrola idzie przez check(), ktore przy niepowodzeniu zrzuca na stdout komplet stanu maszyny
-(ctest zapisuje stdout w LastTest.log): pelne /dev/shm z i-wezlami, blokady z /tmp razem
+(ctest zapisuje stdout w LastTest.log): obiekty IPC z i-wezlami, blokady z /tmp razem
 z wlascicielami odczytanymi z /proc/locks, tablice procesow, log serwera i os czasu zebrana
 przez watek obserwatora. Bez tego kazde zlapane oblanie jest tak samo nieme jak pierwsze.
 """
@@ -25,10 +25,12 @@ import traceback
 
 xretractor, xqry = sys.argv[1:3]
 name = os.environ["RDB_NAMESPACE"]
-QUERY = "DECLARE a BYTE STREAM src, 0.1 FILE '/dev/urandom'\nSELECT src[0] STREAM dst FROM src\n"
+QUERY = "DECLARE a BYTE STREAM src, 0.1 DEVICE '/dev/urandom'\nSELECT src[0] STREAM dst FROM src\n"
 PAYLOAD = b"protected payload"
 
-SHM_DIR = Path("/dev/shm")
+portable = Path(__file__).resolve().parents[1] / "portable.sh"
+SHM_DIR = Path(subprocess.run(["bash", "-c", '. "$1" && shm_dir', "bash", str(portable)],
+                              check=True, capture_output=True, text=True).stdout.strip())
 LOCK_DIR = Path("/tmp")
 # Nazwy nalezace do badanej tozsamosci: trzy obiekty globalne koncza sie kropka i nazwa
 # instancji, kolejki odpowiedzi klientow maja ja w srodku (brcdbr.<nazwa>.<klient>).
@@ -48,11 +50,11 @@ def stamp():
 
 
 def shm_entries():
-    """Mapa nazwa -> i-wezel dla calego /dev/shm; None, gdy platforma go nie ma (Darwin)."""
-    if not SHM_DIR.is_dir():
-        return None
+    """Mapa nazwa -> i-wezel, takze w podkatalogu startu jadra Boost.Interprocess."""
     retVal = {}
-    for entry in os.scandir(SHM_DIR):
+    for entry in SHM_DIR.glob("**/*"):
+        if not entry.is_file():
+            continue
         try:
             retVal[entry.name] = entry.stat().st_ino
         except OSError:
@@ -113,15 +115,15 @@ def process_table():
 
 
 def shm_listing():
-    """Pelne /dev/shm z i-wezlami, trybem, rozmiarem i wiekiem - posortowane, wlasne oznaczone."""
+    """Obiekty IPC z i-wezlami, trybem, rozmiarem i wiekiem - wlasne oznaczone."""
     if not SHM_DIR.is_dir():
-        return ["<brak /dev/shm>"]
+        return [f"<brak {SHM_DIR}>"]
     retVal = []
     now = time.time()
     try:
-        entries = sorted(os.scandir(SHM_DIR), key=lambda e: e.name)
+        entries = sorted((p for p in SHM_DIR.glob("**/*") if p.is_file()), key=lambda p: p.name)
     except OSError as error:
-        return [f"<nie da sie wylistowac /dev/shm: {error}>"]
+        return [f"<nie da sie wylistowac {SHM_DIR}: {error}>"]
     for entry in entries:
         try:
             info = entry.stat()
@@ -137,7 +139,7 @@ def shm_listing():
 # --- watek obserwatora ------------------------------------------------------------------
 #
 # Sama para "przed/po" nie mowi, KIEDY i przy jakim towarzystwie obiekty zniknely. Watek
-# probkuje /dev/shm co kilka milisekund i zapisuje kazda zmiane razem z faza scenariusza;
+# probkuje katalog IPC co kilka milisekund i zapisuje kazda zmiane razem z faza scenariusza;
 # dla zmian dotyczacych badanej tozsamosci dokleja tablice procesow i wlascicieli blokad,
 # bo tylko wtedy warto placic za czytanie /proc.
 
@@ -147,11 +149,9 @@ WATCHER_STOP = threading.Event()
 
 
 def watcher():
-    previous = shm_entries() or {}
+    previous = shm_entries()
     while not WATCHER_STOP.is_set():
         current = shm_entries()
-        if current is None:
-            return
         if current != previous:
             added = {k: v for k, v in current.items() if previous.get(k) != v}
             removed = {k: v for k, v in previous.items() if current.get(k) != v}
@@ -234,7 +234,7 @@ def dump(label, detail):
     except OSError as error:
         print(f"    <nie da sie odczytac: {error}>", flush=True)
 
-    print("\n--- /dev/shm w chwili awarii ---", flush=True)
+    print(f"\n--- {SHM_DIR} w chwili awarii ---", flush=True)
     for line in shm_listing():
         print(line, flush=True)
 
@@ -246,11 +246,11 @@ def dump(label, detail):
     for line in process_table():
         print(f"    {line}", flush=True)
 
-    print("\n--- os czasu /dev/shm: zmiany dotyczace tej tozsamosci ---", flush=True)
+    print(f"\n--- os czasu {SHM_DIR}: zmiany dotyczace tej tozsamosci ---", flush=True)
     for line in timeline_report(only_own=True):
         print(line, flush=True)
 
-    print("\n--- os czasu /dev/shm: wszystkie zmiany (kontekst sasiadow) ---", flush=True)
+    print(f"\n--- os czasu {SHM_DIR}: wszystkie zmiany (kontekst sasiadow) ---", flush=True)
     for line in timeline_report(only_own=False):
         print(line, flush=True)
     print("=" * 100, flush=True)
@@ -322,10 +322,8 @@ def hold_identity_lock(path):
 
 
 def ipc_objects(instance):
-    """Obiekty IPC instancji z ich i-wezlami; None, gdy platforma ich nie wystawia (Darwin)."""
+    """Obiekty IPC instancji z ich i-wezlami."""
     entries = shm_entries()
-    if entries is None:
-        return None
     return {k: v for k, v in entries.items() if OWN_OBJECT.search(k)}
 
 
@@ -391,7 +389,7 @@ def scenario():
         before = ipc_objects(name)
         # Segment odpowiedzi i kolejka komend. Trzeciego obiektu - semafora muteksu mapy - nie ma
         # od X-01 (#254): sloty odpowiedzi nie maja zamka.
-        check("krok2:obiekty-istnieja", before is None or len(before) >= 2,
+        check("krok2:obiekty-istnieja", len(before) >= 2,
               f"pierwszy serwer nie ma kompletu obiektow IPC (oczekiwane >=2): {before}")
 
         CONTEXT["phase"] = "2:proba-drugiego-serwera"
@@ -403,15 +401,12 @@ def scenario():
         hello = xqry_run("--hello", env=env_first)
         check("krok2:pierwszy-odpowiada", hello.returncode == 0,
               f"pierwszy serwer przestal odpowiadac (kod {hello.returncode}); stderr: {hello.stderr!r}")
-        if before is None:
-            print("SKIP IPC object identity check: no /dev/shm on this platform", flush=True)
-        else:
-            after = ipc_objects(name)
-            check("krok2:obiekty-nietkniete", after == before,
-                  f"obiekty IPC pierwszego serwera zmienily sie: {before} -> {after}; "
-                  f"zniknely {sorted(set(before) - set(after))}, "
-                  f"doszly {sorted(set(after) - set(before))}, "
-                  f"zmieniony i-wezel {sorted(k for k in set(before) & set(after) if before[k] != after[k])}")
+        after = ipc_objects(name)
+        check("krok2:obiekty-nietkniete", after == before,
+              f"obiekty IPC pierwszego serwera zmienily sie: {before} -> {after}; "
+              f"zniknely {sorted(set(before) - set(after))}, "
+              f"doszly {sorted(set(after) - set(before))}, "
+              f"zmieniony i-wezel {sorted(k for k in set(before) & set(after) if before[k] != after[k])}")
     except BaseException as error:  # noqa: BLE001 - zrzut przed sprzataniem, potem wyjatek leci dalej
         dump_once(type(error).__name__, str(error) or "<bez tresci>")
         raise
@@ -444,7 +439,7 @@ finally:
 # Zielony przebieg tez ma mowic, czy ktokolwiek dotykal tych obiektow: cisza obserwatora jest
 # czescia dowodu, a jej brak w logu zmusza do powtorzenia calego polowania.
 own_events = [event for event in TIMELINE if event["own"]]
-print(f"OBSERWATOR: zdarzen /dev/shm razem {len(TIMELINE)}, dotyczacych tej tozsamosci {len(own_events)}"
+print(f"OBSERWATOR: zdarzen {SHM_DIR} razem {len(TIMELINE)}, dotyczacych tej tozsamosci {len(own_events)}"
       f"{' (limit probek osiagniety)' if len(TIMELINE) >= TIMELINE_LIMIT else ''}", flush=True)
 # Sama liczba nie wystarcza: zdarzen wlasnych bywa raz dwa, raz trzy, i z liczby nie widac,
 # czy trzecie to podzial tworzenia na dwie probki, czy obcy proces. Os czasu zdarzen wlasnych
