@@ -268,9 +268,10 @@ container="rdb-test-ci-${profile}-$$"
 # wylacznie przy budowie od zera tu nie wyjdzie. Do sprawdzenia "czy przejdzie
 # na CI" przed pushem - tak; jako dowod przed zgloszeniem czegokolwiek - nie.
 build_volume="rdb-test-ci-build-${profile}"
-# CI i CIRCLECI jak w kroku `Preparing environment variables` joba CircleCI.
+# CI i CIRCLECI jak w kroku `Preparing environment variables` joba CircleCI,
+# TERM jak w kroku `Test resources` joba 1224.
 run_opts=(--cpus "$cpus" --memory "$memory" --memory-swap "$memory" --shm-size "$shm_size"
-    --env CI=true --env CIRCLECI=true)
+    --env CI=true --env CIRCLECI=true --env TERM=xterm)
 if [ "$reuse_build" -eq 1 ]; then
     if [ "$reset_build" -eq 1 ]; then
         echo "-- Kasuje zachowany katalog build/ profilu $profile"
