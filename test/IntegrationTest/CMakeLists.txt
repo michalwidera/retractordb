@@ -13,14 +13,17 @@
 # i dokleja sie do nazwy segmentu magistrali (bus::segmentName). Wlasny TMPDIR
 # odsuwa plik blokady i logi.
 #
-# Pula, a nie jedna przestrzen na katalog. Segment magistrali ma okolo 1,8 MB i
-# z zalozenia nikt go nie kasuje (bus.hpp), a /dev/shm w kontenerze CI ma
-# domyslnie 64 MB: piecdziesiat kilka segmentow zmiescilo by sie na styk, a
-# przepelnienie /dev/shm NIE wywraca testu - daje ClaimStatus::Unavailable,
-# ktory jest fail-open, czyli po cichu zdejmuje izolacje i wraca do kolizji
-# nazw. Szesnascie przestrzeni to najwyzej 29 MB niezaleznie od liczby katalogow
-# i nadal wiecej rownoczesnych serwerow, niz `ctest -j $(nproc)` uruchomi na
-# typowej maszynie.
+# Pula, a nie jedna przestrzen na katalog, bo kazdy zywy serwer trzyma w
+# /dev/shm okolo 5,1 MiB: segment magistrali swojej przestrzeni (~2 MiB, kasuje
+# go ostatni proces, ktory go mapuje - bus.hpp), kolejke komend (~1 MiB) i
+# segment odpowiedzi (~2 MiB). Szesnascie przestrzeni to wiec do ~83 MiB naraz
+# niezaleznie od liczby katalogow, plus segmenty testow jednostkowych spoza
+# puli. Zmierzone 2026-10-24 (#574): CircleCI (executor large) ma /dev/shm 48
+# GiB i miesci to z zapasem; przy 64 MiB (domyslnym dockera) juz nie - szczyt 63
+# MiB w pierwszych sekundach `ctest -j 20` i kilkadziesiat porazek, kazda jawna
+# (odmowa startu "shared memory too small" albo "No space left on device").
+# Szesnascie to nadal wiecej rownoczesnych serwerow, niz ctest uruchamia naraz
+# (do 15 przy `ctest -j 36`, jak w CI).
 #
 # Stale ida do pamieci podrecznej, a nie do zmiennych katalogu: makro jest
 # globalne od chwili zdefiniowania, wiec wolaja je takze katalogi dodane pozniej
