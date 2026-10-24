@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include "bus.hpp"
 #include "constants.hpp"
 
 /// Tozsamosc systemd biezacego procesu, ustalona z /proc/self/cgroup.
@@ -129,14 +130,16 @@ struct SweepReport {
 /// Funkcja sweepAbandonedResources powinna:
 /// - [lockmanager.sweep-abandoned-resources.1~1] przez lockfile::sweep usuwać w serviceLockDir porzucone pliki blokad instancji (`xretractor_service.lock` albo `xretractor_service.<poprawna nazwa>.lock`) i liczyć je w serviceLocks.
 ///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `ServiceLockFamily.NamesRoundTripAndForeignFilesAreRejected`; integracja `it_leftover_sweep`.
-/// - [lockmanager.sweep-abandoned-resources.2~1] przez lockfile::sweep usuwać w machineLockDir porzucone blokady tożsamości IPC instancji bezimiennej albo o członie będącym poprawną nazwą serwera lub jej skrótem, a pod tą blokadą usuwać przez ipc::security::removeOwned segment pamięci dzielonej i kolejkę komend tego członu, licząc je w ipcIdentities.
-///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`; integracje `it_ipc_identity_lock`, `it_leftover_sweep`. Nietestowalne: odmiany czlonu pustego i skroconego sa sprawdzone strukturalnie w ipcTokenOf/isInstanceToken; nie usuwamy globalnych obiektow bezimiennego serwera na maszynie testujacej.
+/// - [lockmanager.sweep-abandoned-resources.2~2] przez lockfile::sweep usuwać w machineLockDir porzucone blokady tożsamości IPC instancji bezimiennej albo o członie będącym poprawną nazwą serwera lub jej skrótem, a pod tą blokadą usuwać przez ipc::security::removeOwned segment pamięci dzielonej i kolejkę komend tego członu, o ile człon nie należy do żywej instancji na magistrali busSegment, licząc pliki w ipcIdentities.
+///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `LockManagerSweep.KeepsIpcObjectsOfInstanceLiveOnBus`; integracje `it_ipc_identity_lock`, `it_leftover_sweep`. Nietestowalne: odmiany czlonu pustego i skroconego sa sprawdzone strukturalnie w ipcTokenOf/isInstanceToken; nie usuwamy globalnych obiektow bezimiennego serwera na maszynie testujacej.
 /// - [lockmanager.sweep-abandoned-resources.3~1] usuwać porzucone segmenty magistrali przez bus::sweepAbandonedSegments(machineLockDir) i liczyć je w busSegments.
 /// - [lockmanager.sweep-abandoned-resources.4~1] nie ruszać niczego, czego blokady nie da się zająć wyłącznie, plików innych kont ani kolejek odpowiedzi klientów.
 ///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `IpcSecurity.SweepDoesNotRemoveForeignLockOrInvokeItsCleanup`; integracje `it_leftover_sweep`, `it_ipc_security-foreign-uid` (root lub jawny skip). Nietestowalne: brak wyliczania kolejek klientow - kontrola strukturalna sweepAbandonedResources, ktora przeglada tylko rodziny blokad.
 ///
 /// @note Normalny koniec procesu sprzata po sobie sam; tu trafia to, co zostawil proces zabity (SIGKILL, OOM,
 ///       awaria zasilania). Bezpieczne przy dzialajacych instancjach, bo zywa instancja trzyma swoje blokady
-///       do konca. Kolejek odpowiedzi nie da sie wyliczyc bez listowania /dev/shm. machineLockDir inny niz
-///       domyslny podaja tylko testy.
-SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir = ipc::kMachineLockDir);
+///       do konca. Kolejek odpowiedzi nie da sie wyliczyc bez listowania /dev/shm. machineLockDir i busSegment
+///       inne niz domyslne podaja tylko testy; zywe czlony czyta tylko z magistrali busSegment, czyli z biezacej
+///       przestrzeni RDB_NAMESPACE.
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir = ipc::kMachineLockDir,
+                                    const std::string &busSegment = bus::segmentName());

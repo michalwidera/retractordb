@@ -1,7 +1,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 # covers: launcher.xretractor.19~1, bus.bus.11~1, lockmanager.sweep-abandoned-resources.1~1
-# covers: lockmanager.sweep-abandoned-resources.2~1, lockmanager.sweep-abandoned-resources.4~1
+# covers: lockmanager.sweep-abandoned-resources.2~2, lockmanager.sweep-abandoned-resources.4~1
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

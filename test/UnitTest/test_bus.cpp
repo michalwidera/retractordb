@@ -201,7 +201,7 @@ TEST_F(BusFixture, DisjointStreamsCoexist) {
 }
 
 TEST_F(BusFixture, ReleaseFreesTheName) {
-  // covers: bus.bus.11~1, bus.bus.14~1
+  // covers: bus.bus.11~1, bus.bus.14~2
   bus::Bus second(kTestSegment);
   {
     bus::Bus first(kTestSegment);
@@ -734,6 +734,26 @@ TEST_F(BusFixture, SecondServiceInstanceIsRefused) {
             bus::ClaimStatus::Claimed);
 }
 
+// A2 M3 (#565): druga instancja o tej samej nazwie, ktorej plik blokady tozsamosci zniknal z /tmp
+// (albo lezy w innym PrivateTmp), przechodzila roszczenie przy rozlacznych strumieniach i kasowala
+// potem kolejke komend zywego serwera. Nazwa jest wiec zasobem rozlacznym jak nazwa strumienia.
+TEST_F(BusFixture, SameInstanceNameIsRefused) {
+  // covers: bus.bus.19~1
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .streams = {"dsta"}}).status, bus::ClaimStatus::Claimed);
+  const auto refused = second.claim({.name = "alfa", .streams = {"dstb"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::NameConflict);
+  EXPECT_EQ(refused.ownerName, "alfa");
+  EXPECT_EQ(refused.ownerPid, static_cast<std::int32_t>(getpid()));
+
+  // Instancja bezimienna ma jedna tozsamosc na maszynie, wiec dwie takze sie wykluczaja.
+  ASSERT_EQ(first.claim({.streams = {"dsta"}}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(second.claim({.streams = {"dstb"}}).status, bus::ClaimStatus::NameConflict);
+  EXPECT_EQ(second.claim({.name = "alfa", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+}
+
 // Sciezka dluzsza niz pole slotu jest odmowa, nie cichym obcieciem: obciety napis zrownalby
 // dwa rozne pliki licznika albo rozdzielil jeden.
 TEST_F(BusFixture, OversizedCounterPathIsRefused) {
@@ -1078,7 +1098,7 @@ std::string presenceFile(const std::string &segment) { return "/tmp/" + segment 
 // kto ja jeszcze mapuje, a zostawianie segmentu na zawsze zapelnialo /dev/shm po 1,8 MB na
 // kazda przestrzen nazw.
 TEST(BusPresence, LastMapperRemovesSegment) {
-  // covers: bus.bus.1~1, bus.bus.14~1
+  // covers: bus.bus.1~1, bus.bus.14~2
   const std::string name = std::string(bus::kSegmentName) + "_utlast" + std::to_string(getpid());
   {
     bus::Bus first(name);
@@ -1120,7 +1140,7 @@ TEST(BusPresence, AttachHasDeadlineWithExclusivePresenceHolder) {
 // razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki. Pliki obecnosci leza we
 // wlasnym katalogu testu: w /tmp zabieral je sprzatacz konczacego sie sasiedniego serwera.
 TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
-  // covers: bus.sweep-abandoned-segments.1~1, bus.sweep-abandoned-segments.2~1, bus.sweep-abandoned-segments.3~1
+  // covers: bus.sweep-abandoned-segments.1~2, bus.sweep-abandoned-segments.2~1, bus.sweep-abandoned-segments.3~1
   // covers: lockmanager.sweep-abandoned-resources.3~1
   const std::string pid  = std::to_string(getpid());
   const auto dir         = std::filesystem::temp_directory_path() / ("ut_bus_sweep_" + pid);
@@ -1146,6 +1166,62 @@ TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
 
   ::close(holder);
   IPC::shared_memory_object::remove(live.c_str());
+  std::filesystem::remove_all(dir);
+}
+
+// A2 M3 (#565): czyszczenie katalogu tymczasowego wedlug wieku kasuje plik obecnosci, a serwer
+// zostaje z LOCK_SH na odlaczonym i-wezle. Krotkotrwaly klient zakladal pod ta sciezka nowy plik,
+// przy wyjsciu dostawal na nim LOCK_EX i kasowal segment zywego serwera - nastepna instancja
+// zakladala wtedy drugi segment bez jego rezerwacji. Katalog blokad wlasny, nie /tmp.
+TEST(BusPresence, SegmentOfLiveServerSurvivesLostPresenceFile) {
+  // covers: bus.bus.14~2, bus.bus.20~1
+  const std::string pid      = std::to_string(getpid());
+  const auto dir             = std::filesystem::temp_directory_path() / ("ut_bus_lost_presence_" + pid);
+  const std::string name     = std::string(bus::kSegmentName) + "_utlost" + pid;
+  const std::string presence = (dir / (name + ".lock")).string();
+  std::filesystem::create_directories(dir);
+  {
+    bus::Bus server(name, true, dir.string());
+    ASSERT_TRUE(server.attached());
+    ASSERT_TRUE(std::filesystem::exists(presence)) << "plik obecnosci poza podanym katalogiem";
+    ASSERT_EQ(server.claim({.name = "alfa", .streams = {"core0"}}).status, bus::ClaimStatus::Claimed);
+    ASSERT_TRUE(std::filesystem::remove(presence));
+    {
+      bus::Bus client(name, false, dir.string());
+      ASSERT_TRUE(client.attached());
+    }
+    EXPECT_TRUE(segmentExists(name)) << "klient skasowal segment, w ktorym zywy serwer ma slot";
+
+    bus::Bus next(name, true, dir.string());
+    ASSERT_TRUE(next.attached());
+    EXPECT_EQ(streamsOf(next.instances(), "alfa"), std::vector<std::string>{"core0"});
+    EXPECT_EQ(next.claim({.name = "beta", .streams = {"core0"}}).status, bus::ClaimStatus::Conflict);
+  }
+  IPC::shared_memory_object::remove(name.c_str());
+  std::filesystem::remove_all(dir);
+}
+
+// Ten sam stan widziany przez sprzatacz: plik obecnosci zostawiony przez klienta zabitego SIGKILL
+// nie jest trzymany, ale segment ma slot zywego serwera, wiec znika tylko plik.
+TEST(BusPresence, SweepKeepsSegmentWithLiveSlot) {
+  // covers: bus.sweep-abandoned-segments.1~2, bus.sweep-abandoned-segments.3~1
+  const std::string pid      = std::to_string(getpid());
+  const auto dir             = std::filesystem::temp_directory_path() / ("ut_bus_sweep_live_slot_" + pid);
+  const std::string name     = std::string(bus::kSegmentName) + "_utslot" + pid;
+  const std::string presence = (dir / (name + ".lock")).string();
+  std::filesystem::create_directories(dir);
+  {
+    bus::Bus server(name, true, dir.string());
+    ASSERT_TRUE(server.attached());
+    ASSERT_EQ(server.claim({.name = "alfa", .streams = {"core0"}}).status, bus::ClaimStatus::Claimed);
+    ASSERT_TRUE(std::filesystem::remove(presence));
+    { std::ofstream touch(presence); }
+
+    EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 1U);
+    EXPECT_FALSE(std::filesystem::exists(presence));
+    EXPECT_TRUE(segmentExists(name)) << "sprzatacz skasowal segment, w ktorym zywy serwer ma slot";
+  }
+  IPC::shared_memory_object::remove(name.c_str());
   std::filesystem::remove_all(dir);
 }
 

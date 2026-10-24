@@ -1131,8 +1131,8 @@ TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
 }
 
 TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
-  // covers: bus.sweep-abandoned-segments.1~1, lockfile.sweep.1~1, lockfile.sweep.4~1, lockmanager.sweep-abandoned-resources.1~1
-  // covers: lockmanager.sweep-abandoned-resources.2~1, lockmanager.sweep-abandoned-resources.3~1
+  // covers: bus.sweep-abandoned-segments.1~2, lockfile.sweep.1~1, lockfile.sweep.4~1, lockmanager.sweep-abandoned-resources.1~1
+  // covers: lockmanager.sweep-abandoned-resources.2~2, lockmanager.sweep-abandoned-resources.3~1
   // covers: lockmanager.sweep-abandoned-resources.4~1
   // Wlasne katalogi zamiast /tmp: tam porzucone blokady zabieral sprzatacz konczacego sie
   // sasiedniego serwera i licznik wychodzil 0. Osobny katalog na kazdy rodzaj, zeby zamiana
@@ -1166,7 +1166,9 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   ASSERT_TRUE(liveGuard.acquireIpcLock(liveNames.queryQueue, machineDir.string()));
   IPC::shared_memory_object(IPC::create_only, liveNames.shmemSegment.c_str(), IPC::read_write);
 
-  const SweepReport swept = sweepAbandonedResources(dir.string(), machineDir.string());
+  // Magistrala testu, nie przestrzen srodowiska: sprzatacz czyta jej sloty.
+  const std::string busSegment = std::string(bus::kSegmentName) + "_utsweepbus" + pid;
+  const SweepReport swept      = sweepAbandonedResources(dir.string(), machineDir.string(), busSegment);
   EXPECT_EQ(swept.serviceLocks, 1U);
   EXPECT_EQ(swept.ipcIdentities, 1U);
   EXPECT_EQ(swept.busSegments, 1U) << "katalog nie dotarl do sprzatacza magistrali";
@@ -1184,6 +1186,41 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
 
   liveGuard.releaseLock();
   IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
+  std::filesystem::remove_all(dir);
+  std::filesystem::remove_all(machineDir);
+}
+
+// A2 M3 (#565): plik blokady tozsamosci zywego serwera zniknal z katalogu (czyszczenie wedlug wieku),
+// a pod ta sama sciezka zostal nietrzymany plik instancji zabitej w trakcie startu. Sama blokada
+// pozwalala wtedy sprzataczowi skasowac kolejke komend i segment zywego serwera; jego slot na
+// magistrali dowodzi, ze zyje.
+TEST(LockManagerSweep, KeepsIpcObjectsOfInstanceLiveOnBus) {
+  // covers: lockmanager.sweep-abandoned-resources.2~2
+  const std::string pid            = std::to_string(getpid());
+  const auto dir                   = std::filesystem::temp_directory_path() / ("ut_sweep_live_bus_" + pid);
+  const auto machineDir            = std::filesystem::temp_directory_path() / ("ut_sweep_live_bus_machine_" + pid);
+  const std::string live           = "utbuslive" + pid;
+  const ipc::ServerNames liveNames = ipc::names(live);
+  const std::string busSegment     = std::string(bus::kSegmentName) + "_utsweeplive" + pid;
+  const std::string identityLock   = ipc::identityLockPath(liveNames.queryQueue, machineDir.string());
+  std::filesystem::create_directories(dir);
+  std::filesystem::create_directories(machineDir);
+  {
+    bus::Bus server(busSegment, true, machineDir.string());
+    ASSERT_TRUE(server.attached());
+    ASSERT_EQ(server.claim({.name = live, .streams = {"core0"}}).status, bus::ClaimStatus::Claimed);
+    IPC::shared_memory_object(IPC::create_only, liveNames.shmemSegment.c_str(), IPC::read_write);
+    IPC::message_queue(IPC::create_only, liveNames.queryQueue.c_str(), 1, 16);
+    { std::ofstream touch(identityLock); }
+
+    const SweepReport swept = sweepAbandonedResources(dir.string(), machineDir.string(), busSegment);
+    EXPECT_EQ(swept.ipcIdentities, 1U);
+    EXPECT_FALSE(std::filesystem::exists(identityLock));
+    EXPECT_TRUE(shmExists(liveNames.shmemSegment)) << "sprzatacz skasowal segment instancji zywej na magistrali";
+    EXPECT_TRUE(IPC::message_queue::remove(liveNames.queryQueue.c_str())) << "sprzatacz skasowal kolejke komend";
+  }
+  IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
+  IPC::shared_memory_object::remove(busSegment.c_str());
   std::filesystem::remove_all(dir);
   std::filesystem::remove_all(machineDir);
 }
