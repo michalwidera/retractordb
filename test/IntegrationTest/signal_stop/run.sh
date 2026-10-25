@@ -115,6 +115,11 @@ printf '[timing]\nquery_no_data_timeout_ms = 5000\n' > client.toml
 } > query2.rql
 
 subscribe() {
+  # Obciecie w powloce testu, nie w przekierowaniu: `> sub.out` przy `&` wykonuje dopiero proces
+  # potomny, wiec petla nizej potrafila przeczytac sub.out poprzedniej iteracji, uznac 2 wiersze
+  # i wyslac sygnal, zanim xqry przeszedl show/get/detail - klient konczyl sie wtedy kodem 10
+  # (wyjatek IPC, kolejka serwera juz zniknela). Tak padl CircleCI job 1237 (2026-10-25, HUP).
+  : > sub.out
   xqry -s dst -m 1000 --config client.toml > sub.out 2> sub.err &
   _sub_pid=$!
   local i=0
