@@ -3,6 +3,14 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
                     ${CMAKE_SOURCE_DIR}/src)
 
+# Release bez LTO w testach jednostkowych - uzasadnienie przy RDB_UT_WITHOUT_IPO
+# w korzeniu CMakeLists.txt. Obiekty bibliotek niosa obok zwyklego kodu takze
+# IR, a -fno-lto przy linkowaniu jawnie wybiera zwykly kod.
+if(RDB_UT_WITHOUT_IPO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
+  add_link_options($<$<CONFIG:Release>:-fno-lto>)
+endif()
+
 file(
   GLOB V_GLOB CONFIGURE_DEPENDS
   LIST_DIRECTORIES false

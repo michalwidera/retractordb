@@ -155,8 +155,19 @@ function(rdb_noexcept_check target)
   target_link_libraries(${check} PRIVATE ${libraries})
   target_compile_options(${check}
                          PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
-  # Kontrola dotyczy frontendu kompilatora; LTO tylko wydluzalby budowe.
-  set_target_properties(${check} PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
+  # Kontrola dotyczy frontendu kompilatora, wiec kompiluje z -fsyntax-only:
+  # cmake/syntaxOnly.sh dokleja flage i tworzy pusty plik obiektowy, bez ktorego
+  # ninja przebudowywalby kontrole przy kazdym wywolaniu. Launcher ccache idzie
+  # za nim, bo ccache -fsyntax-only buforuje. Zmierzone 2026-10-25 w obrazie CI
+  # (GCC 14.2): `throw` w szablonie naglowka rdb/descriptor.hpp instancjonowanym
+  # z pliku rdzenia pada tak samo jak przy -c, a praca kontroli spada o polowe.
+  # Wlasciwosc _RELEASE, bo CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ustawia
+  # wlasnie ja i przy niej INTERPROCEDURAL_OPTIMIZATION nie dziala.
+  set(launcher ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/cmake/syntaxOnly.sh
+               ${CMAKE_CXX_COMPILER_LAUNCHER})
+  set_target_properties(
+    ${check} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
+                        CXX_COMPILER_LAUNCHER "${launcher}")
 endfunction()
 
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
@@ -298,6 +309,17 @@ if(RDB_USE_MOLD)
     )
   endif()
   string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=mold")
+  # mold startuje tyle watkow, ile rdzeni podaje nproc, a nie tyle, ile daje
+  # kwota cgroup. W kontenerze CI (4 vCPU, nproc 36) wspolbiezne linkowania
+  # wypieraly wtedy kompilatory: zmierzone 2026-10-25 w obrazie CI, profil
+  # commit, czas dlawienia cgroup 450 s -> 6 s, budowa Debug -8 %.
+  # RDB_MOLD_THREADS w env ustawia --thread-count; ustawia go tylko CI
+  # (.circleci/config.yml, scripts/test-ci.sh), lokalnie mold linkuje rownolegle
+  # jak dotad.
+  if(DEFINED ENV{RDB_MOLD_THREADS})
+    string(APPEND CMAKE_EXE_LINKER_FLAGS
+           " -Wl,--thread-count=$ENV{RDB_MOLD_THREADS}")
+  endif()
   # mold < 2.37 przy LTO wpisuje do --dependency-file tymczasowy plik
   # ccXXXX.ltrans0.ltrans.o, ktory gcc kasuje po linkowaniu. CMake czyta te
   # zaleznosci (CMAKE_LINK_DEPENDS_USE_LINKER), wiec brakujacy plik robil kazdy
@@ -445,6 +467,18 @@ if(RDB_USE_IPO AND NOT RDB_BENCH_PROBE)
     LANGUAGES CXX)
   if(RDB_IPO_SUPPORTED)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    # Testy jednostkowe linkuja sie bez LTO (test/UnitTest/CMakeLists.txt), wiec
+    # obiekty niosa obok IR zwykly kod (fat LTO objects). Z LTO kazdy z ok. 67
+    # testow optymalizowal przy linkowaniu caly silnik od nowa: zmierzone
+    # 2026-10-25 w obrazie CI (4 vCPU), linkowania testow = 53 % pracy budowy
+    # Release. Programy linkuja sie z LTO jak dotad, wiec testy integracyjne
+    # nadal sprawdzaja kod po LTO; jednostkowe - juz nie (decyzja czlowieka z
+    # 2026-10-25). Tylko GCC, bo od niego sa te flagi IPO (CMake,
+    # Modules/Compiler/GNU.cmake); inny kompilator zostaje przy LTO testow.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      set(CMAKE_CXX_COMPILE_OPTIONS_IPO -flto=auto -ffat-lto-objects)
+      set(RDB_UT_WITHOUT_IPO ON)
+    endif()
   else()
     message(STATUS "IPO for Release is not supported: ${RDB_IPO_ERROR}")
   endif()
