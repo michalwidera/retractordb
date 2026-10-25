@@ -224,6 +224,9 @@ pid_foo=""
 # instancji i zaraz potem meldowal dostarczenie do uslugi -- dwa sprzeczne zdania na stdout.
 printf 'STARY PLAN\n' >service_target.rql
 rm -f systemctl_called
+# Obciecie w powloce testu: `>auto.log` przy `&` wykonuje dopiero proces potomny, a auto.log
+# poprzedniego biegu niesie inna, wylosowana nazwe instancji.
+: >auto.log
 
 PATH="$PWD/fakebin:$PATH" SYSTEMCTL_MARKER="$PWD/systemctl_called" \
   xretractor named.rql --noanykey --autoname </dev/null >auto.log 2>&1 &
