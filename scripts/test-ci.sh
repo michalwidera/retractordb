@@ -141,6 +141,9 @@ show_help() {
     echo "  --keep             Nie usuwaj kontenera po zakonczeniu (do grzebania recznie)"
     echo "  --reuse-build      Zachowaj katalog build/ miedzy przebiegami (szybko, ale NIE jak CI)"
     echo "  --reset-build      Skasuj zachowany katalog build/ tego profilu i zbuduj od zera"
+    echo "  --ccache-volume <nazwa>"
+    echo "                     Cache ccache w nazwanym wolumenie dockera - jak cache CircleCI"
+    echo "                     odtworzony z poprzedniego joba (domyslnie: pusty, jak pierwszy job galezi)"
 }
 
 # ── Domyslne parametry ───────────────────────────────────────────────────────
@@ -180,6 +183,7 @@ keep_container=0
 force_pull=0
 reuse_build=0
 reset_build=0
+ccache_volume=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -194,6 +198,7 @@ while [ $# -gt 0 ]; do
         --keep)        keep_container=1; shift ;;
         --reuse-build) reuse_build=1; shift ;;
         --reset-build) reset_build=1; reuse_build=1; shift ;;
+        --ccache-volume) ccache_volume="${2:?--ccache-volume wymaga nazwy wolumenu}"; shift 2 ;;
         --list)     show_list; exit 0 ;;
         -h|--help)  show_help; exit 0 ;;
         *)
@@ -251,10 +256,12 @@ fi
 # ── Kontener ─────────────────────────────────────────────────────────────────
 container="rdb-test-ci-${profile}-$$"
 
-# BEZ nazwanego wolumenu na ccache: profil odwzorowuje job CI, a ten startuje
-# z pustym cache, bo config.yml nie przenosi go miedzy jobami (uzasadnienie w
-# sekcji `commands` tamtego pliku). Cieply cache dawalby tu czasy kompilacji,
-# jakich CI nie ma.
+# Domyslnie BEZ wolumenu na ccache, czyli z pustym cache - jak pierwszy job
+# galezi bez cache mastera i jak joby, ktore cache nie przenosza (ablacja,
+# bramka). Joby build-*-ninja-mydocker odtwarzaja go od 2026-10-25 z cache
+# CircleCI (ccache-restore w config.yml); --ccache-volume odwzorowuje to
+# wolumenem, ktory przechodzi z przebiegu na przebieg. To nadal nie jest cache
+# CI: ten zalezy od tego, co zapisal ostatni job galezi.
 
 # --reuse-build: katalog build/ w nazwanym wolumenie, osobnym dla kazdego
 # profilu. Osobnym, bo profile roznia sie konfiguracja tego samego katalogu -
@@ -272,6 +279,13 @@ build_volume="rdb-test-ci-build-${profile}"
 # TERM jak w kroku `Test resources` joba 1224.
 run_opts=(--cpus "$cpus" --memory "$memory" --memory-swap "$memory" --shm-size "$shm_size"
     --env CI=true --env CIRCLECI=true --env TERM=xterm)
+# `environment` executora debian-mydocker; make-build biegnie na ubuntu-docker.
+if [ "$profile" != "make-build" ]; then
+    run_opts+=(--env RDB_MOLD_THREADS=1)
+fi
+if [ -n "$ccache_volume" ]; then
+    run_opts+=(--volume "$ccache_volume:/home/$container_user/.cache/ccache")
+fi
 if [ "$reuse_build" -eq 1 ]; then
     if [ "$reset_build" -eq 1 ]; then
         echo "-- Kasuje zachowany katalog build/ profilu $profile"
@@ -297,6 +311,9 @@ echo "   wyniki:  $out_dir/$profile"
 if [ "$reuse_build" -eq 1 ]; then
     echo "   build:   wolumen $build_volume - przebudowa inkrementalna, NIE jak czysty checkout CI"
 fi
+if [ -n "$ccache_volume" ]; then
+    echo "   ccache:  wolumen $ccache_volume - cache z poprzednich przebiegow"
+fi
 
 docker run --detach --name "$container" "${run_opts[@]}" \
     --workdir "$(dirname "$work_dir")" \
@@ -307,6 +324,10 @@ docker run --detach --name "$container" "${run_opts[@]}" \
 # kontenera konczy sie odmowa dostepu.
 if [ "$reuse_build" -eq 1 ]; then
     docker exec --user root "$container" chown "$container_user:$container_user" "$work_dir" "$work_dir/build"
+fi
+if [ -n "$ccache_volume" ]; then
+    docker exec --user root "$container" chown "$container_user:$container_user" \
+        "/home/$container_user/.cache" "/home/$container_user/.cache/ccache"
 fi
 
 # Testowana tresc: pliki sledzone + niesledzone nieignorowane, czyli drzewo
@@ -394,6 +415,14 @@ conan_build() {
     step "Conan build ($build_type, $build_tool)"
     conan build . -s build_type="$build_type" --build missing
     (cd "build/$build_type" && "$build_tool" install)
+}
+
+# Odpowiednik `ccache-save` bez samego save_cache (cache trwa tu w wolumenie
+# --ccache-volume albo znika z kontenerem).
+ccache_save() {
+    step "Trim ccache to entries used by this job"
+    ccache --evict-older-than 7200s
+    ccache --show-stats
 }
 
 smoke_test() {
@@ -494,6 +523,7 @@ case "$profile" in
         prep_env
         conan_install
         conan_build
+        ccache_save
         smoke_test
         run_tests || status=$?
         if [ "$status" -eq 0 ] && [ "$profile" = "nightly-debug" ]; then

@@ -231,6 +231,10 @@ executors:
   debian-mydocker:
     docker:
       - image: micwide/buildenv-retractordb:latest
+        # mold z jednym watkiem zamiast nproc (36) przy kwocie 4 vCPU -
+        # uzasadnienie przy RDB_MOLD_THREADS w CMakeLists.txt.
+        environment:
+          RDB_MOLD_THREADS: "1"
     resource_class: large
 
   ubuntu-docker:
@@ -337,12 +341,45 @@ commands:
   # CCACHE_SLOPPINESS w launcherze): przebudowa celu xretractor w tym samym
   # katalogu z cieplym cache trwa 10 s zamiast 58 s (8 CPU).
   #
-  # Pary mimo to nie przywrocono. ccache biegnie teraz w kazdym jobie na obrazie
-  # projektu (CMakeLists.txt podpina go sam, obraz go ma), ale job kompiluje
-  # drzewo raz, wiec bez cache przenoszonego miedzy jobami nic nie zyskuje.
-  # Czy przenoszenie sie oplaci - ile joba commitowego zajmuje kompilacja, a ile
-  # zwykle testy, i ile kosztuje przeslanie cache - to osobna decyzja,
-  # do podjecia po pomiarze na CircleCI.
+  # Para wraca 2026-10-25 po pomiarze w obrazie CI (4 vCPU, scripts/test-ci.sh
+  # --ccache-volume; lokalnie ok. 2x szybciej niz w CircleCI): budowa Debug od
+  # zera 224-232 s, z cieplym cache po zmianie jednego .cpp 41-43 s. Zmiana
+  # rdb/descriptor.hpp (33 pliki) dawala przed kontrola -fsyntax-only 182 s
+  # wobec 263 s od zera. Cache Debug ma ok. 350 MB, Release ok. 250 MB; ccache
+  # juz kompresuje, wiec tyle idzie przez siec w kazda strone. Klucz: typ
+  # budowy + galaz + rewizja, a przy odtwarzaniu najnowszy cache tej galezi,
+  # potem mastera.
+  #
+  # Przed zapisem zostaja tylko wpisy uzyte w tym jobie (ccache odswieza czas
+  # wpisu przy trafieniu), zeby cache nie rosl z kazdym commitem o wpisy
+  # zmienionych plikow.
+  ccache-restore:
+    parameters:
+      build_type:
+        type: string
+    steps:
+      - restore_cache:
+          name: Restore ccache
+          keys:
+            - ccache-v1-<< parameters.build_type >>-{{ .Branch }}-{{ .Revision }}
+            - ccache-v1-<< parameters.build_type >>-{{ .Branch }}-
+            - ccache-v1-<< parameters.build_type >>-master-
+
+  ccache-save:
+    parameters:
+      build_type:
+        type: string
+    steps:
+      - run:
+          name: Trim ccache to entries used by this job
+          command: |
+            ccache --evict-older-than 7200s
+            ccache --show-stats
+      - save_cache:
+          name: Save ccache
+          key: ccache-v1-<< parameters.build_type >>-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ~/.cache/ccache
 
   conan-install:
     parameters:
@@ -500,9 +537,13 @@ jobs:
       - conan-install:
           build_param: --build missing
           build_tool: ninja
+      - ccache-restore:
+          build_type: Release
       - conan-build:
           build_param: --build missing
           build_tool: ninja
+      - ccache-save:
+          build_type: Release
       - run-test:
           build_tool: ninja
 
@@ -527,10 +568,14 @@ jobs:
           build_type: Debug
           build_param: --build missing
           build_tool: ninja
+      - ccache-restore:
+          build_type: Debug
       - conan-build:
           build_type: Debug
           build_param: --build missing
           build_tool: ninja
+      - ccache-save:
+          build_type: Debug
       - run-test:
           build_type: Debug
           build_tool: ninja
