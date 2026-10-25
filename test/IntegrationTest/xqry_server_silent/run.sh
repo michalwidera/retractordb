@@ -12,6 +12,9 @@ rm -rf temp && mkdir -p temp
 
 server_start query.rql --noanykey
 
+# Obciecie w powloce testu: `>out.txt` przy `&` wykonuje dopiero proces potomny, a out.txt
+# poprzedniego biegu ma juz 3 wiersze - petla nizej moglaby zamrozic serwer przed pierwszym wierszem.
+: >out.txt
 xqry -s dst -m 1000 --config short.toml >out.txt 2>err.txt &
 client=$!
 i=0
