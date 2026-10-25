@@ -12,9 +12,16 @@ file(
 # pod Valgrindem sprawdza wycieki i odczyty niezainicjowanej pamieci lokalnie.
 # Na platformie bez Valgrinda kopia nie jest rejestrowana; straz pamieci
 # zapewnia konfiguracja z -DRDB_SANITIZE=address,undefined.
+#
+# --fair-sched=yes: Valgrind wykonuje watki po jednym pod wspolnym zamkiem, a
+# domyslny zamek (no) oddaje go zwykle watkowi, ktory go wlasnie zwolnil. Watek
+# krecacy sie w petli (czytelnik w BusRepairSeqlock) glodzil wtedy watek glowny
+# na dziesiatki sekund i ut_busFallback-valgrind przekraczal limit (nightly
+# 2026-10-25, job 1229). Pod kwota 4 CPU z trzema sasiadami proba z budzetem 3 s
+# trwala do 9,1 s bez opcji i 3,1 s z nia.
 if(PROG_VALGRIND)
   set(RDB_UT_VALGRIND ${PROG_VALGRIND} --vgdb=no --error-exitcode=1
-                      --leak-check=full)
+                      --leak-check=full --fair-sched=yes)
 endif()
 
 # Limit chroni zwykly zestaw przed zawieszeniem. Pod Valgrindem czasy sa o rzad
