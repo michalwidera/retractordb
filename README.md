@@ -2,241 +2,55 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
 
-[comment]: # (VSCode view: Ctrl+k,v)
-
-**RetractorDB** is a specialized Edge Signal Processing Engine system designed for processing and recording regular time series data in real-time. The system is optimized for continuous data streams, signal processing, telemetry, and IoT monitoring applications.
+**RetractorDB** is an Edge Signal Processing Engine for processing and recording regular time series close to their sources. It combines a declarative query language (RQL), continuous signal processing and binary storage for telemetry, monitoring and IoT applications.
 
 > ⚠️ **This is work in progress:** Active development is ongoing.
 
+[Website](https://retractordb.com/) | [Documentation (PL)](https://dokumentacja.retractordb.com/) | [Documentation (EN)](https://documentation.retractordb.com/) | [Releases](https://github.com/michalwidera/retractordb/releases)
+
 ## Overview
 
-RetractorDB provides a unique approach to time series data management through continuous query processing and real-time data transformation. The system consists of three cooperating programs written in C++ and tested on x64 and ARM64 platforms under Linux.
+- **Regular streams:** exact rational sampling intervals, synchronization, interleaving, rate conversion and sliding windows.
+- **Continuous queries:** RQL compiles stream transformations, field expressions and rules into an execution plan.
+- **Execution and storage:** sequential plan evaluation, named engine instances, shared-memory access to live results, and binary artifacts with descriptors and metadata.
+- **Python and Jupyter:** an embedded engine with NumPy output, DLPack windows and optional PyTorch integration.
 
-**Key characteristics:**
-- **Real-time processing**: Designed to operate with real-time constraints
-- **Deterministic execution**: Sequential, deterministic processing thread
-- **Continuous queries**: Queries execute continuously from declaration until system termination
-- **Memory-efficient**: Uses shared memory for inter-process communication
-- **Stream-oriented**: Built on a custom algebra for regular time series
+Linux x86-64 and ARM64 are the deployment platforms. macOS on Apple silicon is a development and test platform built from source; see the build guide for requirements and tested configurations. The standalone engine supports clocked processing and optional Linux real-time scheduling, without hard real-time guarantees. The embedded Python engine runs on a logical timeline.
 
-### Project Links
-- **Official website**: [retractordb.com](https://retractordb.com)
-- **Documentation**: [Polish](https://dokumentacja.retractordb.com/) and [English](https://documentation.retractordb.com/)
-- **Installation**: [system and Python/Jupyter](https://documentation.retractordb.com/system-installation/)
-- **Repository**: [github.com/michalwidera/retractordb](https://github.com/michalwidera/retractordb)
+## Components
 
-## Core Components
+| Component | Role |
+| --- | --- |
+| [`xretractor`](src/retractor/README.md) | Compiles and executes RQL plans, standalone or as a service. |
+| [`xqry`](src/qry/README.md) | Reads live results, inspects instances and sends ad-hoc queries or plan replacements through IPC. |
+| [`xtrdb`](src/rdb/README.md) | Inspects and edits offline binary storage, descriptors and metadata. |
+| Python `Engine`, `Storage`, `Descriptor` | Executes plans inside Python and accesses offline storage without a running service; see the Python API guide below. |
 
-RetractorDB consists of three main programs:
+The [monitoring clients](api/README.md) for Python and C++ use `xqry` to access a running engine. They are separate from embedded plan execution.
 
-| Program | Role |
-|---------|------|
-| [`xretractor`](src/retractor/README.md) | Engine: compiles `.rql` query sets and executes continuous query plans (optionally as a systemd service, with real-time scheduling via `-t/--realtime`) |
-| [`xqry`](src/qry/README.md) | Client: reads results from the running engine via shared memory |
-| [`xtrdb`](src/rdb/README.md) | Inspection tool: reads binary storage artifacts and metadata |
+## Getting started
 
-## Installation
+The Polish manual is the canonical documentation; the English manual is its synchronized translation. Installation, configuration and runnable examples are maintained there:
 
-RetractorDB runs on Linux (x64 and ARM64) and on macOS. The macOS port is tested on Apple silicon only, with macOS 27 and Apple clang 21; Intel Macs and older macOS releases are untested. Prebuilt packages are published for Linux only; on macOS you build from source. See [Option B](#option-b---build-from-source) and the macOS notes below it.
+| Task | PL | EN |
+| --- | --- | --- |
+| Install Linux binaries: portable archives, DEB, systemd, upgrades | [Instalacja](https://dokumentacja.retractordb.com/instalacja-systemu/linux-releases.html) | [Linux releases](https://documentation.retractordb.com/system-installation/linux-releases.html) |
+| Build from source: Linux and macOS, Conan 2, CMake, Ninja | [Budowanie](https://dokumentacja.retractordb.com/instalacja-systemu/source-build.html) | [Source build](https://documentation.retractordb.com/system-installation/source-build.html) |
+| Run a first plan or load a service plan | [Uruchamianie](https://dokumentacja.retractordb.com/instalacja-systemu/running.html) | [Running](https://documentation.retractordb.com/system-installation/running.html) |
+| Set up Python, Jupyter or Colab | [Python i Jupyter](https://dokumentacja.retractordb.com/instalacja-systemu/python-jupyter.html) | [Python and Jupyter](https://documentation.retractordb.com/system-installation/python-jupyter.html) |
+| Use the embedded Python API, NumPy and PyTorch | [API Python](https://dokumentacja.retractordb.com/zalaczniki/python-jupyter-api.html) | [Python API](https://documentation.retractordb.com/appendices/python-jupyter-api.html) |
+| Configure the engine, storage and service | [xretractor](https://dokumentacja.retractordb.com/zalaczniki/opcje-wywolania/xretractor.html) | [xretractor](https://documentation.retractordb.com/appendices/command-line-options/xretractor.html) |
+| Learn RQL | [Język zapytań](https://dokumentacja.retractordb.com/konstrukcja-jezyka-zapytan/) | [Query language](https://documentation.retractordb.com/query-language-construction/) |
+| Understand the stream algebra | [Podstawy matematyczne](https://dokumentacja.retractordb.com/podstawy-matematyczne/) | [Mathematical foundations](https://documentation.retractordb.com/mathematical-foundations/) |
 
-### Option A - install from a release package
+For local examples, see [RQL plans](examples/) and [Python notebooks](api/python/notebooks/). The manuals also include signal-filter, ECG and OHLC walkthroughs: [PL](https://dokumentacja.retractordb.com/przyklady-zastosowan/) / [EN](https://documentation.retractordb.com/usage-examples/).
 
-Prebuilt packages are published on the [GitHub Releases page](https://github.com/michalwidera/retractordb/releases). Each release ships three assets named after the project version, for example (version `0.1.11`):
+## Development
 
-- `retractordb-0.1.11-Linux.deb` - Debian / Ubuntu package for x86-64, with the systemd service
-- `retractordb-0.1.11-linux-x86_64-portable.tar.gz` - portable CLI archive for x86-64
-- `retractordb-0.1.11-linux-aarch64-portable.tar.gz` - portable CLI archive for AArch64 (ARM64)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [CLAUDE.md](CLAUDE.md) for repository build, test and collaboration rules. Release packaging is documented in [scripts/release_package/README.md](scripts/release_package/README.md).
 
-GitHub Releases shows the SHA-256 digest of every asset; the web installer checks it before installing.
+## License and author
 
-**Debian / Ubuntu (`.deb`)** - installs binaries into `/usr/bin` and wires up the systemd service automatically:
+[MIT License](LICENSE). Created and maintained by **Michal Widera** (2003-2026).
 
-```bash
-# Download the .deb from the Releases page, then:
-sudo apt install ./retractordb-0.1.11-Linux.deb
-```
-
-The package `postinst` creates the system user `retractor` and runs `systemctl enable xretractor.service`. The service is enabled (starts on next boot) but **not** started immediately - start it now with:
-
-```bash
-sudo systemctl start xretractor
-systemctl status xretractor        # or: xretractor --status
-journalctl -u xretractor           # logs
-```
-
-See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service) for the packaged systemd unit details.
-
-**Portable archive (`-portable.tar.gz`)** - x86-64 or AArch64, installed by the [website installer](https://retractordb.com/install/). It picks the asset for your CPU, verifies its SHA-256 digest and installs the three programs into `~/.local` (no root) or `/usr/local`:
-
-```bash
-curl -fsSL https://retractordb.com/install.sh | bash -s -- install --user
-curl -fsSL https://retractordb.com/install.sh | sudo bash -s -- install --system --service   # with a systemd service
-```
-
-`--version 0.1.11` installs a specific release; `upgrade`, `uninstall`, `list` and `status` manage an existing install. The installer copies the default `retractor.toml` to `/etc/retractor/` for a system install or the user's XDG configuration directory, only if no local configuration exists. xretractor reads it automatically, including when run as a service. Do not combine the installer's `--service` with the `.deb` on one host: both use the same systemd unit name.
-
-The archive holds `bin/`, `share/doc/retractordb/LICENSE` and `share/retractordb/retractor.toml` relative to an install prefix, so it can also be unpacked by hand, for example `tar xzf retractordb-0.1.11-linux-x86_64-portable.tar.gz -C ~/.local`.
-
-After install, verify the three binaries are reachable:
-
-```bash
-xretractor -h
-xqry -h
-xtrdb -h
-```
-
-### Option B - build from source
-
-The build uses **Conan 2 + CMake + Ninja**. On Linux it requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13); on macOS it requires the **Xcode 16.3+ command-line tools** and a deployment target of **macOS 14.4 or newer** - `std::print` carries an availability annotation in Apple's libc++, so an older target fails to compile. That is the floor the code imposes, not a tested configuration. A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
-
-```bash
-git clone https://github.com/michalwidera/retractordb.git
-cd retractordb
-# Note: research data lives in the independent rdb-experiment repository.
-# See "Experiments" below if you need it.
-
-# 1. Install build dependencies (apt packages + Python venv + Conan)
-scripts/buildrdb.sh toolchain
-
-# 2. Configure the Conan profile (C++23) and add the Ninja generator
-scripts/buildrdb.sh conan ninja
-
-# 3. Add ~/.local/bin to PATH (the default install prefix)
-scripts/buildrdb.sh bashrc        # then restart the shell or: source ~/.bashrc
-
-# 4. Build (Debug); use 'release' for an optimized build
-scripts/buildrdb.sh debug
-```
-
-Install the binaries (no sudo - prefix defaults to `~/.local`) and run the test suite from the build directory:
-
-```bash
-cd build/Debug
-ninja install     # installs xretractor, xqry, xtrdb to ~/.local/bin
-ninja test        # optional: unit + integration tests
-ninja test-valgrind  # Linux: local memory checks
-```
-
-#### macOS
-
-`scripts/buildrdb.sh` covers macOS as well: `toolchain` installs through Homebrew instead of apt, and `mold` and `valgrind` - neither of which exists on Apple silicon - are reported as not applicable rather than missing. There is also a single-shot script that runs the whole sequence and writes one log:
-
-```bash
-scripts/macos-build.sh              # Debug: configure, build, install, ctest
-scripts/macos-build.sh release
-scripts/macos-build.sh --sanitize   # -fsanitize=address,undefined
-```
-
-Two differences are worth knowing before you read the results:
-
-- **Memory checking.** Unit tests run directly in the default suite. On Linux, `ninja test-valgrind` repeats them and runs the integration memory checks locally. There is no Valgrind for Apple silicon; the equivalent check is a sanitizer build (`-DRDB_SANITIZE=address,undefined`, which `--sanitize` passes for you).
-- **Real time and the service.** `SCHED_FIFO` is set per thread rather than per process, CPU affinity has no macOS equivalent (`--realtime` reports this instead of silently doing nothing), and there is no `PREEMPT_RT` counterpart, so macOS is a development and test target rather than a measurement platform. Service mode talks to launchd rather than systemd, and no unit file is packaged.
-
-To produce your own `.deb` / `.tar.gz` packages locally:
-
-```bash
-scripts/buildrdb.sh release package
-```
-
-To prepare portable release assets locally, from a configured Release build:
-
-```bash
-cd build/Release
-ninja package-portable          # x86-64 on an x86-64 host
-ninja package-portable-arm64    # local Docker ARM64 build; output in build/ARM64-Packages
-```
-
-The ARM64 target uses Docker's `linux/arm64` platform to compile natively under emulation on an x86-64 host, then checks that all three archive members are AArch64 ELF binaries. It is a manual target and is not run by CI. CPack only packages binaries built for the configured target architecture.
-
-To build all release assets in Docker (`.deb`, x86-64 and AArch64 portable archives), check that a release is ready and verify it after publishing on GitHub, see [scripts/release_package/README.md](scripts/release_package/README.md).
-
-
-### What this does to CI
-
-| Action | Pipeline |
-|---|---|
-| Commit and push in `rdb-experiment` | Does not trigger this repository's CircleCI pipeline |
-| Commit in this repository | Runs according to this repository's branch and workflow filters |
-
-CircleCI does not fetch the experiment repository. The `[skipci]` commit message marker remains available for explicit commit-triggered skips; scheduled and manual workflows ignore it and run regardless.
-
-## Initial configuration
-
-RetractorDB runs with sensible defaults and **needs no configuration file** to start - a missing config is a valid state. Configuration is optional TOML, loaded in layers (later layers override earlier ones):
-
-1. system: `/etc/retractor/retractor.toml`
-2. user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
-3. explicit: `xretractor --config <file>` - when given, **only** that file is loaded
-
-Both `xretractor` and `xqry` use the same search. Logs go to `/tmp/xretractor.log` and `/tmp/xqry.log` (in `--service` mode `xretractor` logs to stderr/journald instead).
-
-**Storage.** Where stream data and `.desc` / `.meta` artifacts are written is controlled by the `:STORAGE` directive inside the RQL file. The `[storage] dir` config key only provides a *default* used when the RQL has no `:STORAGE` directive - **RQL always wins**. If `storage.dir` is set, the directory must already exist and be writable by the xretractor process, otherwise startup fails with a configuration error.
-
-A minimal config that sets a default storage directory:
-
-```toml
-[storage]
-dir = "/var/lib/retractor/data"
-```
-
-For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`, `[service]`), validation rules, and the systemd service setup, see [src/retractor/README.md](src/retractor/README.md#configuration-toml).
-
-## Running your first query
-
-A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s. The example below needs no input data files - it reads bytes from `/dev/urandom`. Save it as `first.rql`:
-
-```sql
-# declaration of input time series
-DECLARE a BYTE , b BYTE STREAM core0, 1 DEVICE '/dev/urandom'
-DECLARE c BYTE , d BYTE STREAM core1, 0.5 DEVICE '/dev/urandom'
-
-SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
-SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0
-```
-
-Note: the interlace operator `#` requires both input streams to have the same number of fields. After `#` the constituents share one schema, so the result is read by its own name (`str1[0]`, `str1[1]`), not through `core0` or `core1`.
-
-(More ready-made examples live under [examples/](examples/), e.g. [examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
-
-**1. Sanity-check (compile only)** - no data processing, just validate the query set:
-
-```bash
-xretractor -c first.rql
-```
-
-**2. Start the engine.** `xretractor` compiles the queries and then runs them continuously until terminated. Start it (here in the foreground; press a key to stop, or use `-k` to disable that):
-
-```bash
-xretractor first.rql
-```
-
-If you installed via the `.deb`, the engine usually runs as a systemd service instead. To load a query set into an **already running** service, just start `xretractor` with your `.rql` file - it detects the running service, validates (compiles) the queries, overwrites the service's query file and restarts the unit to apply them, keeping the unit configuration:
-
-```bash
-xretractor my-new-queries.rql      # delivered to the running service via restart
-```
-
-This is the path for a full, persistent query set (rules, `:STORAGE`, rotation), as opposed to the transient ad-hoc injection over IPC (`xqry --adhoc`). Use `systemctl`/`journalctl` to manage and inspect the service. See [src/retractor/README.md](src/retractor/README.md#delivering-a-query-set-to-a-running-service) for details.
-
-**3. Query the running engine** with the `xqry` client (in a second terminal). `xretractor` must be running - `xqry` reads results from shared memory:
-
-```bash
-xqry -d              # list active streams/queries
-xqry -s str1         # stream out results of stream 'str1'
-xqry -s str2
-```
-
-`xqry` also offers other output modes (`--graphite`, `--influxdb`, `--gnuplot`) and an ad-hoc query mode (`--adhoc`); see [src/qry/README.md](src/qry/README.md) and `xqry -h`. To stop the engine you can also run `xqry --kill`.
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
-## Author
-
-Created and maintained by **Michal Widera** (2003-2026)  
 Contact: michal@widera.com.pl
