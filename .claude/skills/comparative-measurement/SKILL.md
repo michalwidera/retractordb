@@ -12,6 +12,7 @@ Reguła (każdy werdykt wydajnościowy na rodzinach uc01..uc08) i embargo publik
 Run one family from a FRESH copy of its directory with an empty `temp/`:
 
 ```bash
+scripts/buildrdb.sh probe          # first time only: creates build/Release-Probe
 cmake --build build/Release-Probe   # `ninja` in build/Release does NOT rebuild it
 python3 <usecases>/ucNN/generate_data.py --out "$work"
 cp <usecases>/ucNN/rql/query.rql "$work/query.rql"

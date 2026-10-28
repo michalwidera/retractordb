@@ -59,7 +59,8 @@ PROBE_SLOTS = 96          # sondowanie slotów konsumenta
 # daje przewidywania niedomiaru dla `>N`, `#`, `Θ` i `~Θ`, których nie
 # potwierdza żadna obserwacja: w podpróbie 112 planów wykonanych end-to-end
 # te klasy nie dały ani jednego rekordu all-NULL ani awarii. Dla `>N` jest to
-# wytłumaczalne - `fetchBack` adresuje wstecznie, więc wyprzedzenie czoła się
+# wytłumaczalne - `fetchForward` czyta dla niego pozycję n - N (do 2026-08-07
+# przez usunięty `fetchBack`), czyli wstecznie, więc wyprzedzenie czoła się
 # skraca. Dla `#`, `Θ` i `~Θ` pozostaje nierozstrzygnięte i jest raportowane
 # osobno jako przewidywanie bez potwierdzenia (patrz sekcja "nierozstrzygnięte"
 # w wyniku skryptu), a nie jako defekt.
@@ -73,7 +74,7 @@ PROBE_SLOTS = 96          # sondowanie slotów konsumenta
 DECLARATION_PREFETCH = 2
 PREFETCH_CONFIRMED = (SUB, AGSE, ADD)
 
-# Operatory faktycznie sięgające do historii składowej: `>N` przez fetchBack,
+# Operatory faktycznie sięgające do historii składowej: `>N` (pozycja n - N),
 # `#`, `&`, `%`, `-`, `+` przez fetchForward, `@` przez constructAgsePayload.
 # Projekcja i redukcje czytają wyłącznie bieżący payload składowej
 # (dataModel.cpp:206-214, :259-266), więc nie stawiają wymagań pojemnościowych
@@ -236,7 +237,7 @@ def main():
         writer.writerows(rows)
 
     # Limit pojemności wiąże wyłącznie dla składowych DEKLAROWANYCH: strażniki
-    # w dataModel::fetchForward/fetchBack i w storage::revRead sprawdzają
+    # w dataModel::fetchForward i w storage::revRead sprawdzają
     # historię tylko pod warunkiem isDeclared(). Strumienie obliczane czytają
     # z magazynu, który zachowuje komplet rekordów. Zawężenie potwierdzone
     # empirycznie: bez niego model daje 4 fałszywe alarmy na planach, które

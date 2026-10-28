@@ -59,8 +59,10 @@ set_property(GLOBAL PROPERTY IT_NAMESPACE_NEXT 0)
 
 # Opakowanie valgrindem dla tych testow integracyjnych, ktore sprawdzaja nie
 # tylko wynik, ale i czystosc pamieci silnika. PUSTE tam, gdzie valgrinda nie ma
-# (Apple silicon nie ma go i miec nie bedzie) - test wykonuje sie wtedy bez
-# opakowania, czyli sprawdza samo zachowanie, a straz pamieci przechodzi na
+# (Apple silicon nie ma go i miec nie bedzie). Testy -vg-* (etykieta valgrind)
+# nie biegna tam wtedy w `ninja test` ani w test-valgrind, ktorego bez valgrinda
+# nie ma; wykonuje je tylko jawne `ctest` (pelne albo -L valgrind) - bez
+# opakowania, czyli sprawdzaja samo zachowanie, a straz pamieci przechodzi na
 # konfiguracje z -DRDB_SANITIZE=address,undefined. Lepsze to niz "command not
 # found" w dziewieciu testach, ktore z pamiecia nie maja nic wspolnego.
 if(PROG_VALGRIND)

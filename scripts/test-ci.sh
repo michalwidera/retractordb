@@ -84,6 +84,11 @@ profile_desc() {
 # na x86: wolna i niewierna akurat w tym, co ten job sprawdza (zachowanie na
 # innej architekturze). Luka jest swiadoma - po zmianie w `manual-make-build`
 # job ARM nadal trzeba sprawdzic przebiegiem CI.
+#
+# Joba `build-debug-macos` (workflow `manual-macos`) tez NIE odwzorowujemy:
+# biegnie na executorze macOS (Apple silicon), ktorego obrazu nie da sie
+# uruchomic w Dockerze na Linuksie. Zmiane w tym jobie sprawdza dopiero
+# przebieg CI albo `scripts/macos-build.sh` na Macu.
 profile_image() {
     case "$1" in
         make-build) echo "$stock_image" ;;

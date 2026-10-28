@@ -309,6 +309,9 @@ TEST_F(GroupFileTest, test_fagrp_purge_is_not_a_rotation_failure) {
     gfa->write(&record);
   }
   EXPECT_EQ(log.text().find("Failed to rotate"), std::string::npos) << log.text();
+  // Purge przez zapis zostawilby pusty plik do rotacji, a .old3 i tak skonczyloby z {42} - nadpisane
+  // archiwum widac tylko w logu.
+  EXPECT_EQ(log.text().find("overwrote existing archive"), std::string::npos) << log.text();
   EXPECT_EQ(readFile(sandboxPath("test_file.old3")), std::vector<BYTE>({42}));
 }
 

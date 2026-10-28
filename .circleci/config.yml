@@ -83,7 +83,9 @@ workflows:
   # `triggers.schedule` o tym samym cronie - scalony tutaj, zeby jeden harmonogram
   # nie byl zapisany w dwoch miejscach.
   #
-  # Dwie warstwy, pierwsza odcina druga:
+  # Dwie warstwy, pierwsza odcina druga - ale tylko w polowie: L2 czeka wylacznie
+  # na zielony Release z L1 (requires: build-release-ninja-mydocker), wiec
+  # czerwony Debug ani Valgrind bramki i podlogi nie zatrzymuja:
   #   L1  zwykle testy w Debug i Release oraz Valgrind tylko w Debug;
   #   L2  bramka badawcza H9/H10 (najdrozszy job przebiegu) i podloga ablacyjna.
   #

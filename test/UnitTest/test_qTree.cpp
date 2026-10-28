@@ -104,8 +104,8 @@ TEST(qTree, getQuery_returns_first_of_twin_names) {
 
 // Kontrprzyklad z #272. Podpowiedz pozycyjna uzbrojona na ukladzie [a, x, x'] potwierdza sie
 // na sprawdzeniu "czy [1].id == x", a mimo to po skasowaniu 'a' pozycja 1 trzyma juz blizniaka.
-// Uklad powstaje w factorMatchedHashTimeMoves (compiler.cpp:2185 push_back, :2211 erase), a
-// compile() biegnie na ZYWYM drzewie przy imporcie ad-hoc (executorsmAdHoc.cpp:234), wiec nie
+// Uklad powstaje w compiler::factorMatchedHashTimeMoves (push_back, a potem erase), a
+// compile() biegnie na ZYWYM drzewie przy imporcie ad-hoc (executorsm::getAdHoc), wiec nie
 // jest hipotetyczny.
 TEST(qTree, getQuery_keeps_first_occurrence_after_plan_shift) {
   qTree qt;
