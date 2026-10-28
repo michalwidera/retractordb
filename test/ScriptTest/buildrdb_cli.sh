@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 # Warstwa przenosnosci powloki testow integracyjnych - jedno miejsce na caly test/.
 . "$(dirname "$0")/../IntegrationTest/portable.sh"
 
@@ -17,7 +17,8 @@ fail() {
 # Kazde niepowodzenie POZA `fail` konczylo ten test w ciszy: `set -e` przerywa,
 # a `trap ... EXIT` sprzata katalog i po tescie zostaje samo "***Failed" bez
 # jednego slowa o przyczynie. Kosztowalo to osobny przebieg diagnostyczny przy
-# porcie na macOS, wiec numer linii jest teraz wypisywany zawsze.
+# porcie na macOS, wiec numer linii jest teraz wypisywany zawsze. `set -E` w naglowku
+# przenosi te pulapke do funkcji - bez niego blad wewnatrz funkcji nadal konczyl test w ciszy.
 trap 'status=$?; [ "$status" -ne 0 ] && echo "FAIL: buildrdb_cli.sh przerwany w linii $LINENO (kod $status)" >&2; exit $status' ERR
 
 assert_contains() {

@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <any>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/rational.hpp>
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -14,6 +12,8 @@
 #include <utility>
 
 #include <gmock/gmock.h>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/rational.hpp>
 
 #include "fldType.hpp"
 #include "rdb/convertTypes.hpp"

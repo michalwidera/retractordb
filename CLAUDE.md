@@ -45,7 +45,7 @@ ninja test-ci-nightly-debug # Debug job from run_manual_nightly_full, including 
 ninja test-ci-fast   # same job, build/ kept between runs - quick, NOT a faithful CI run
 scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
 ```
-Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
+Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`; the exception is `make-build`, which mirrors a job on stock `cimg/base:current`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
 
 By default, local CI profiles start with a fresh build directory and an empty ccache. CircleCI's `build-debug-ninja-mydocker` and `build-release-ninja-mydocker` jobs instead restore ccache by build type, branch and revision, falling back to the branch and then master; before saving they evict entries older than 7200 seconds. The other jobs do not use those restore/save steps. A fresh checkout therefore does not imply a cold compiler cache.
 

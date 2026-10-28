@@ -80,7 +80,7 @@ RDB_WRAP_SYSCALL(long, sysconf, (int key), (key));
 RDB_WRAP_SYSCALL(int, pthread_setaffinity_np, (pthread_t thread, size_t size, const cpu_set_t *mask), (thread, size, mask));
 #endif
 
-// ctest -R '^ut-test_executor_rt' -V
+// ctest -R '^ut_executor_rt' -V
 
 namespace {
 

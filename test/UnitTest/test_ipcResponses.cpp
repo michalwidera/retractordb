@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <format>

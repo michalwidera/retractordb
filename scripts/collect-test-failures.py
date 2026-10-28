@@ -148,7 +148,9 @@ def comparePairs(command: str, workDir: Path) -> list[tuple[Path, Path]]:
     roznice byly diffem dwoch niezwiazanych plikow.
     """
     pairs = []
-    for args in re.findall(r"compare\.sh((?:\s+[^\s&|;<>]+)+)", command):
+    # [ \t], nie \s: \s przechodzi przez znak nowej linii i wchlanial nastepne polecenie
+    # razem z jego wlasnym compare.sh, a ta para przepadala.
+    for args in re.findall(r"compare\.sh((?:[ \t]+[^\s&|;<>]+)+)", command):
         operands = [arg for arg in args.split() if not arg.startswith("-")]
         if len(operands) < 2:
             continue

@@ -580,7 +580,11 @@ foreach(_target ${_imported_targets})
 endforeach()
 
 # Na Linuksie osobny cel test-valgrind wymaga narzedzia. Na Apple Silicon straz
-# pamieci przechodzi na sanitizery (RDB_SANITIZE).
+# pamieci przechodzi na sanitizery (RDB_SANITIZE). REQUIRED zostaje, choc `ninja
+# test` valgrinda nie uzywa: bez niego cel test-valgrind po cichu by nie
+# powstal, a lokalny przebieg pamieci jest obowiazkowy przed kazdym commitem
+# (CLAUDE.md, *Session end*) - brak narzedzia ma zatrzymac konfiguracje, a nie
+# zdjac kontrole.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_program(PROG_VALGRIND valgrind REQUIRED)
 else()
