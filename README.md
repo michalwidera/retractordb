@@ -24,7 +24,7 @@ Linux x86-64 and ARM64 are the deployment platforms. macOS on Apple silicon is a
 | [`xretractor`](src/retractor/README.md) | Compiles and executes RQL plans, standalone or as a service. |
 | [`xqry`](src/qry/README.md) | Reads live results, inspects instances and sends ad-hoc queries or plan replacements through IPC. |
 | [`xtrdb`](src/rdb/README.md) | Inspects and edits offline binary storage, descriptors and metadata. |
-| Python `Engine`, `Storage`, `Descriptor` | Executes plans inside Python and accesses offline storage without a running service; see the Python API guide below. |
+| [Python `Engine`, `Storage`, `Descriptor`](api/python/README.md) | Executes plans inside Python and accesses offline storage without a running service. |
 
 The [monitoring clients](api/README.md) for Python and C++ use `xqry` to access a running engine. They are separate from embedded plan execution.
 
