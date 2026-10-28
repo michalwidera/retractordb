@@ -1,5 +1,7 @@
 # Python: Engine, Storage and Descriptor
 
+[![Python >=3.10](https://img.shields.io/badge/Python-%3E%3D3.10-blue?logo=python)](https://documentation.retractordb.com/system-installation/python-jupyter.html)
+
 [RetractorDB](../../README.md) | [API manual (PL)](https://dokumentacja.retractordb.com/zalaczniki/python-jupyter-api.html) | [API manual (EN)](https://documentation.retractordb.com/appendices/python-jupyter-api.html)
 
 The embedded Python API executes RQL plans and reads stored results without a running service. It uses the compiled `retractordb._core` extension, with NumPy output and optional PyTorch integration for notebooks and applications.
