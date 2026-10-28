@@ -47,7 +47,9 @@ scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
 ```
 Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
 
-Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and ccache does not shorten it (the container starts with an empty cache, as a CI job does). `test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume; use it to check a change before committing, not to conclude anything about a CI run. `scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
+By default, local CI profiles start with a fresh build directory and an empty ccache. CircleCI's `build-debug-ninja-mydocker` and `build-release-ninja-mydocker` jobs instead restore ccache by build type, branch and revision, falling back to the branch and then master; before saving they evict entries older than 7200 seconds. The other jobs do not use those restore/save steps. A fresh checkout therefore does not imply a cold compiler cache.
+
+`scripts/test-ci.sh --profile <name> --ccache-volume <volume>` keeps ccache in a named Docker volume across local runs. This models cache reuse, but its contents are independent of CircleCI's cache, so local build times do not establish CI build times. Separately, `test-ci-fast` keeps `build/` in a per-profile Docker volume; use it to check a change before committing, not as evidence of a fresh CI build. `scripts/test-ci.sh --profile <name> --reset-build` drops that kept build directory without clearing an explicitly selected ccache volume.
 
 Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and adds the `-vg-` integration memory checks (ctest label `valgrind`). When each must be run is in *Session end*. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
