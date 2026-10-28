@@ -1,6 +1,11 @@
 # RetractorDB
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
+[![GitHub release](https://img.shields.io/github/v/release/michalwidera/retractordb)](https://github.com/michalwidera/retractordb/releases/latest)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue?logo=cplusplus)](https://documentation.retractordb.com/system-installation/source-build.html)
+[![PyPI version](https://img.shields.io/pypi/v/retractordb)](https://pypi.org/project/retractordb/)
+[![Documentation PL](https://img.shields.io/badge/docs-PL-blue)](https://dokumentacja.retractordb.com/)
+[![Documentation EN](https://img.shields.io/badge/docs-EN-blue)](https://documentation.retractordb.com/)
 
 **RetractorDB** is an Edge Signal Processing Engine for processing and recording regular time series close to their sources. It combines a declarative query language (RQL), continuous signal processing and binary storage for telemetry, monitoring and IoT applications.
 
