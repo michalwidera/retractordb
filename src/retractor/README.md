@@ -1,271 +1,43 @@
-# [RetractorDB](../README.md):xretractor
+# xretractor
 
-[comment]: # (VSCode view: Ctrl+k,v)
+[RetractorDB](../../README.md) | [Manual (PL)](https://dokumentacja.retractordb.com/zalaczniki/opcje-wywolania/xretractor.html) | [Manual (EN)](https://documentation.retractordb.com/appendices/command-line-options/xretractor.html)
 
-## RetractorDB - query compiler & executor process
+`xretractor` compiles RQL query sets and executes continuous stream-processing plans. It reads declared sources, evaluates transformations and rules, stores results, and publishes live streams for [`xqry`](../qry/README.md).
 
-Compilation and execution are gathered in one program called xretractor. The build phase precedes the query execution process. The tool also provides methods to dump compiled query execution plans in text form.
+## Basic use
 
-This process is called from command prompt with:
-```
-$xretractor - compiler & data processing tool.
-
-Usage: xretractor queryfile [option]
-
-Available options:
-  -h [ --help ]               Show program options
-  -b [ --build-info ]         show optimizer build configuration
-  -c [ --onlycompile ]        compile only mode
-  -q [ --queryfile ] arg      query set file
-  -r [ --quiet ]              no output on screen, skip presenter
-  -s [ --status ]             check service status
-  -v [ --verbose ]            verbose mode (show stream params)
-  -x [ --xqrywait ]           wait with processing for first query
-  -n [ --name ] arg           instance name; own IPC area and lock
-  -a [ --autoname ]           generate a docker-style instance name
-  -k [ --noanykey ]           do not wait for any key to terminate
-  -j [ --service ]            service mode: log to stderr (journald)
-  -t [ --realtime ]           enable real-time scheduling
-  -f [ --no-clock ]           offline mode: compute slots without waiting
-  -u [ --until-eof ]          forces one-shot all sources
-  -g [ --config ] arg         config file (TOML); overrides search
-  -m [ --llimitqry ] arg (=0) loop iteration limit, 0 - no limit
-Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
-Log: <system temporary directory>/xretractor.log
-Config: Defaults
-This software is licensed under the MIT License and is provided ‘as is’,
-without warranty of any kind. For more information, see the LICENSE file.
-```
-
-The query file is optional in execution mode, where omitting it starts an idle instance. Compile-only mode requires a query file.
-When configuration files are loaded, `Config:` lists their paths in load order instead of `Defaults`.
-
-## Running as a systemd service
-
-xretractor can run as a Linux systemd service without any wrapper/supervisor process. It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
-
-Relevant options:
-- `-j` / `--service` - service mode: log to **stderr** (captured by journald), with no per-process log file.
-- `-k` / `--noanykey` - ignore key presses from an attached terminal. Input is ignored automatically when stdin is not a TTY; the packaged service still passes this option explicitly.
-- starting **without** a query file - or with a file that carries no statements at all - boots an **idle** instance that stays alive until `SIGTERM` (no crash-loop before any query is defined); pass a `.rql` file with statements to load queries at start-up, or send one later with `xqry --reset` (below).
-
-### One service, one name
-
-An instance in service mode (`--service`, `XRETRACTOR_SERVICE=1`, or a detected systemd unit) is named **`service`** on the bus unless `--name` / `--autoname` / `RDB_NAMESPACE` says otherwise. The name is fixed on purpose: it is what an operator types (`xqry --server service ...`), and a name that must first be looked up on the bus cannot be written into a script.
-
-Several **plain** servers may run side by side, each with its own name, IPC area and plan. A **service** is exactly one. Two guards enforce it: the per-name instance lock (two unnamed services both want the name `service`) and a check of the bus at start-up, which refuses a second instance in service mode even under a different `--name`:
-
-```
-xretractor: a service instance is already running as instance 'service' (pid 4711);
-only one service instance is allowed
-```
-
-### Reloading the whole plan without a restart
-
-`xqry --reset <file.rql> --server service` replaces the entire plan of a running instance, including an instance that is still idle - that is how a service started at boot with no queries gets its first plan. The set is validated (parse, compile, stream-name disjointness against other live instances) **before** the running plan is touched, so a refusal costs nothing. A file with no statements returns the instance to the idle state. Details and examples: [xqry](../qry/README.md).
-
-For an instance that really is a systemd unit, an accepted plan is also written to the unit's query file, so a later restart resumes what the service is actually computing. The same file is **emptied** if the process dies on a critical error (`FatalError`): the unit then restarts into the idle state instead of coming up again on the plan that has just killed it. A plain process started from a terminal never has its `.rql` file rewritten this way.
-
-Service logging mode can also be enabled with the `XRETRACTOR_SERVICE` environment variable (any value other than empty or `0`), which is convenient in a systemd unit via `Environment=`:
-
-```ini
-[Service]
-Type=simple
-Environment=XRETRACTOR_SERVICE=1
-ExecStart=/usr/bin/xretractor --noanykey
-KillSignal=SIGTERM
-TimeoutStopSec=30
-```
-
-### Delivering a query set to a running service
-
-When `xretractor` is started with a query file while another instance is **already running as a systemd service**, and the invocation does not ask for an identity of its own, it does not fail with a lock error. Instead it:
-
-1. detects that the running instance is a systemd unit (and whether it is a `system` or `--user` unit),
-2. compiles the new query set locally to validate it (a parse/compile error stops here - nothing is delivered),
-3. overwrites the service's query file with the validated set (atomically), and
-4. restarts the unit (`systemctl restart` / `systemctl --user restart`), so the service reloads the new queries while keeping its unit configuration.
-
-On success it prints `Query ... sent to running service '<unit>'` and exits `0`.
+Given an RQL file `plan.rql`:
 
 ```bash
-# xretractor.service is already running
-xretractor my-new-queries.rql      # validated, delivered, service restarted
+xretractor --onlycompile plan.rql
+xretractor plan.rql --name demo --noanykey
 ```
 
-Notes:
-- Since `xqry --reset` exists, this is no longer the only way to hand a full query set to a running service. Use it when you want the service **restarted** on the new set; use `xqry --reset` when you want the plan swapped in place, without a restart and without `systemctl` privileges.
-- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) - unlike the lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single `SELECT`, `DECLARE` or `RULE`. An ad-hoc `RULE` may use `DO DUMP`; `DO SYSTEM` is rejected over IPC. The same boundary applies to `xqry --reset`, which carries a full plan but no authorship either: a plan holding a `DO SYSTEM` rule is refused as a whole, so such a rule may only be asked for in the plan file this process starts from. An operator who deliberately hands that channel over sets `unrestricted = true` under `[service]` in the service configuration; the ad-hoc channel stays closed regardless.
-- The running service is found on the **bus**, not by the lock file name: a service is named `service`, so a new invocation almost never shares its lock file.
-- **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo` (likewise `--autoname` or `[server] autoname = true`) starts a **separate instance** next to the service; the service's query file is not touched and its unit is not restarted. `--name service` - the name the service itself carries - still means "target that service" and delivers. Such a separate instance may not claim a stream name or rotation counter the live service holds: that is a normal conflict (`device_or_resource_busy`), because the two are meant to run side by side. Starting a second instance in **service mode** stays refused regardless of its name (see *One service, one name*).
-- Restarting a **system** unit needs privileges - run with `sudo` if `systemctl restart` is denied; a `--user` unit restarts without root.
-- Which file is overwritten: the service reports its own query file in the lock file; if that is unavailable, the `[service] query_file` config default is used.
-- If the running instance is a plain process (not a systemd unit), startup fails with the usual single-instance lock error (`no_lock_available`).
+The first command inspects the compiled plan without processing data. The second starts a named instance; stop it with Ctrl+C. To process finite file inputs without waiting for the wall clock:
 
-### Packaged unit (DEB)
-
-The `.deb` produced by `scripts/buildrdb.sh package` ships the unit and wires it up automatically:
-
-- binaries install to `/usr/bin/` (so `ExecStart=/usr/bin/xretractor`),
-- the unit installs to `/usr/lib/systemd/system/xretractor.service`,
-- its `ExecStart` loads the canonical query file `/etc/retractor/startup.rql` (an **empty** file = idle); `postinst` creates it empty if absent,
-- `postinst` copies the packaged `retractor.toml` to `/etc/retractor/retractor.toml` only when no local configuration exists; xretractor loads that path automatically at startup,
-- the `postinst` maintainer script creates the system user `retractor` and runs `systemctl enable xretractor.service` (the service starts on next boot; it is **not** started immediately - use `systemctl start xretractor` to start it now),
-- `postrm` disables the unit on package removal.
-
-The unit is generated from the template [`packaging/systemd/xretractor.service.in`](../../packaging/systemd/xretractor.service.in) (`@RETRACTOR_BIN@` and `@RETRACTOR_QUERY_FILE@` are substituted at build time). Edit the template, not the generated copy. The query-file path has a single build-time source (CMake `RETRACTOR_QUERY_FILE`); an administrator can override it at runtime **without editing the unit** by setting `RETRACTOR_QUERY_FILE=...` in `/etc/retractor/service.env` (shipped as `service.env.example`, read via the unit's `EnvironmentFile`). Logs: `journalctl -u xretractor`; status: `systemctl status xretractor` or `xretractor --status`.
-
-## Configuration (TOML)
-
-xretractor and xqry support optional TOML configuration loaded in layers:
-
-- system: `/etc/retractor/retractor.toml`
-- user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
-
-The later layer overrides keys from previous layers. If `--config <file>` is used, only that file is loaded; a missing or invalid explicit file is an error.
-
-Missing implicit system and user configuration files are valid (defaults are used). An existing file with invalid TOML stops startup with a nonzero exit code and an ERROR diagnostic naming the file and cause, including in Release builds. Each loaded layer must be valid even if a later layer would override its keys. The same rule applies to xqry and xtrdb. `--help` works regardless of the configuration; xretractor reports the error in the `Config:` line of its help.
-
-A nonempty `paths.lock_dir` must be absolute in every loaded file; a relative path stops startup with the same error reporting. An empty value keeps the default temporary directory.
-
-### Validation and warnings
-
-Some numeric options are validated at load time. If a value is invalid, the process logs `WARN` and falls back to the built-in default. For suspiciously high values, the process logs `WARN` and keeps the value.
-
-For `storage.dir`, validation is strict:
-- if configured, the directory must exist,
-- it must be a directory,
-- it must be writable by xretractor process.
-
-If any of those checks fail, xretractor reports a configuration error and stops.
-
-### All supported keys
-
-#### [storage]
-
-- `storage.dir` (string, default: empty)
-  - Default storage directory.
-  - Used only if RQL input does not define its own `:STORAGE` directive.
-  - If set, path must exist and be writable; otherwise startup fails with configuration error.
-
-- `storage.ref_dirs` (array of strings, default: empty) - read by `xtrdb`
-  - Extra directories into which a `REF` taken from a stored `.desc` may move a writable data file (#278).
-  - Without the key, a `REF` read from a `.desc` writes and deletes only inside the storage directory: `open` of a writable storage whose `REF` leads elsewhere is refused before the file is touched, and `quitdrop` / `rox` delete only the `.desc` of a data file outside the allowed directories.
-  - Reading a declared source (`TYPE BINFILE`, `TEXTSOURCE`, `DEVICE`) through `REF` is always allowed, and a `REF` given by the plan or by an `open` schema is the operator's decision and is not limited. In xretractor the `REF` of a stored `.desc` must equal the plan's, so the key does not change the engine.
-  - Each entry must be an absolute path to an existing directory; otherwise `xtrdb` stops with a configuration error.
-
-#### [ipc]
-
-- `ipc.queue_buffer_seconds` (int, default: `10`, must be `> 0`)
-  - Queue headroom in seconds used by xretractor for per-stream response queues.
-  - Higher value increases burst tolerance and memory usage.
-
-- `ipc.min_queue_elements` (int, default: `100`, must be `> 0`)
-  - Minimum queue capacity regardless of stream interval.
-
-- `ipc.client_response_max_fails` (int, default: `300`, must be `> 0`)
-  - Retry budget for xqry waiting for a response in shared memory; the value is a count, not a time unit.
-  - Effective wait time is a wall-clock deadline of `client_response_max_fails * kClientResponsePollInterval` (300 × 10 ms = 3 s).
-  - The 3-second default accommodates a command thread running as SCHED_OTHER beside a SCHED_FIFO processing thread on the same pinned core; scheduling can delay a response for an RT throttling period (issue_217).
-
-#### [timing]
-
-- `timing.server_startup_wait_s` (int, default: `30`, must be `> 0`)
-  - Maximum time xqry waits for server availability with `--wait-server`.
-
-- `timing.server_startup_poll_ms` (int, default: `100`, must be `> 0`)
-  - Polling interval while waiting for server startup in xqry.
-
-- `timing.query_no_data_timeout_ms` (int, default: `10000`, must be `> 0`)
-  - xqry select-loop no-data timeout. After this time without data, xqry assumes server is dead.
-
-#### [scheduling]
-
-- `scheduling.rt_priority` (int, default: `50`, allowed `1..99`)
-  - SCHED_FIFO priority used by xretractor in `--realtime` mode.
-
-#### [paths]
-
-- `paths.lock_dir` (string, default: empty)
-  - Directory for singleton lock file.
-  - Empty means system temp directory.
-  - Recommended for service deployments: `/var/run/retractor` or `$XDG_RUNTIME_DIR`.
-
-#### [server]
-
-- `server.autoname` (bool, default: `false`)
-  - When `true`, an instance started without `--name` and without `--autoname` gets a generated docker-style name (same generator as `--autoname`), printed on stdout as `Instance name: <name>`.
-  - Explicit `--name` wins over this key, silently.
-  - Default `false` keeps the historical single-instance identity: empty name, lock file and IPC objects without a suffix, reported by `xqry --bus` as `(unnamed)`.
-  - The generated name is random, so it differs after every restart - it identifies a running instance, not a durable service.
-
-#### [service]
-
-- `service.query_file` (string, default: `/etc/retractor/startup.rql`)
-  - Query file overwritten when delivering a set to a running service (see "Delivering a query set to a running service").
-  - Fallback only: normally the running service reports its own query file in the lock.
-  - Must match the unit's `ExecStart` argument - this key does **not** change `ExecStart`.
-
-### Example configuration
-
-```toml
-[storage]
-dir = "/var/lib/retractor/data"
-
-[ipc]
-queue_buffer_seconds = 10
-min_queue_elements = 100
-client_response_max_fails = 300
-
-[timing]
-server_startup_wait_s = 30
-server_startup_poll_ms = 100
-query_no_data_timeout_ms = 10000
-
-[scheduling]
-rt_priority = 50
-
-[paths]
-lock_dir = "/var/run/retractor"
-
-[server]
-autoname = false
-
-[service]
-query_file = "/etc/retractor/startup.rql"
+```bash
+xretractor plan.rql --name batch --no-clock --until-eof --noanykey
 ```
 
-The tool has a separate compile-only interface used to inspect a query plan or generate its diagrams.
+Use `xretractor --help` for runtime options and `xretractor --onlycompile --help` for plan inspection and diagram options. Installation and a complete first-plan example are linked below.
 
-```
-$xretractor -c -h
-xretractor - compiler & data processing tool.
+## Instances, configuration and services
 
-Usage: xretractor -c queryfile [option]
+- Instances can run concurrently with distinct names and disjoint stream/storage resources. Use `--name` or `--autoname` and discover them with `xqry --bus`.
+- Starting without a query file creates an idle instance. `xqry --server demo --reset plan.rql` submits a whole replacement plan without restarting the process; existing subscriptions end when the plan changes.
+- Configuration is optional TOML. `--config file.toml` selects one explicit file; otherwise the engine loads the platform's system and user layers. The manual defines keys, precedence and validation.
+- Linux service setup uses systemd. For a service, an accepted reset also attempts to save its startup plan; `OK` does not guarantee durable persistence or successful late activation. Check service logs. Delivering a plan through a separate `xretractor plan.rql` invocation can instead restart a detected service; see the manual for targeting and permissions.
 
-Available options:
-  -h [ --help ]          show help options
-  -b [ --build-info ]    show optimizer build configuration
-  -c [ --onlycompile ]   compile only mode
-  -q [ --queryfile ] arg query set file
-  -r [ --quiet ]         no output on screen, skip presenter
-  -d [ --dot ]           create dot output
-  -m [ --csv ]           create csv output
-  -f [ --fields ]        show fields in dot file
-  -t [ --tags ]          show tags in dot file
-  -s [ --streamprogs ]   show stream programs in dot file
-  -u [ --rules ]         show rules in dot file
-  -i [ --hideruleprog ]  hide rule program in rules (-u) output
-  -p [ --transparent ]   make dot background transparent
-  -w [ --diagram ] arg   create diagram output
-  -z [ --shmbudget ]     show shared memory budget of the compiled plan
-Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
-Log: <system temporary directory>/xretractor.log
-Config: Defaults
-This software is licensed under the MIT License and is provided ‘as is’,
-without warranty of any kind. For more information, see the LICENSE file.
-```
+Clocked processing and optional Linux real-time scheduling do not provide hard real-time guarantees. For execution inside Python on a logical timeline, use the [embedded API](../../api/python/README.md).
 
-## Storage state machine
+## Documentation
 
-![Declared-source state machine](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/retractor/UML/storage-access-state.puml)
+| Topic | PL | EN |
+| --- | --- | --- |
+| CLI, configuration, services and plan replacement | [xretractor](https://dokumentacja.retractordb.com/zalaczniki/opcje-wywolania/xretractor.html) | [xretractor](https://documentation.retractordb.com/appendices/command-line-options/xretractor.html) |
+| Installation and source builds | [Instalacja](https://dokumentacja.retractordb.com/instalacja-systemu/) | [Installation](https://documentation.retractordb.com/system-installation/) |
+| First plan and service use | [Uruchamianie](https://dokumentacja.retractordb.com/instalacja-systemu/running.html) | [Running](https://documentation.retractordb.com/system-installation/running.html) |
+| Named instances and resource ownership | [Magistrala](https://dokumentacja.retractordb.com/architektura-systemu-przetwarzania-danych/wiele-instancji-i-magistrala.html) | [Instances and bus](https://documentation.retractordb.com/data-processing-system-architecture/multiple-instances-and-bus.html) |
+| RQL syntax and operators | [Język zapytań](https://dokumentacja.retractordb.com/konstrukcja-jezyka-zapytan/) | [Query language](https://documentation.retractordb.com/query-language-construction/) |
+
+See also [example plans](../../examples/) and the [declared-source state diagram](UML/storage-access-state.puml). Repository build and test rules are in [CLAUDE.md](../../CLAUDE.md).
