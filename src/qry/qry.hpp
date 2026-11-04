@@ -70,6 +70,7 @@ const char *toString(selectResult result);
 /// - [qry.qry.14~1] przez jsonCommand wypisywać na stdout zdarzenia JSON w wersji 1, jedno na wiersz: pong dla hello, streams dla dir, schema dla detail, a dla select schema, kolejne record z wartościami i null oraz end z przyczyną limit albo server_stopped_or_reloaded, a każdą porażkę zgłaszać zdarzeniem error z kodem i kodem wyjścia 1.
 ///   Ograniczenie: st_api_real wymaga osobnego zbudowania i wykonania przez test-api; sam ninja test nie wykonuje protokolu strumieniowego API.
 /// - [qry.qry.15~1] przez vars zwracać tabelę zmiennych VAR planu z nazwą, typem i wartością w kolejności z odpowiedzi serwera, a przez varsYaml dokument YAML z tą samą listą albo z pustą listą dla planu bez zmiennych i instancji bezczynnej; dla instancji bezczynnej vars zwraca wydruk braku planu, a dla braku odpowiedzi, odpowiedzi bez listy zmiennych lub zamykania obie zwracają werdykt zamiast wydruku.
+/// - [qry.qry.16~1] w select po wyczerpaniu limitu elementów kończyć się bez oczekiwania na opróżnienie kolejki producenta, niezależnie od tempa strumienia.
 class qry {
   int elemLimitCnt{0};
   int serverNoDataTimeoutMs_{kDefaultServerNoDataTimeoutMs};

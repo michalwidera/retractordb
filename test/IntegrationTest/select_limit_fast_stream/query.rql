@@ -1,0 +1,7 @@
+# make install && ctest -R select_limit_fast_stream -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1/10000 TEXTFILE 'data.txt'
+
+SELECT a STREAM out FROM src
