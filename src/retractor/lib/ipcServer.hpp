@@ -11,6 +11,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -42,7 +44,7 @@
 ///   Zakres testow: `IpcServerQueues.insufficient_space_refuses_subscription_before_queue_creation`, `IpcSecurity.ResubscriptionRecreatesOwnQueueWithRequestedCapacity`, `IpcServerQueues.epoch_can_close_while_queue_creation_is_paused`, `IpcServerQueues.subscribe_after_out_of_business_is_refused_without_queue`, `IpcServerQueues.subscribe_after_queue_removal_is_refused_without_queue`; integracja `it_subscribe_epoch_race-run`.
 /// - [ipcserver.ipc-server.7~1] nie trzymać blokady map klienckich podczas tworzenia kolejki klienta.
 ///   Zakres testow: `IpcServerQueues.epoch_can_close_while_queue_creation_is_paused` (backend POSIX); kontrola strukturalna subscribe w ipcServer.cpp dla backendu plikowego, niewykonana na Darwinie.
-/// - [ipcserver.ipc-server.8~1] w broadcast przetwarzać span streams w jego kolejności, bez deduplikacji nazw; dla każdego wystąpienia nazwy formatować wiersz najwyżej raz i tylko gdy strumień nadal ma subskrybenta, współdzielić ten wiersz między jego subskrybentami i wysyłać go bez czekania na miejsce w kolejce. Powtórzona nazwa oznacza kolejną emisję, o ile pozostali subskrybenci; klienta z pełną lub porzuconą kolejką wyrejestrowywać i usuwać jego kolejkę.
+/// - [ipcserver.ipc-server.8~2] w broadcast przetwarzać span streams w jego kolejności, bez deduplikacji nazw; dla każdego wystąpienia nazwy formatować wiersz najwyżej raz i tylko gdy strumień nadal ma subskrybenta, współdzielić ten wiersz między jego subskrybentami i wysyłać go bez czekania na miejsce w kolejce. Powtórzona nazwa oznacza kolejną emisję, o ile pozostali subskrybenci; klienta z pełną lub porzuconą kolejką wyrejestrowywać od razu, a jego kolejkę przekazywać do odroczonego zwolnienia.
 ///   Ograniczenie weryfikacji: kolejnosc i powtorzenia nazw potwierdza kontrola strukturalna petli broadcast w ipcServer.cpp; brak osobnej asercji duplikatow.
 /// - [ipcserver.ipc-server.9~1] pomijać emisję wiersza dłuższego niż slot kolejki odpowiedzi, zgłaszając to w logu jeden raz na strumień, bez wyjątku.
 /// - [ipcserver.ipc-server.10~1] w broadcastOutOfBusiness podejmować dla każdego subskrybenta jedną próbę wysłania znacznika końca pracy, bez czekania na miejsce w kolejce i bez ponawiania; pełna kolejka znacznika nie dostaje.
@@ -57,6 +59,10 @@
 /// - [ipcserver.ipc-server.16~1] uniemożliwiać kopiowanie obiektu.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_ipcServer.cpp, static_assert cech kopiowania IpcServer.
 /// - [ipcserver.ipc-server.17~1] odrzucać z wpisem w logu, przed parserem INFO i bez wywołania onCommand, komendę zawierającą linię, której pierwszy znak inny niż biały to '#' (dyrektywa parsera, np. #include otwierająca plik), tak aby treść komendy nie otwierała plików z prawami serwera.
+/// - [ipcserver.ipc-server.18~1] w broadcast nie zamykać mapowania ani nie usuwać nazwy porzuconej kolejki, tylko przenosić jej uchwyt na listę do zwolnienia, tak aby koszt munmap i unlink (do ~50 ms przy kolejce 64 MiB) nie trafiał do slotu.
+/// - [ipcserver.ipc-server.19~1] w releaseAbandonedQueues, wołanym przez wątek komunikacyjny w każdym obrocie pętli odbioru, zabierać listę do zwolnienia pod blokadą map i poza nią zamykać mapowanie każdej kolejki, a potem usuwać jej nazwę; przy pustej liście nie brać blokady map.
+/// - [ipcserver.ipc-server.20~1] w subscribe przejmować zaległe zwolnienie kolejki tego samego klienta pod tym samym zajęciem blokady map, pod którym wypisuje go z rejestru, tak aby późniejsze zwolnienie listy nie usunęło nazwy nowej kolejki.
+/// - [ipcserver.ipc-server.21~1] w broadcastOutOfBusiness i removeClientQueues (a przez nią w removeAllObjects i shutdownFromExitHandler) zwalniać także wszystkie kolejki z listy do zwolnienia.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
@@ -131,12 +137,16 @@ class IpcServer {
   /// Kolejke kazdego subskrybenta usuwa takze po nieudanej wysylce: wymagania powyzej.
   void broadcastOutOfBusiness();
 
+  /// Zwalnia kolejki porzucone w broadcast(): zamyka mapowanie, potem usuwa nazwe. Wola go
+  /// watek komunikacyjny; pusta lista kosztuje jeden odczyt atomowy, bez blokady map.
+  void releaseAbandonedQueues();
+
   /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend
   /// i kolejki odpowiedzi pozostalych klientow. Wolac po stop().
   void removeAllObjects();
 
  private:
-  void commandLoop() const;
+  void commandLoop();
 
   /// Segment odpowiedzi i kolejka komend. Nie dotyka stanu klientow.
   void removeGlobalObjects() const;
@@ -144,6 +154,10 @@ class IpcServer {
   /// Kolejki odpowiedzi klientow plus wyczyszczenie rejestru subskrypcji.
   /// Wolajacy MUSI trzymac clientMapsMutex_.
   void removeClientQueues();
+
+  /// Synchroniczne zwolnienie calej listy pendingRelease_. Wolajacy MUSI trzymac
+  /// clientMapsMutex_; tylko dla sciezek poza slotem (koniec epoki, zamkniecie).
+  void releasePendingLocked();
 
   /// Czy wiersz miesci sie w slocie kolejki odpowiedzi. Falsz melduje przyczyne raz na
   /// strumien i jest rownoznaczny z pominieciem emisji -- nigdy z wyjatkiem, bo wyjatek
@@ -181,6 +195,20 @@ class IpcServer {
   // komunikat zalalby dziennik tysiac razy na sekunde. Czytane i pisane wylacznie w broadcast(),
   // czyli pod clientMapsMutex_.
   std::set<std::string> oversizedRowStreams_;
+
+  // Kolejki porzucone w broadcast(), czekajace na zwolnienie w watku komunikacyjnym (#600).
+  // munmap i unlink segmentu kosztowaly w slocie do ~50 ms (kolejka 64 MiB pod mlockall).
+  // Niezmiennik: klient jest albo w mapach powyzej, albo tutaj, nigdy w obu - broadcast
+  // przenosi go stad i stamtad pod jednym zajeciem muteksu, a subscribe() zabiera stad
+  // wpis swojego klienta, zanim utworzy nowa kolejke o tej samej nazwie. Dzieki temu
+  // usuniecie nazwy przy zwolnieniu nigdy nie trafia w kolejke nowego klienta.
+  // Pisane pod clientMapsMutex_.
+  std::vector<std::pair<int, std::unique_ptr<boost::interprocess::message_queue>>> pendingRelease_;
+  // Czy pendingRelease_ ma wpisy. Watek komunikacyjny budzi sie co kQueuePollInterval
+  // i bez tej flagi bralby muteks map w kazdym obrocie - std::mutex nie dziedziczy
+  // priorytetu, wiec kazde zajecie przez watek spoza RT to okazja do inwersji wobec slotu.
+  // Ustawiana i zerowana pod clientMapsMutex_, czytana bez niego.
+  std::atomic<bool> releasePending_{false};
 
   // Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
   // mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/

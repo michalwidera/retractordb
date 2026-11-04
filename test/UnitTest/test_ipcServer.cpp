@@ -379,7 +379,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
-  // covers: ipcserver.ipc-server.8~1
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
@@ -391,6 +391,8 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
   const std::array<std::string_view, 1> streams{"strumien"};
   EXPECT_NO_THROW(server.broadcast(streams, [](const std::string &) { return std::string("wiersz"); }));
 
+  EXPECT_TRUE(queueExists(kClientA)) << "broadcast usunal kolejke w slocie zamiast odlozyc zwolnienie";
+  server.releaseAbandonedQueues();
   EXPECT_FALSE(queueExists(kClientA)) << "kolejka martwego klienta zostala";
   EXPECT_TRUE(queueExists(kClientB)) << "zdrowy klient stracil kolejke";
   EXPECT_NO_THROW(server.broadcast(streams, [](const std::string &) { return std::string("wiersz"); }));
@@ -447,7 +449,7 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
 }
 
 TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue) {
-  // covers: ipcserver.ipc-server.8~1
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.19~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
@@ -462,7 +464,7 @@ TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_th
     return std::string("row");
   });
   EXPECT_EQ(formatted, 1);
-  EXPECT_FALSE(queueExists(kClientA));
+  EXPECT_TRUE(queueExists(kClientA)) << "broadcast usunal kolejke w slocie zamiast odlozyc zwolnienie";
   EXPECT_TRUE(queueExists(kClientB));
   EXPECT_EQ(full.get_num_msg(), 1U);
   EXPECT_EQ(healthy.get_num_msg(), 1U);
@@ -470,8 +472,90 @@ TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_th
     ++formatted;
     return std::string("next");
   });
-  EXPECT_EQ(formatted, 2);
+  EXPECT_EQ(formatted, 2) << "klient z porzucona kolejka nie zostal wypisany od razu";
+  EXPECT_EQ(full.get_num_msg(), 1U);
   EXPECT_EQ(healthy.get_num_msg(), 2U);
+  server.releaseAbandonedQueues();
+  EXPECT_FALSE(queueExists(kClientA));
+  EXPECT_TRUE(queueExists(kClientB));
+  server.removeAllObjects();
+}
+
+// #600: zwolnienie odroczone usuwa kolejke PO NAZWIE. Klient, ktory subskrybuje ponownie, zanim
+// watek komunikacyjny zwolni jego porzucona kolejke, dostaje nowa kolejke o tej samej nazwie -
+// zwolnienie zostawione na liscie skasowaloby wtedy kolejke nowej subskrypcji.
+TEST_F(IpcServerQueues, resubscription_takes_over_pending_release_of_the_same_client) {
+  // covers: ipcserver.ipc-server.20~1
+  IpcServer server;
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
+  {
+    IPC::message_queue full(IPC::open_only, queueNameFor(kClientA).c_str());
+    full.send("sentinel", 8, 0);
+  }
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+  ASSERT_TRUE(queueExists(kClientA)) << "zwolnienie nie zostalo odlozone";
+
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 3, server.subscriptionEpoch()));
+  server.releaseAbandonedQueues();
+  ASSERT_TRUE(queueExists(kClientA)) << "zwolnienie starej kolejki skasowalo kolejke nowej subskrypcji";
+
+  IPC::message_queue fresh(IPC::open_only, queueNameFor(kClientA).c_str());
+  EXPECT_EQ(fresh.get_num_msg(), 0U) << "nowa subskrypcja otworzyla stara, pelna kolejke";
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+  EXPECT_EQ(fresh.get_num_msg(), 1U) << "nowa subskrypcja nie dostaje wierszy";
+  server.removeAllObjects();
+  EXPECT_FALSE(queueExists(kClientA));
+}
+
+// #600: koniec epoki i kazda sciezka zamkniecia zwalniaja takze kolejki czekajace na watek
+// komunikacyjny - po zamknieciu nikt juz ich nie zna, wiec zostalyby w /dev/shm.
+TEST_F(IpcServerQueues, end_of_epoch_and_shutdown_release_pending_queues) {
+  // covers: ipcserver.ipc-server.21~1
+  const std::array<std::pair<std::string_view, void (*)(IpcServer &)>, 3> paths{{
+      {"broadcastOutOfBusiness", [](IpcServer &s) { s.broadcastOutOfBusiness(); }},
+      {"removeAllObjects", [](IpcServer &s) { s.removeAllObjects(); }},
+      {"shutdownFromExitHandler", [](IpcServer &s) { s.shutdownFromExitHandler(); }},
+  }};
+  for (const auto &[path, close] : paths) {
+    IpcServer server;
+    ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch())) << path;
+    {
+      IPC::message_queue full(IPC::open_only, queueNameFor(kClientA).c_str());
+      full.send("sentinel", 8, 0);
+    }
+    const std::array<std::string_view, 1> streams{"stream"};
+    server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+    ASSERT_TRUE(queueExists(kClientA)) << path << ": zwolnienie nie zostalo odlozone";
+    close(server);
+    EXPECT_FALSE(queueExists(kClientA)) << path << ": kolejka z listy do zwolnienia zostala w /dev/shm";
+    server.removeAllObjects();
+  }
+}
+
+// #600: watek komunikacyjny budzi sie co kQueuePollInterval. Pusta lista do zwolnienia nie moze
+// brac blokady map - inaczej kazdy obrot konkurowalby o nia ze slotem trzymajacym ja w broadcast().
+TEST_F(IpcServerQueues, empty_release_list_does_not_wait_for_the_broadcast_map_lock) {
+  // covers: ipcserver.ipc-server.19~1
+  IpcServer server;
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, server.subscriptionEpoch()));
+  std::promise<void> entered, resume;
+  auto entrance  = entered.get_future();
+  auto release   = resume.get_future().share();
+  auto broadcast = std::async(std::launch::async, [&] {
+    const std::array<std::string_view, 1> streams{"stream"};
+    server.broadcast(streams, [&](const std::string &) {
+      entered.set_value();
+      release.wait();
+      return std::string("row");
+    });
+  });
+  EXPECT_EQ(entrance.wait_for(std::chrono::seconds(5)), std::future_status::ready);
+  auto drain = std::async(std::launch::async, [&] { server.releaseAbandonedQueues(); });
+  EXPECT_EQ(drain.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+  resume.set_value();
+  broadcast.get();
+  drain.get();
   server.removeAllObjects();
 }
 
@@ -715,6 +799,9 @@ class RunningServer {
 
   [[nodiscard]] const std::string &commandQueue() const { return names_.queryQueue; }
 
+  /// Serwer pod spodem - dla testow, ktore subskrybuja i emituja obok petli komend.
+  IpcServer &server() { return server_; }
+
   /// Odpowiedz dla `clientId` ze slotow odpowiedzi, zdjeta tak, jak zdejmuje ja IpcClient::netClient.
   /// Komendy testu nie niosa db.seq, a bez db.start `clientId` nie jest zywym procesem, wiec serwer
   /// zapisuje seq 0 i startTime 0 (znacznika startu nie ma czego odczytac).
@@ -796,6 +883,27 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(server.handled(), 1) << "znieksztalcona wiadomosc dotarla do handlera";
+}
+
+// #600: kolejke porzucona w broadcast() zwalnia sam watek komunikacyjny, bez zadnej komendy -
+// klient, ktory odszedl, niczego juz nie wysle.
+TEST(IpcServerLoop, communication_thread_releases_queue_abandoned_in_broadcast) {
+  // covers: ipcserver.ipc-server.19~1
+  RunningServer running;
+  ASSERT_TRUE(running.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+  IpcServer &server = running.server();
+  ASSERT_TRUE(server.subscribe(kClientFull, "stream", 1, server.subscriptionEpoch()));
+  {
+    IPC::message_queue full(IPC::open_only, queueNameFor(kClientFull, kServerLoop).c_str());
+    full.send("sentinel", 8, 0);
+  }
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+
+  const auto deadline = std::chrono::steady_clock::now() + kResponseBudget;
+  while (queueExists(kClientFull, kServerLoop) && std::chrono::steady_clock::now() < deadline)
+    std::this_thread::sleep_for(ipc::kQueuePollInterval);
+  EXPECT_FALSE(queueExists(kClientFull, kServerLoop)) << "watek komunikacyjny nie zwolnil porzuconej kolejki";
 }
 
 // Regresja S-03, druga droga: poprawne INFO bez db.id rzucalo bad_lexical_cast - i to dopiero
