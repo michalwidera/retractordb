@@ -123,13 +123,42 @@ void IpcServer::removeGlobalObjects() const {
 /// Zamyka uchwyty i usuwa wlasne kolejki z zakonczonej epoki. Obcego UID nie
 /// sprzatamy nawet po odmowie startu lub subskrypcji.
 void IpcServer::removeClientQueues() {
-  // Najpierw zamkniecie mapowan, potem unlink -- ta sama kolejnosc co w broadcast().
+  releasePendingLocked();
+  // Najpierw zamkniecie mapowan, potem unlink -- ta sama kolejnosc co przy odroczonym zwolnieniu.
   id2QueueCache_.clear();
   for (const auto &element : id2StreamNameRelation_) {
     ipc::security::removeOwned(names_.responseQueue(element.first));
   }
   id2StreamNameRelation_.clear();
   subscriptionEpoch_.fetch_add(1, std::memory_order_release);
+}
+
+void IpcServer::releasePendingLocked() {
+  for (auto &[clientId, queue] : pendingRelease_) {
+    queue.reset();  // zamknij mapowanie przed unlink
+    ipc::security::removeOwned(names_.responseQueue(clientId));
+  }
+  pendingRelease_.clear();
+  releasePending_.store(false, std::memory_order_relaxed);
+}
+
+void IpcServer::releaseAbandonedQueues() {
+  if (!releasePending_.load(std::memory_order_acquire)) return;
+  decltype(pendingRelease_) released;
+  {
+    std::scoped_lock lock(clientMapsMutex_);
+    released.swap(pendingRelease_);
+    // Pojemnosc na kazdego obecnego subskrybenta: broadcast() dopisuje wtedy bez alokacji.
+    pendingRelease_.reserve(id2StreamNameRelation_.size());
+    releasePending_.store(false, std::memory_order_relaxed);
+  }
+  // Poza muteksem: munmap i unlink segmentu to milisekundy, a slot czekalby na nie przy
+  // nastepnym broadcast(). Nazwa nalezy wciaz do zwalnianej kolejki - patrz pendingRelease_.
+  for (auto &[clientId, queue] : released) {
+    queue.reset();  // zamknij mapowanie przed unlink
+    ipc::security::removeOwned(names_.responseQueue(clientId));
+    SPDLOG_WARN("queue erased on timeout, procId={}", clientId);
+  }
 }
 
 bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch) {
@@ -152,14 +181,29 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // Rejestracja jest serializowana przez watek komend. Najpierw wypisujemy
   // stara subskrypcje, aby RT nie wysylal do odlinkowanej kolejki podczas mmap.
   // Obca kolejka pod ta nazwa daje odmowe zamiast usuniecia lub przejecia.
+  //
+  // Zalegle zwolnienie kolejki tego klienta (porzuconej w broadcast) przejmujemy pod TYM SAMYM
+  // zajeciem muteksu (#600). Zwolnienie odroczone usuwa nazwe; gdyby zostalo na liscie, po
+  // utworzeniu nowej kolejki o tej nazwie skasowaloby kolejke nowego klienta. Nazwe usuwa
+  // removeOwned ponizej, mapowanie zamyka taken.clear() -- juz poza muteksem.
+  decltype(pendingRelease_) taken;
   {
     std::scoped_lock lock(clientMapsMutex_);
     if (subscriptionEpoch_.load(std::memory_order_relaxed) != expectedEpoch) return false;
     if (!ipc::security::removeOwned(queueName))
       throw ipc::security::Rejected(std::format("response queue '{}' could not be safely removed", queueName));
+    for (auto it = pendingRelease_.begin(); it != pendingRelease_.end();) {
+      if (it->first == clientId) {
+        taken.push_back(std::move(*it));
+        it = pendingRelease_.erase(it);
+      } else {
+        ++it;
+      }
+    }
     id2QueueCache_.erase(clientId);
     id2StreamNameRelation_.erase(clientId);
   }
+  taken.clear();
   // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
   // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
   // zostac w torze emisji watku RT -- lazy open_only w broadcast() kosztowal
@@ -178,10 +222,12 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
     if (subscriptionEpoch_.load(std::memory_order_relaxed) == expectedEpoch) {
       id2StreamNameRelation_[clientId] = streamName;
       id2QueueCache_[clientId]         = std::move(queueHandle);
+      // Miejsce na porzucenie kazdej zarejestrowanej kolejki: broadcast() dopisuje bez alokacji.
+      pendingRelease_.reserve(pendingRelease_.size() + id2StreamNameRelation_.size());
       return true;
     }
   }
-  queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w broadcast()
+  queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w releaseAbandonedQueues()
   ipc::security::removeOwned(queueName);
   return false;
 }
@@ -257,9 +303,11 @@ void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFo
         // If send queue is full - means no one is listening and queue is
         // going to remove
         //
+        // Bez munmap i unlink w slocie (#600): uchwyt idzie na liste, kolejke zwalnia
+        // watek komunikacyjny w releaseAbandonedQueues().
         if (!trySendOrAbandoned(*mqPtr, row, element.first)) {
-          mqPtr.reset();  // zamknij mapowanie przed unlink
-          ipc::security::removeOwned(queueName);
+          pendingRelease_.emplace_back(element.first, std::move(mqPtr));
+          releasePending_.store(true, std::memory_order_release);
           eraseList.push_back(element.first);
         }
       }
@@ -270,7 +318,6 @@ void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFo
     for (const auto &element : eraseList) {
       id2StreamNameRelation_.erase(element);
       id2QueueCache_.erase(element);
-      SPDLOG_WARN("queue erased on timeout, procId={}", element);
     }
   }
 }
@@ -303,13 +350,15 @@ void IpcServer::broadcastOutOfBusiness() {
     ipc::security::removeOwned(queueName);
     SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
   }
+  // Koniec epoki biegnie poza slotem, wiec zalegle zwolnienia wykonujemy tu synchronicznie.
+  releasePendingLocked();
   id2StreamNameRelation_.clear();
   id2QueueCache_.clear();
   subscriptionEpoch_.fetch_add(1, std::memory_order_release);
 }
 
 // Procedura watku komunikacyjnego.
-void IpcServer::commandLoop() const {
+void IpcServer::commandLoop() {
   bool readyAnnounced = false;
   try {
     // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment i kolejka
@@ -437,6 +486,7 @@ void IpcServer::commandLoop() const {
           SPDLOG_ERROR("IPC message dropped: {}", ex.what());
         }
       }
+      releaseAbandonedQueues();
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
       if (callbacks_.shouldStop()) loopRunning = false;

@@ -321,8 +321,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
         break;
       }
     }
-    while (transport_->popQueue(e_value) && !transport_->done)
-      std::this_thread::sleep_for(ipc::kQueuePollInterval);
+    // Bez drenazu kolejki producenta. Do 2026-11-04 (#599) stala tu petla zdejmujaca po elemencie
+    // na kQueuePollInterval az do pustej kolejki; przy strumieniu szybszym niz ~1 kHz kolejka nie
+    // bywala pusta i klient z limitem -m N nie konczyl sie wcale. Zdejmowane elementy i tak szly do
+    // kosza, a `done` + join() nizej nie potrzebuja pustej kolejki.
 
     if (elemLimitCnt != 1 && !transport_->done) _getch();
 
