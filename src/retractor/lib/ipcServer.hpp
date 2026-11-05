@@ -63,12 +63,13 @@
 /// - [ipcserver.ipc-server.19~2] w releaseAbandonedQueues, wołanym przez wątek komunikacyjny w każdym obrocie pętli odbioru, zabierać listę do zwolnienia pod blokadą map i poza nią każdą kolejkę oddawać do puli albo, gdy się to nie uda, zamykać jej mapowanie, a potem usuwać jej nazwę; przy pustej liście nie brać blokady map.
 /// - [ipcserver.ipc-server.20~1] w subscribe przejmować zaległe zwolnienie kolejki tego samego klienta pod tym samym zajęciem blokady map, pod którym wypisuje go z rejestru, tak aby późniejsze zwolnienie listy nie usunęło nazwy nowej kolejki.
 /// - [ipcserver.ipc-server.21~1] w broadcastOutOfBusiness i removeClientQueues (a przez nią w removeAllObjects i shutdownFromExitHandler) zwalniać także wszystkie kolejki z listy do zwolnienia.
-/// - [ipcserver.ipc-server.22~1] w releaseAbandonedQueues oddawać porzuconą kolejkę do puli zamiast ją zwalniać wyłącznie wtedy, gdy jądro potwierdziło brak procesu klienta (inspectProcess: found i unreadable równe false), odebranie przez try_receive na uchwycie serwera opróżniło ją bez błędu i renameOwned przeniósł jej nazwę na wolną nazwę responsePool; pula ma najwyżej kResponseQueuePoolSegments wpisów, a pełna zwalnia przed zmianą nazwy swój najstarszy wpis. W każdym innym przypadku zwalniać kolejkę jak dotąd.
+/// - [ipcserver.ipc-server.22~2] w releaseAbandonedQueues oddawać porzuconą kolejkę do puli zamiast ją zwalniać wyłącznie wtedy, gdy jądro potwierdziło brak procesu klienta (inspectProcess: found i unreadable równe false), pierwsza porcja odbioru przez try_receive na uchwycie serwera, jeszcze pod nazwą klienta i najwyżej kResponseQueueDrainBatch komunikatów, przeszła bez błędu i renameOwned przeniósł jej nazwę na wolną nazwę responsePool; kolejka, której ta porcja nie opróżniła, wchodzi do puli jako wpis niegotowy z budżetem odbiorów równym jej pojemności pomniejszonej o odebrane komunikaty. Pula ma najwyżej kResponseQueuePoolSegments wpisów, gotowych i niegotowych razem, a pełna zwalnia przed zmianą nazwy swój najstarszy wpis. W każdym innym przypadku zwalniać kolejkę jak dotąd.
 /// - [ipcserver.ipc-server.23~1] w subscribe brać z puli kolejkę o liczbie elementów równej maxElements: przenosić przez renameOwned jej nazwę na nazwę kolejki klienta, a jej uchwyt do rejestru, bez tworzenia kolejki i bez sprawdzania miejsca; gdy zmiana nazwy się nie uda, zwalniać ten wpis puli i tworzyć kolejkę jak bez puli.
 /// - [ipcserver.ipc-server.24~1] w subscribe przy braku miejsca na nową kolejkę zwalniać bezczynne kolejki puli od najstarszej, dopóki miejsca nie wystarczy albo pula się nie opróżni, i dopiero wtedy zgłaszać brak; kolejki odmówionej przez epokę, zastąpionej przy ponownej subskrypcji albo przejętej z listy do zwolnienia tego samego klienta nie oddawać do puli.
 /// - [ipcserver.ipc-server.25~1] w removeAllObjects zamykać mapowania puli i usuwać jej nazwy, a w shutdownFromExitHandler i na starcie wątku komunikacyjnego usuwać nazwy responsePool(0..kResponseQueuePoolSegments-1) bez dotykania struktury puli.
 /// - [ipcserver.ipc-server.26~1] obsługiwać pulę wyłącznie z wątku komunikacyjnego (subscribe, releaseAbandonedQueues) i z removeAllObjects po stop, bez blokady map.
 ///   Kontrola strukturalna: subscribe wolaja tylko commandProcessor w watku komunikacyjnym i testy jednostkowe; broadcast i broadcastOutOfBusiness nie siegaja do responsePool_.
+/// - [ipcserver.ipc-server.27~1] w releaseAbandonedQueues, przed sprawdzeniem listy do zwolnienia, odbierać jedną porcję (najwyżej kResponseQueueDrainBatch komunikatów, nie więcej niż budżet wpisu) z najstarszego niegotowego wpisu puli; wpis, którego kolejka jest po porcji pusta, oznaczać jako gotowy, a wpis, którego odbiór zgłosił błąd albo wyczerpał budżet bez opróżnienia kolejki, zwalniać (zamknięcie mapowania, potem usunięcie nazwy). W subscribe brać z puli i liczyć jako dostępne wyłącznie wpisy gotowe.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
@@ -161,20 +162,29 @@ class IpcServer {
   /// Wolajacy MUSI trzymac clientMapsMutex_.
   void removeClientQueues();
 
-  /// Porzucona kolejka do puli (#603): oprozniona, pod nazwa responsePool. Falsz = kolejka nadal
-  /// pod nazwa klienta, z uchwytem w @p queue, i wolajacy zwalnia ja jak dotad.
+  /// Porzucona kolejka do puli (#603): po pierwszej porcji drenazu, pod nazwa responsePool, gotowa
+  /// albo jeszcze nie. Falsz = kolejka nadal pod nazwa klienta, z uchwytem w @p queue, i wolajacy
+  /// zwalnia ja jak dotad.
   bool poolAbandonedQueue(int clientId, std::unique_ptr<boost::interprocess::message_queue> &queue);
 
   /// Kolejka z puli o pojemnosci @p maxElements, juz pod nazwa @p queueName, albo nullptr.
   std::unique_ptr<boost::interprocess::message_queue> takePooledQueue(int maxElements, const std::string &queueName);
 
-  /// Oproznienie kolejki przez jej uchwyt. Falsz = kolejka nie do ponownego uzycia (np. not_recoverable).
-  static bool drainQueue(boost::interprocess::message_queue &queue, int clientId);
+  /// Wynik jednej porcji drenazu: kolejka pusta, jeszcze nie, albo nie do ponownego uzycia
+  /// (blad odbioru, np. not_recoverable, lub budzet odbiorow wyczerpany przed oproznieniem).
+  enum class DrainStep { drained, pending, failed };
+
+  /// Najwyzej kResponseQueueDrainBatch odbiorow przez uchwyt kolejki, kazdy pomniejsza @p left.
+  static DrainStep drainBatch(boost::interprocess::message_queue &queue, boost::interprocess::message_queue::size_type &left,
+                              const std::string &queueName);
+
+  /// Jedna porcja drenazu najstarszego niegotowego wpisu puli; wpis nie do uzycia jest zwalniany.
+  void drainPooledStep();
 
   /// Zwolnienie najstarszego wpisu puli: munmap, potem unlink. Pula nie moze byc pusta.
   void releaseOldestPooled();
 
-  /// Czy pula ma kolejke o pojemnosci @p maxElements.
+  /// Czy pula ma gotowa kolejke o pojemnosci @p maxElements.
   [[nodiscard]] bool poolHas(int maxElements) const;
 
   /// Nazwy wszystkich miejsc puli, bez dotykania responsePool_ (sciezka atexit, start watku).
@@ -240,9 +250,13 @@ class IpcServer {
   // na rdzeniu slotu) i unlink, ktory oddaje jego strony jadru; obu towarzyszyl dluzszy slot (R603).
   // Wpis zachowuje mapowanie serwera, wiec ponowne uzycie nie robi ani munmap, ani mmap. Tylko watek
   // komunikacyjny i removeAllObjects po stop - bez blokady, bo watek RT tu nie siega.
+  // Wpis niegotowy (drained == false) czeka na kolejne porcje drenazu (drainPooledStep) i nie jest
+  // oddawany klientom; left to pozostaly budzet odbiorow, liczony od pojemnosci kolejki.
   struct PooledQueue {
     int index;  // miejsce w puli: nazwa names_.responsePool(index)
     std::unique_ptr<boost::interprocess::message_queue> queue;
+    bool drained;
+    boost::interprocess::message_queue::size_type left;
   };
   std::vector<PooledQueue> responsePool_;
 

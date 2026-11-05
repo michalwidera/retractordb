@@ -152,6 +152,8 @@ void IpcServer::releasePendingLocked() {
 }
 
 void IpcServer::releaseAbandonedQueues() {
+  // Przed wczesnym powrotem: wpis niegotowy postepuje w kazdym obrocie, takze gdy nic nowego nie porzucono.
+  drainPooledStep();
   if (!releasePending_.load(std::memory_order_acquire)) return;
   decltype(pendingRelease_) released;
   {
@@ -181,8 +183,12 @@ bool IpcServer::poolAbandonedQueue(int clientId, std::unique_ptr<IPC::message_qu
   const osplat::ProcessSnapshot owner = osplat::inspectProcess(clientId);
   if (owner.found || owner.unreadable) return false;
   const std::string queueName = names_.responseQueue(clientId);
-  // Oproznienie przed zmiana nazwy: pod nazwa puli kolejka jest juz gotowa dla nastepnego klienta.
-  if (!drainQueue(*queue, clientId)) return false;
+  // Pierwsza porcja jeszcze pod nazwa klienta: muteks porzucony przez klienta zabitego w srodku
+  // odbioru wychodzi tutaj i kolejka jest zwalniana od razu, jak dotad. Reszta schodzi porcjami
+  // w kolejnych obrotach (drainPooledStep), juz pod nazwa puli - jako wpis niegotowy.
+  auto left             = queue->get_max_msg();
+  const DrainStep first = drainBatch(*queue, left, queueName);
+  if (first == DrainStep::failed) return false;
   // Pelna pula ustepuje najswiezszej kolejce: koszt zwolnienia jest ten sam, a pula nie zostaje
   // na zawsze przy pojemnosciach strumieni, ktorych juz nikt nie subskrybuje.
   if (responsePool_.size() >= static_cast<std::size_t>(ipc::kResponseQueuePoolSegments)) {
@@ -192,28 +198,53 @@ bool IpcServer::poolAbandonedQueue(int clientId, std::unique_ptr<IPC::message_qu
   while (std::ranges::any_of(responsePool_, [index](const PooledQueue &entry) { return entry.index == index; }))
     ++index;
   if (!ipc::security::renameOwned(queueName, names_.responsePool(index))) return false;
-  responsePool_.push_back({.index = index, .queue = std::move(queue)});
+  responsePool_.push_back({.index = index, .queue = std::move(queue), .drained = first == DrainStep::drained, .left = left});
   return true;
 }
 
-/// Odbior wszystkiego, co zostawil klient, przez uchwyt serwera: bez nowego mapowania. Samo wyzerowanie
+/// Odbior tego, co zostawil klient, przez uchwyt serwera: bez nowego mapowania. Samo wyzerowanie
 /// licznika w naglowku nie wystarcza - Boost wymaga (BOOST_ASSERT w do_send), zeby wolny komunikat
 /// mial wyzerowana dlugosc i priorytet, a zeruje je wlasnie odbior. Koszt rosnie z liczba
-/// komunikatow: naglowek kazdego i kopia jego wiersza (#603, wariant D1a).
-bool IpcServer::drainQueue(IPC::message_queue &queue, int clientId) {
+/// komunikatow: naglowek kazdego i kopia jego wiersza (#603, wariant D1a). Cala pelna kolejka
+/// jednym ciagiem wydluzala sloty obudzone w tym czasie (R603C), stad porcja kResponseQueueDrainBatch.
+IpcServer::DrainStep IpcServer::drainBatch(IPC::message_queue &queue, IPC::message_queue::size_type &left,
+                                           const std::string &queueName) {
   std::array<char, ipc::kResponseQueueMaxMessageSize> buffer;
   IPC::message_queue::size_type received = 0;
   unsigned int priority                  = 0;
   try {
-    // Nikt juz do tej kolejki nie pisze (klient wypisany z rejestru), wiec wystarcza jeden przebieg
+    // Nikt juz do tej kolejki nie pisze (klient wypisany z rejestru), wiec wystarcza budzet rowny
     // pojemnosci; licznik na koncu potwierdza, ze kolejka jest pusta.
-    for (auto left = queue.get_max_msg(); left > 0 && queue.try_receive(buffer.data(), buffer.size(), received, priority);
-         --left) {}
-    return queue.get_num_msg() == 0;
+    for (int batch = 0; batch < ipc::kResponseQueueDrainBatch && left > 0; ++batch) {
+      if (!queue.try_receive(buffer.data(), buffer.size(), received, priority)) break;
+      --left;
+    }
+    if (queue.get_num_msg() == 0) return DrainStep::drained;
+    if (left > 0) return DrainStep::pending;
+    SPDLOG_WARN("response queue '{}' not empty after receiving its capacity; not reused", queueName);
+    return DrainStep::failed;
   } catch (const IPC::interprocess_exception &ex) {
     // Takze not_recoverable: muteks porzucony przez zmarly proces - taka kolejka nie nadaje sie do puli.
-    SPDLOG_WARN("response queue of client {} not drained for reuse: {}", clientId, ex.what());
-    return false;
+    SPDLOG_WARN("response queue '{}' not drained for reuse: {}", queueName, ex.what());
+    return DrainStep::failed;
+  }
+}
+
+void IpcServer::drainPooledStep() {
+  const auto entry = std::ranges::find_if(responsePool_, [](const PooledQueue &candidate) { return !candidate.drained; });
+  if (entry == responsePool_.end()) return;
+  const std::string poolName = names_.responsePool(entry->index);
+  switch (drainBatch(*entry->queue, entry->left, poolName)) {
+    case DrainStep::drained:
+      entry->drained = true;
+      break;
+    case DrainStep::pending:
+      break;
+    case DrainStep::failed:
+      entry->queue.reset();  // zamknij mapowanie przed unlink
+      ipc::security::removeOwned(poolName);
+      responsePool_.erase(entry);
+      break;
   }
 }
 
@@ -225,15 +256,15 @@ void IpcServer::releaseOldestPooled() {
 
 bool IpcServer::poolHas(int maxElements) const {
   return std::ranges::any_of(responsePool_, [maxElements](const PooledQueue &entry) {
-    return entry.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
+    return entry.drained && entry.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
   });
 }
 
 std::unique_ptr<IPC::message_queue> IpcServer::takePooledQueue(int maxElements, const std::string &queueName) {
   // Dokladnie ta sama pojemnosc: zapas wolnego klienta (domyslnie 10 s) i wycena miejsca zostaja takie,
-  // jakie dalaby nowa kolejka.
+  // jakie dalaby nowa kolejka. Wpis niegotowy nosi jeszcze wiersze poprzedniego klienta.
   const auto entry = std::ranges::find_if(responsePool_, [maxElements](const PooledQueue &candidate) {
-    return candidate.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
+    return candidate.drained && candidate.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
   });
   if (entry == responsePool_.end()) return nullptr;
   std::unique_ptr<IPC::message_queue> queue;

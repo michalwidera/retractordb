@@ -232,6 +232,12 @@ constexpr int kResponseQueueMaxMessageSize = 1024;
 // wpis; 2 to zapas. Kazdy wpis zajmuje w pamieci dzielonej tyle, co kolejka jego strumienia.
 constexpr int kResponseQueuePoolSegments = 2;
 
+// Najwieksza liczba komunikatow, ktore watek komunikacyjny odbiera z porzuconej kolejki w jednym
+// obrocie petli (#603). Drenaz jednym ciagiem czytal cala pelna kolejke (uc05 ~8000 komunikatow
+// w ~2 ms) przez wspolne L2 i wydluzal sloty obudzone w tym czasie (R603C). Porcja 256 to ~75 us
+// na Cortex-A72, a kolejka uc05 schodzi w ~31 obrotach. Liczba, nie budzet czasu: nie zalezy od platformy.
+constexpr int kResponseQueueDrainBatch = 256;
+
 // Miejsce na terminator w buforze odbiorczym kazdej z dwoch kolejek. try_receive moze oddac
 // DOKLADNIE max_message_size bajtow, a odbiorca pisze '\0' pod indeksem recvd_size, czyli
 // zaraz za nimi. Bufor o rozmiarze samego max_message_size konczy sie zapisem poza tablica.
