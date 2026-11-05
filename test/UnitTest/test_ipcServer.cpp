@@ -409,7 +409,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
-  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.22~1
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.22~2
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
@@ -764,7 +764,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_wait_for_the_broadcast_map_lock) {
 // #603: kolejka klienta, ktorego juz nie ma, nie jest zwalniana w czasie pracy (munmap + unlink),
 // tylko czeka pusta w puli i nastepny klient tej samej pojemnosci dostaje TEN SAM segment.
 TEST_F(IpcServerQueues, abandoned_queue_of_dead_client_is_reused_empty_by_next_subscriber) {
-  // covers: ipcserver.ipc-server.19~2, ipcserver.ipc-server.22~1, ipcserver.ipc-server.23~1, ipcserver.ipc-server.25~1
+  // covers: ipcserver.ipc-server.19~2, ipcserver.ipc-server.22~2, ipcserver.ipc-server.23~1, ipcserver.ipc-server.25~1
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 2));
   EXPECT_FALSE(queueExists(kClientA)) << "nazwa porzuconej kolejki zostala";
@@ -793,7 +793,7 @@ TEST_F(IpcServerQueues, abandoned_queue_of_dead_client_is_reused_empty_by_next_s
 // Zywy klient ma kolejke nadal zmapowana: po ponownym uzyciu czytalby wiersze nastepnego klienta.
 // Pojemnosc inna niz zadana zmienialaby zapas wolnego klienta - wtedy powstaje nowa kolejka.
 TEST_F(IpcServerQueues, live_owner_and_other_capacity_bypass_the_pool) {
-  // covers: ipcserver.ipc-server.22~1, ipcserver.ipc-server.23~1
+  // covers: ipcserver.ipc-server.22~2, ipcserver.ipc-server.23~1
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, getpid(), 1));
   EXPECT_FALSE(queueExists(getpid())) << "kolejka zywego klienta nie zostala zwolniona";
@@ -811,7 +811,7 @@ TEST_F(IpcServerQueues, live_owner_and_other_capacity_bypass_the_pool) {
 
 // Pula ma najwyzej kResponseQueuePoolSegments wpisow; pelna zwalnia najstarszy, nie najnowszy.
 TEST_F(IpcServerQueues, full_pool_gives_way_to_the_newest_abandoned_queue) {
-  // covers: ipcserver.ipc-server.22~1
+  // covers: ipcserver.ipc-server.22~2
   static_assert(ipc::kResponseQueuePoolSegments == 2, "test zaklada dwa miejsca puli");
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 1));
@@ -896,6 +896,76 @@ TEST_F(IpcServerQueues, exit_handler_removes_pool_names) {
   ASSERT_TRUE(segmentExists(poolNameFor(0)));
   server.shutdownFromExitHandler();
   EXPECT_FALSE(segmentExists(poolNameFor(0)));
+}
+
+namespace {
+// Kolejka na dwie pelne porcje drenazu i reszte: pierwsza porcja pod nazwa klienta, dwie nastepne w puli.
+constexpr int kMultiBatchCapacity = (2 * ipc::kResponseQueueDrainBatch) + 88;
+
+IPC::message_queue::size_type pendingMessages(const std::string &name) {
+  return IPC::message_queue(IPC::open_only, name.c_str()).get_num_msg();
+}
+}  // namespace
+
+// #603 R603C: drenaz calej pelnej kolejki jednym ciagiem wydluzal sloty. Kolejka wieksza niz porcja
+// schodzi porcjami w kolejnych obrotach, a do tego czasu wpis puli nie trafia do zadnego klienta.
+TEST_F(IpcServerQueues, abandoned_queue_larger_than_one_batch_is_drained_over_several_turns) {
+  // covers: ipcserver.ipc-server.22~2, ipcserver.ipc-server.27~1
+  const auto capacity = static_cast<IPC::message_queue::size_type>(kMultiBatchCapacity);
+  const auto batch    = static_cast<IPC::message_queue::size_type>(ipc::kResponseQueueDrainBatch);
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, kMultiBatchCapacity));
+  EXPECT_FALSE(queueExists(kClientA)) << "nazwa porzuconej kolejki zostala";
+  ASSERT_TRUE(segmentExists(poolNameFor(0))) << "kolejka wieksza niz porcja nie trafila do puli";
+  const ino_t pooled = inodeOf(poolNameFor(0));
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - batch) << "pierwsza porcja nie miala rozmiaru porcji";
+
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", kMultiBatchCapacity, server.subscriptionEpoch()));
+  EXPECT_NE(inodeOf(queueNameFor(kClientB)), pooled) << "klient dostal z puli kolejke z wierszami poprzedniego";
+  EXPECT_EQ(pendingMessages(queueNameFor(kClientB)), 0U);
+  ASSERT_TRUE(segmentExists(poolNameFor(0))) << "wpis niegotowy zniknal przy chybieniu";
+
+  // Obrot bez nowych porzucen: jedna porcja.
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - (2 * batch)) << "obrot bez porzucen nie odebral porcji";
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), 0U);
+
+  ASSERT_TRUE(server.subscribe(kClientC, "stream", kMultiBatchCapacity, server.subscriptionEpoch()));
+  EXPECT_EQ(inodeOf(queueNameFor(kClientC)), pooled) << "oprozniony wpis nie zostal oddany klientowi";
+  EXPECT_FALSE(segmentExists(poolNameFor(0)));
+  EXPECT_EQ(pendingMessages(queueNameFor(kClientC)), 0U);
+  server.removeAllObjects();
+}
+
+// Wpis niegotowy, ktorego muteks porzucil proces zabity miedzy porcjami, zwalnia kolejny obrot.
+TEST_F(IpcServerQueues, dead_mutex_between_drain_batches_releases_the_pool_entry) {
+  // covers: ipcserver.ipc-server.27~1
+  if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, kMultiBatchCapacity));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  ASSERT_GT(pendingMessages(poolNameFor(0)), 0U) << "test wymaga wpisu niegotowego";
+  IPC::message_queue probe(IPC::open_only, poolNameFor(0).c_str());
+  ASSERT_NO_FATAL_FAILURE(abandonQueueLock(poolNameFor(0)));
+  ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
+
+  EXPECT_NO_THROW(server.releaseAbandonedQueues());
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "wpis z porzuconym muteksem zostal w puli";
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", kMultiBatchCapacity, server.subscriptionEpoch()));
+  EXPECT_EQ(pendingMessages(queueNameFor(kClientB)), 0U);
+  server.removeAllObjects();
+}
+
+// Zamkniecie w trakcie drenazu: removeAllObjects usuwa takze wpis niegotowy.
+TEST_F(IpcServerQueues, removeAllObjects_removes_a_pool_entry_still_being_drained) {
+  // covers: ipcserver.ipc-server.25~1, ipcserver.ipc-server.27~1
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, kMultiBatchCapacity));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  ASSERT_GT(pendingMessages(poolNameFor(0)), 0U) << "test wymaga wpisu niegotowego";
+  server.removeAllObjects();
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "removeAllObjects zostawil wpis niegotowy";
 }
 
 namespace {
