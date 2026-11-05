@@ -1,5 +1,6 @@
 #include "ipcServer.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -15,6 +16,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
@@ -110,6 +112,7 @@ void IpcServer::shutdownFromExitHandler() {
 }
 
 void IpcServer::removeAllObjects() {
+  responsePool_.clear();  // zamknij mapowania puli przed unlink jej nazw w removeGlobalObjects()
   removeGlobalObjects();
   std::scoped_lock lock(clientMapsMutex_);
   removeClientQueues();
@@ -118,6 +121,12 @@ void IpcServer::removeAllObjects() {
 void IpcServer::removeGlobalObjects() const {
   ipc::security::removeOwned(names_.shmemSegment);
   ipc::security::removeOwned(names_.queryQueue);
+  removePoolNames();
+}
+
+void IpcServer::removePoolNames() const {
+  for (int index = 0; index < ipc::kResponseQueuePoolSegments; ++index)
+    ipc::security::removeOwned(names_.responsePool(index));
 }
 
 /// Zamyka uchwyty i usuwa wlasne kolejki z zakonczonej epoki. Obcego UID nie
@@ -155,10 +164,87 @@ void IpcServer::releaseAbandonedQueues() {
   // Poza muteksem: munmap i unlink segmentu to milisekundy, a slot czekalby na nie przy
   // nastepnym broadcast(). Nazwa nalezy wciaz do zwalnianej kolejki - patrz pendingRelease_.
   for (auto &[clientId, queue] : released) {
+    if (poolAbandonedQueue(clientId, queue)) {
+      SPDLOG_WARN("queue pooled on timeout, procId={}", clientId);
+      continue;
+    }
     queue.reset();  // zamknij mapowanie przed unlink
     ipc::security::removeOwned(names_.responseQueue(clientId));
     SPDLOG_WARN("queue erased on timeout, procId={}", clientId);
   }
+}
+
+bool IpcServer::poolAbandonedQueue(int clientId, std::unique_ptr<IPC::message_queue> &queue) {
+  // Zywy klient ma kolejke nadal zmapowana i po ponownym uzyciu czytalby wiersze nastepnego klienta.
+  // Mapowanie wyklucza dopiero brak procesu potwierdzony przez jadro: zombie (watki grupy moga
+  // jeszcze zyc) i nieczytelny wpis znacza "nie wiem", wiec kolejka idzie do zwolnienia jak dotad.
+  const osplat::ProcessSnapshot owner = osplat::inspectProcess(clientId);
+  if (owner.found || owner.unreadable) return false;
+  const std::string queueName = names_.responseQueue(clientId);
+  // Oproznienie przed zmiana nazwy: pod nazwa puli kolejka jest juz gotowa dla nastepnego klienta.
+  if (!drainQueue(*queue, clientId)) return false;
+  // Pelna pula ustepuje najswiezszej kolejce: koszt zwolnienia jest ten sam, a pula nie zostaje
+  // na zawsze przy pojemnosciach strumieni, ktorych juz nikt nie subskrybuje.
+  if (responsePool_.size() >= static_cast<std::size_t>(ipc::kResponseQueuePoolSegments)) {
+    releaseOldestPooled();
+  }
+  int index = 0;
+  while (std::ranges::any_of(responsePool_, [index](const PooledQueue &entry) { return entry.index == index; }))
+    ++index;
+  if (!ipc::security::renameOwned(queueName, names_.responsePool(index))) return false;
+  responsePool_.push_back({.index = index, .queue = std::move(queue)});
+  return true;
+}
+
+/// Odbior wszystkiego, co zostawil klient, przez uchwyt serwera: bez nowego mapowania. Samo wyzerowanie
+/// licznika w naglowku nie wystarcza - Boost wymaga (BOOST_ASSERT w do_send), zeby wolny komunikat
+/// mial wyzerowana dlugosc i priorytet, a zeruje je wlasnie odbior. Koszt rosnie z liczba
+/// komunikatow: naglowek kazdego i kopia jego wiersza (#603, wariant D1a).
+bool IpcServer::drainQueue(IPC::message_queue &queue, int clientId) {
+  std::array<char, ipc::kResponseQueueMaxMessageSize> buffer;
+  IPC::message_queue::size_type received = 0;
+  unsigned int priority                  = 0;
+  try {
+    // Nikt juz do tej kolejki nie pisze (klient wypisany z rejestru), wiec wystarcza jeden przebieg
+    // pojemnosci; licznik na koncu potwierdza, ze kolejka jest pusta.
+    for (auto left = queue.get_max_msg(); left > 0 && queue.try_receive(buffer.data(), buffer.size(), received, priority);
+         --left) {}
+    return queue.get_num_msg() == 0;
+  } catch (const IPC::interprocess_exception &ex) {
+    // Takze not_recoverable: muteks porzucony przez zmarly proces - taka kolejka nie nadaje sie do puli.
+    SPDLOG_WARN("response queue of client {} not drained for reuse: {}", clientId, ex.what());
+    return false;
+  }
+}
+
+void IpcServer::releaseOldestPooled() {
+  responsePool_.front().queue.reset();  // zamknij mapowanie przed unlink
+  ipc::security::removeOwned(names_.responsePool(responsePool_.front().index));
+  responsePool_.erase(responsePool_.begin());
+}
+
+bool IpcServer::poolHas(int maxElements) const {
+  return std::ranges::any_of(responsePool_, [maxElements](const PooledQueue &entry) {
+    return entry.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
+  });
+}
+
+std::unique_ptr<IPC::message_queue> IpcServer::takePooledQueue(int maxElements, const std::string &queueName) {
+  // Dokladnie ta sama pojemnosc: zapas wolnego klienta (domyslnie 10 s) i wycena miejsca zostaja takie,
+  // jakie dalaby nowa kolejka.
+  const auto entry = std::ranges::find_if(responsePool_, [maxElements](const PooledQueue &candidate) {
+    return candidate.queue->get_max_msg() == static_cast<IPC::message_queue::size_type>(maxElements);
+  });
+  if (entry == responsePool_.end()) return nullptr;
+  std::unique_ptr<IPC::message_queue> queue;
+  if (ipc::security::renameOwned(names_.responsePool(entry->index), queueName)) {
+    queue = std::move(entry->queue);
+  } else {
+    entry->queue.reset();  // zamknij mapowanie przed unlink
+    ipc::security::removeOwned(names_.responsePool(entry->index));
+  }
+  responsePool_.erase(entry);
+  return queue;
 }
 
 bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch) {
@@ -170,13 +256,24 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // "No space left on device", czyli komunikat, ktory nie mowi ani ile brakuje, ani dlaczego
   // akurat ten strumien jest drogi. Pomiar nieudany (Space::known == false) PRZEPUSZCZA
   // subskrypcje: odmowa na podstawie niewiedzy byla by gorsza od proby.
-  const std::uint64_t needed = shmbudget::responseQueueBytes(maxElements);
-  if (const shmbudget::Space fs = shmbudget::space(); fs.known && fs.available < needed)
-    throw std::runtime_error(
-        std::format("response queue for stream '{}' needs {} ({} elements of {} B), "
-                    "shared memory has {} free",
-                    streamName, shmbudget::humanBytes(needed), maxElements, ipc::kResponseQueueMaxMessageSize,
-                    shmbudget::humanBytes(fs.available)));
+  //
+  // Kolejka z puli (#603) nie potrzebuje nowego miejsca. Bez niej bezczynna pula ustepuje nowej
+  // kolejce, zanim padnie odmowa: jej zwolnienie kosztuje munmap i unlink, ale tylko przy braku miejsca.
+  const bool pooled = poolHas(maxElements);
+  if (!pooled) {
+    const std::uint64_t needed = shmbudget::responseQueueBytes(maxElements);
+    shmbudget::Space fs        = shmbudget::space();
+    while (fs.known && fs.available < needed && !responsePool_.empty()) {
+      releaseOldestPooled();
+      fs = shmbudget::space();
+    }
+    if (fs.known && fs.available < needed)
+      throw std::runtime_error(
+          std::format("response queue for stream '{}' needs {} ({} elements of {} B), "
+                      "shared memory has {} free",
+                      streamName, shmbudget::humanBytes(needed), maxElements, ipc::kResponseQueueMaxMessageSize,
+                      shmbudget::humanBytes(fs.available)));
+  }
 
   // Rejestracja jest serializowana przez watek komend. Najpierw wypisujemy
   // stara subskrypcje, aby RT nie wysylal do odlinkowanej kolejki podczas mmap.
@@ -212,7 +309,11 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // kolejki i razem z uchwytem pod muteksem, wiec watek RT nigdy nie widzi
   // klienta bez gotowego uchwytu. Tworzenie i mmap poza muteksem map oraz poza
   // blokada epoki planu (#283).
-  auto queueHandle = ipc::security::createQueue(queueName, maxElements, ipc::kResponseQueueMaxMessageSize);
+  //
+  // Kolejka z puli jest juz zmapowana i pusta: zmiana nazwy zastepuje shm_open, fallocate i mmap.
+  // Nieudana zmiana nazwy konczy sie zwyklym utworzeniem, juz bez strazy miejsca powyzej.
+  auto queueHandle = pooled ? takePooledQueue(maxElements, queueName) : nullptr;
+  if (!queueHandle) queueHandle = ipc::security::createQueue(queueName, maxElements, ipc::kResponseQueueMaxMessageSize);
   // Sprawdzenie epoki i wpis do map pod JEDNYM zajeciem muteksu: broadcastOutOfBusiness bierze
   // ten sam muteks, wiec albo rejestracja wypada przed nim i OOB ja obejmie, albo po nim i widzi
   // nowa epoke. Rejestr zamkniety od odczytu expectedEpoch oznacza, ze strumien, ktorego
@@ -227,6 +328,7 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
       return true;
     }
   }
+  // Do puli nie wraca: klient otwiera kolejke, gdy tylko pojawi sie jego nazwa, wiec mogl ja juz zmapowac.
   queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w releaseAbandonedQueues()
   ipc::security::removeOwned(queueName);
   return false;
@@ -369,6 +471,9 @@ void IpcServer::commandLoop() {
     // nie siega poza obszar tego serwera.
     if (!ipc::security::removeOwned(names_.queryQueue) || !ipc::security::removeOwned(names_.shmemSegment))
       throw ipc::security::Rejected("IPC startup refused: existing resources could not be safely removed");
+    // Pula poprzednika (#603). Obcy wpis pod nazwa puli nie blokuje startu: renameOwned na nia odmowi,
+    // a porzucona kolejka zostanie wtedy zwolniona jak bez puli.
+    removePoolNames();
     const ipc::responses::Mapping responses(IPC::create_only, names_.shmemSegment);
     const auto createCommandQueue = [this] {
       return ipc::security::createQueue(names_.queryQueue, ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize);

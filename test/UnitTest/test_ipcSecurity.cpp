@@ -67,6 +67,7 @@ class IpcSecurity : public ::testing::Test {
     IPC::shared_memory_object::remove(names.shmemSegment.c_str());
     IPC::message_queue::remove(names.queryQueue.c_str());
     IPC::message_queue::remove(names.responseQueue(getpid()).c_str());
+    IPC::message_queue::remove(names.responsePool(0).c_str());
     std::filesystem::remove(pathFor(names.shmemSegment) + ".alias");
   }
 };
@@ -195,6 +196,45 @@ TEST_F(IpcSecurity, QueueOpenRejectsNameReplacementAfterOpening) {
   EXPECT_EQ(objectLstats, 4);
   changedObjectPath.clear();
   EXPECT_NO_THROW(sec::openQueue(names.queryQueue));
+}
+
+// #603: kolejka z puli dostaje nazwe klienta przez zmiane nazwy. Serwer zachowuje mapowanie,
+// a klient sprawdza tozsamosc wpisu, wiec obiekt (inode) musi przejsc bez zmian.
+TEST_F(IpcSecurity, RenameMovesOwnQueueWithItsMappingAndRefusesUnsafeCases) {
+  // covers: ipcsecurity.rename-owned.1~1, ipcsecurity.rename-owned.2~1
+  const std::string from = names.responseQueue(getpid());
+  const std::string to   = names.responsePool(0);
+  const auto queue       = sec::createQueue(from, 2, 16);
+  struct stat before{};
+  ASSERT_EQ(__real_lstat(pathFor(from).c_str(), &before), 0);
+  ASSERT_TRUE(sec::renameOwned(from, to));
+  struct stat after{};
+  ASSERT_EQ(__real_lstat(pathFor(to).c_str(), &after), 0);
+  EXPECT_EQ(after.st_ino, before.st_ino);
+  EXPECT_FALSE(std::filesystem::exists(pathFor(from)));
+  queue->send("kept", 4, 0);
+  EXPECT_EQ(sec::openQueue(to)->get_num_msg(), 1U) << "mapowanie nie przezylo zmiany nazwy";
+
+  // Zajety cel: odmowa, obie kolejki zostaja takie, jakie byly.
+  const auto occupant = sec::createQueue(from, 1, 16);
+  EXPECT_FALSE(sec::renameOwned(to, from));
+  EXPECT_EQ(sec::openQueue(from)->get_max_msg(), 1U);
+  EXPECT_EQ(sec::openQueue(to)->get_max_msg(), 2U);
+
+  // Zrodlo obcego konta albo z szerokim trybem: odmowa, zrodlo zostaje pod swoja nazwa.
+  ASSERT_TRUE(sec::removeOwned(from));
+  foreignPath = pathFor(to);
+  EXPECT_FALSE(sec::renameOwned(to, from));
+  foreignPath.clear();
+  ASSERT_EQ(chmod(pathFor(to).c_str(), 0644), 0);
+  EXPECT_FALSE(sec::renameOwned(to, from));
+  EXPECT_TRUE(std::filesystem::exists(pathFor(to)));
+  EXPECT_FALSE(std::filesystem::exists(pathFor(from)));
+
+  // Brak zrodla i niepoprawna nazwa celu.
+  EXPECT_FALSE(sec::renameOwned(names.responsePool(1), from));
+  EXPECT_FALSE(sec::renameOwned(to, "bad/name"));
+  EXPECT_TRUE(std::filesystem::exists(pathFor(to)));
 }
 
 TEST_F(IpcSecurity, CleanupIoFailureLogsAndReturnsFalseWithoutRemovingTheObject) {

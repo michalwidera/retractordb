@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -33,6 +34,7 @@
 
 #include "constants.hpp"
 #include "ipcResponses.hpp"
+#include "ipcSecurity.hpp"
 #include "logCapture.hpp"
 #include "osPlatform.hpp"
 #include "retractor/lib/ipcServer.hpp"
@@ -51,6 +53,7 @@ bool noQueueSpace = false;
 // trafic w kolejke zywego procesu na tej maszynie.
 constexpr int kClientA = 990001;
 constexpr int kClientB = 990002;
+constexpr int kClientC = 990005;
 
 // Nazwa serwera uzywana w testach rozlacznosci obszarow. Pusta nazwa = obszar historyczny.
 constexpr std::string_view kServerA = "srva";
@@ -59,6 +62,8 @@ constexpr std::string_view kServerB = "srvb";
 std::string queueNameFor(int clientId, std::string_view serverName = {}) {
   return ipc::names(serverName).responseQueue(clientId);
 }
+
+std::string poolNameFor(int index, std::string_view serverName = {}) { return ipc::names(serverName).responsePool(index); }
 
 bool queueExists(int clientId, std::string_view serverName = {}) {
   try {
@@ -195,6 +200,27 @@ bool segmentExists(const std::string &name) {
   }
 }
 
+/// Inode obiektu IPC: ta sama liczba przed i po zmianie nazwy znaczy ten sam segment.
+ino_t inodeOf(const std::string &name) {
+  const IPC::shared_memory_object shm(IPC::open_only, name.c_str(), IPC::read_only);
+  struct stat info{};
+  return fstat(shm.get_mapping_handle().handle, &info) == 0 ? info.st_ino : 0;
+}
+
+/// Klient subskrybuje, jego kolejka sie zapelnia, broadcast() ja porzuca, a releaseAbandonedQueues()
+/// ja obsluguje - jak klient, ktory odszedl bez slowa i ktorego kolejka sie zapelnila.
+void abandonAndRelease(IpcServer &server, int clientId, int capacity) {
+  ASSERT_TRUE(server.subscribe(clientId, "stream", capacity, server.subscriptionEpoch()));
+  {
+    IPC::message_queue full(IPC::open_only, queueNameFor(clientId).c_str());
+    for (int sent = 0; sent < capacity; ++sent)
+      full.send("sentinel", 8, 0);
+  }
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+  server.releaseAbandonedQueues();
+}
+
 // Kazdy test zaczyna i konczy sie bez sladu po sobie w /dev/shm, niezaleznie
 // od tego, czy przeszedl.
 class IpcServerQueues : public ::testing::Test {
@@ -212,6 +238,10 @@ class IpcServerQueues : public ::testing::Test {
     for (const std::string_view server : {std::string_view{}, kServerA, kServerB}) {
       IPC::message_queue::remove(queueNameFor(kClientA, server).c_str());
       IPC::message_queue::remove(queueNameFor(kClientB, server).c_str());
+      IPC::message_queue::remove(queueNameFor(kClientC, server).c_str());
+      IPC::message_queue::remove(queueNameFor(getpid(), server).c_str());
+      for (int index = 0; index < ipc::kResponseQueuePoolSegments; ++index)
+        IPC::message_queue::remove(poolNameFor(index, server).c_str());
       IPC::shared_memory_object::remove(ipc::names(server).shmemSegment.c_str());
     }
   }
@@ -379,7 +409,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
-  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.22~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
@@ -394,6 +424,7 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
   EXPECT_TRUE(queueExists(kClientA)) << "broadcast usunal kolejke w slocie zamiast odlozyc zwolnienie";
   server.releaseAbandonedQueues();
   EXPECT_FALSE(queueExists(kClientA)) << "kolejka martwego klienta zostala";
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "kolejka z porzuconym muteksem trafila do puli";
   EXPECT_TRUE(queueExists(kClientB)) << "zdrowy klient stracil kolejke";
   EXPECT_NO_THROW(server.broadcast(streams, [](const std::string &) { return std::string("wiersz"); }));
   server.removeAllObjects();
@@ -449,7 +480,7 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
 }
 
 TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue) {
-  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.19~1
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.19~2
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
@@ -536,7 +567,7 @@ TEST_F(IpcServerQueues, end_of_epoch_and_shutdown_release_pending_queues) {
 // #600: watek komunikacyjny budzi sie co kQueuePollInterval. Pusta lista do zwolnienia nie moze
 // brac blokady map - inaczej kazdy obrot konkurowalby o nia ze slotem trzymajacym ja w broadcast().
 TEST_F(IpcServerQueues, empty_release_list_does_not_wait_for_the_broadcast_map_lock) {
-  // covers: ipcserver.ipc-server.19~1
+  // covers: ipcserver.ipc-server.19~2
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, server.subscriptionEpoch()));
   std::promise<void> entered, resume;
@@ -730,6 +761,143 @@ TEST_F(IpcServerQueues, exit_handler_does_not_wait_for_the_broadcast_map_lock) {
   EXPECT_FALSE(queueExists(kClientA));
 }
 
+// #603: kolejka klienta, ktorego juz nie ma, nie jest zwalniana w czasie pracy (munmap + unlink),
+// tylko czeka pusta w puli i nastepny klient tej samej pojemnosci dostaje TEN SAM segment.
+TEST_F(IpcServerQueues, abandoned_queue_of_dead_client_is_reused_empty_by_next_subscriber) {
+  // covers: ipcserver.ipc-server.19~2, ipcserver.ipc-server.22~1, ipcserver.ipc-server.23~1, ipcserver.ipc-server.25~1
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 2));
+  EXPECT_FALSE(queueExists(kClientA)) << "nazwa porzuconej kolejki zostala";
+  ASSERT_TRUE(segmentExists(poolNameFor(0))) << "kolejka martwego klienta nie trafila do puli";
+  const ino_t pooled = inodeOf(poolNameFor(0));
+
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", 2, server.subscriptionEpoch()));
+  ASSERT_TRUE(queueExists(kClientB));
+  EXPECT_EQ(inodeOf(queueNameFor(kClientB)), pooled) << "nowy klient nie dostal segmentu z puli";
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "wpis puli zostal po ponownym uzyciu";
+  IPC::message_queue reused(IPC::open_only, queueNameFor(kClientB).c_str());
+  EXPECT_EQ(reused.get_num_msg(), 0U) << "nowy klient dostal wiersze poprzedniego";
+  EXPECT_EQ(reused.get_max_msg(), 2U);
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+  EXPECT_EQ(reused.get_num_msg(), 1U) << "kolejka z puli nie dostaje wierszy";
+
+  // Kolejka w puli w chwili zamkniecia: removeAllObjects usuwa i ja.
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientC, 1));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  server.removeAllObjects();
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "removeAllObjects zostawil kolejke z puli";
+  EXPECT_FALSE(queueExists(kClientB));
+}
+
+// Zywy klient ma kolejke nadal zmapowana: po ponownym uzyciu czytalby wiersze nastepnego klienta.
+// Pojemnosc inna niz zadana zmienialaby zapas wolnego klienta - wtedy powstaje nowa kolejka.
+TEST_F(IpcServerQueues, live_owner_and_other_capacity_bypass_the_pool) {
+  // covers: ipcserver.ipc-server.22~1, ipcserver.ipc-server.23~1
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, getpid(), 1));
+  EXPECT_FALSE(queueExists(getpid())) << "kolejka zywego klienta nie zostala zwolniona";
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "kolejka zywego klienta trafila do puli";
+
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 1));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  const ino_t pooled = inodeOf(poolNameFor(0));
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
+  EXPECT_NE(inodeOf(queueNameFor(kClientB)), pooled) << "kolejka o innej pojemnosci przyszla z puli";
+  EXPECT_EQ(IPC::message_queue(IPC::open_only, queueNameFor(kClientB).c_str()).get_max_msg(), 3U);
+  EXPECT_TRUE(segmentExists(poolNameFor(0))) << "chybienie puli zabralo jej wpis";
+  server.removeAllObjects();
+}
+
+// Pula ma najwyzej kResponseQueuePoolSegments wpisow; pelna zwalnia najstarszy, nie najnowszy.
+TEST_F(IpcServerQueues, full_pool_gives_way_to_the_newest_abandoned_queue) {
+  // covers: ipcserver.ipc-server.22~1
+  static_assert(ipc::kResponseQueuePoolSegments == 2, "test zaklada dwa miejsca puli");
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 1));
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientB, 2));
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientC, 3));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  ASSERT_TRUE(segmentExists(poolNameFor(1)));
+  EXPECT_FALSE(segmentExists(poolNameFor(2))) << "pula przekroczyla limit";
+  EXPECT_EQ(IPC::message_queue(IPC::open_only, poolNameFor(0).c_str()).get_max_msg(), 3U)
+      << "najnowsza nie zajela miejsca najstarszej";
+  EXPECT_EQ(IPC::message_queue(IPC::open_only, poolNameFor(1).c_str()).get_max_msg(), 2U);
+  EXPECT_FALSE(queueExists(kClientC));
+  server.removeAllObjects();
+  EXPECT_FALSE(segmentExists(poolNameFor(0)));
+  EXPECT_FALSE(segmentExists(poolNameFor(1)));
+}
+
+// Kolejka z puli nie potrzebuje nowego miejsca; przy chybieniu bezczynna pula ustepuje, zanim padnie odmowa.
+TEST_F(IpcServerQueues, insufficient_space_releases_the_idle_pool_before_refusing) {
+  // covers: ipcserver.ipc-server.23~1, ipcserver.ipc-server.24~1
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 1));
+  noQueueSpace = true;
+  EXPECT_TRUE(server.subscribe(kClientB, "stream", 1, server.subscriptionEpoch())) << "kolejka z puli wymagala miejsca";
+  noQueueSpace = false;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientB, 1));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  noQueueSpace = true;
+  EXPECT_THROW(server.subscribe(kClientC, "stream", 3, server.subscriptionEpoch()), std::runtime_error);
+  noQueueSpace = false;
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "pula nie ustapila przed odmowa";
+  EXPECT_FALSE(queueExists(kClientC));
+  server.removeAllObjects();
+}
+
+// Kolejka, ktora klient mogl juz otworzyc, do puli nie trafia: odmowa przez epoke i kolejka
+// zastapiona przy ponownej subskrypcji tego samego klienta, takze przejeta z listy do zwolnienia.
+// Wpis puli, ktorego nazwy nie da sie przeniesc, zastepuje zwykle utworzenie.
+TEST_F(IpcServerQueues, queues_a_client_may_hold_never_enter_the_pool) {
+  // covers: ipcserver.ipc-server.23~1, ipcserver.ipc-server.24~1
+  IpcServer server;
+  const std::uint64_t stale = server.subscriptionEpoch();
+  server.broadcastOutOfBusiness();
+  EXPECT_FALSE(server.subscribe(kClientA, "stream", 1, stale));
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "odmowa przez epoke oddala kolejke do puli";
+
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "kolejka zastapiona przy ponownej subskrypcji trafila do puli";
+
+  {
+    IPC::message_queue full(IPC::open_only, queueNameFor(kClientA).c_str());
+    full.send("sentinel", 8, 0);
+  }
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [](const std::string &) { return std::string("row"); });
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
+  server.releaseAbandonedQueues();
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "kolejka przejeta z listy do zwolnienia trafila do puli";
+  EXPECT_EQ(IPC::message_queue(IPC::open_only, queueNameFor(kClientA).c_str()).get_num_msg(), 0U);
+
+  // Wpis puli z trybem innym niz 0600: renameOwned odmawia, wpis jest zwalniany, a klient
+  // dostaje nowa kolejke.
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientB, 2));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  const ino_t pooled = inodeOf(poolNameFor(0));
+  {
+    IPC::shared_memory_object shm(IPC::open_only, poolNameFor(0).c_str(), IPC::read_write);
+    ASSERT_EQ(fchmod(shm.get_mapping_handle().handle, 0644), 0);
+  }
+  ASSERT_TRUE(server.subscribe(kClientC, "stream", 2, server.subscriptionEpoch()));
+  EXPECT_NE(inodeOf(queueNameFor(kClientC)), pooled);
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "wpis puli, ktorego nazwy nie dalo sie przeniesc, zostal";
+  server.removeAllObjects();
+}
+
+// Sciezka atexit nie dotyka struktury puli, ale jej nazw nie zostawia.
+TEST_F(IpcServerQueues, exit_handler_removes_pool_names) {
+  // covers: ipcserver.ipc-server.25~1
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 1));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  server.shutdownFromExitHandler();
+  EXPECT_FALSE(segmentExists(poolNameFor(0)));
+}
+
 namespace {
 
 // Wlasny obszar nazw: watek komunikacyjny kasuje na wejsciu segment i kolejke komend
@@ -888,7 +1056,7 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
 // #600: kolejke porzucona w broadcast() zwalnia sam watek komunikacyjny, bez zadnej komendy -
 // klient, ktory odszedl, niczego juz nie wysle.
 TEST(IpcServerLoop, communication_thread_releases_queue_abandoned_in_broadcast) {
-  // covers: ipcserver.ipc-server.19~1
+  // covers: ipcserver.ipc-server.19~2
   RunningServer running;
   ASSERT_TRUE(running.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
   IpcServer &server = running.server();
@@ -904,6 +1072,19 @@ TEST(IpcServerLoop, communication_thread_releases_queue_abandoned_in_broadcast) 
   while (queueExists(kClientFull, kServerLoop) && std::chrono::steady_clock::now() < deadline)
     std::this_thread::sleep_for(ipc::kQueuePollInterval);
   EXPECT_FALSE(queueExists(kClientFull, kServerLoop)) << "watek komunikacyjny nie zwolnil porzuconej kolejki";
+}
+
+// #603: pula poprzednika, ktory padl, nie zostaje w /dev/shm do konca swiata: start watku
+// komunikacyjnego usuwa nazwy puli tego serwera.
+TEST(IpcServerLoop, startup_removes_the_pool_left_by_a_crashed_predecessor) {
+  // covers: ipcserver.ipc-server.25~1
+  const std::string leftover = poolNameFor(0, kServerLoop);
+  IPC::message_queue::remove(leftover.c_str());
+  { const auto queue = ipc::security::createQueue(leftover, 1, ipc::kResponseQueueMaxMessageSize); }
+  ASSERT_TRUE(segmentExists(leftover));
+  RunningServer running;
+  ASSERT_TRUE(running.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+  EXPECT_FALSE(segmentExists(leftover)) << "start serwera zostawil pule poprzednika";
 }
 
 // Regresja S-03, druga droga: poprawne INFO bez db.id rzucalo bad_lexical_cast - i to dopiero

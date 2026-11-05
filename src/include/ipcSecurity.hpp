@@ -69,4 +69,12 @@ std::unique_ptr<boost::interprocess::message_queue> openQueue(const std::string 
 ///       wyklucza zywy serwer.
 bool removeOwned(const std::string &name) noexcept;
 
+/// Funkcja renameOwned powinna:
+/// - [ipcsecurity.rename-owned.1~1] zmieniać nazwę wyłącznie obiektu, który przechodzi kontrolę jak w removeOwned i ma tryb kObjectPermissions, i wyłącznie na nazwę w zaufanej przestrzeni nazw, pod którą nie ma żadnego wpisu, zachowując sam obiekt (ten sam inode i jego mapowania).
+/// - [ipcsecurity.rename-owned.2~1] przy odmowie albo błędzie logować diagnostykę ERROR i zwracać false, nie zgłaszając wyjątku i nie usuwając ani źródła, ani wpisu pod nazwą docelową.
+///
+/// @note Wolac na tych samych warunkach co removeOwned. Istniejacego celu nie nadpisujemy: kontrola i rename nie sa
+///       jedna operacja, ale w katalogu ze sticky obcego wpisu i tak nie da sie podmienic, a wlasny UID jest zaufany.
+bool renameOwned(const std::string &from, const std::string &to) noexcept;
+
 }  // namespace ipc::security
