@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <format>
@@ -171,6 +172,28 @@ bool removeOwned(const std::string &name) noexcept {
     return false;
   } catch (const std::exception &ex) {
     SPDLOG_ERROR("IPC object '{}': cleanup failed: {}", name, ex.what());
+    return false;
+  }
+}
+
+bool renameOwned(const std::string &from, const std::string &to) noexcept {
+  try {
+    checkNamespace(from);
+    checkNamespace(to);
+    struct stat named{};
+    if (lstat(objectPath(from).c_str(), &named) != 0)
+      reject(from, std::format("cannot inspect object for rename: {}", std::strerror(errno)));
+    checkMetadata(named, from, true);
+    struct stat target{};
+    if (lstat(objectPath(to).c_str(), &target) == 0) reject(to, "rename target already exists", target.st_uid);
+    if (errno != ENOENT) reject(to, std::format("cannot inspect rename target: {}", std::strerror(errno)));
+    if (std::rename(objectPath(from).c_str(), objectPath(to).c_str()) != 0)
+      reject(from, std::format("rename to '{}' failed: {}", to, std::strerror(errno)), named.st_uid);
+    return true;
+  } catch (const Rejected &) {
+    return false;
+  } catch (const std::exception &ex) {
+    SPDLOG_ERROR("IPC object '{}': rename to '{}' failed: {}", from, to, ex.what());
     return false;
   }
 }

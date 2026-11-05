@@ -54,7 +54,7 @@ constexpr std::string_view kResponseQueuePrefix = "brcdbr";
 // Pusta nazwa serwera daje dokładnie nazwy historyczne (jednoserwerowe). To jest celowe:
 // sama parametryzacja niczego nie zmienia w zachowaniu, a rozdział obszarów włącza się
 // dopiero wtedy, gdy ktoś poda nazwę niepustą.
-/// @requirements-exempt ServerNames: Nosnik nazw obiektow IPC; responseQueue tylko dokleja id klienta do gotowego prefiksu.
+/// @requirements-exempt ServerNames: Nosnik nazw obiektow IPC; responseQueue i responsePool tylko doklejaja liczbe do gotowego prefiksu.
 struct ServerNames {
   std::string shmemSegment;
   std::string queryQueue;
@@ -62,6 +62,10 @@ struct ServerNames {
 
   /// Nazwa kolejki odpowiedzi konkretnego klienta.
   [[nodiscard]] std::string responseQueue(int clientId) const { return responseQueuePrefix + std::to_string(clientId); }
+
+  /// Nazwa bezczynnej kolejki odpowiedzi w puli serwera (#603). Litera 'p' oddziela ja od
+  /// responseQueue(clientId), ktorej czlon to same cyfry identyfikatora klienta.
+  [[nodiscard]] std::string responsePool(int index) const { return responseQueuePrefix + "p" + std::to_string(index); }
 };
 
 /// Najdluzsza nazwa obiektu IPC, ktora jadro przyjmie.
@@ -220,6 +224,13 @@ constexpr int kQueryQueueMaxMessageSize = 1000;
 // Maksymalny rozmiar odpowiedzi w kolejce per-proces brcdbr{pid} (bajty).
 // Odpowiedzi mogą być dłuższe niż komendy (pełne dane strumieniowe).
 constexpr int kResponseQueueMaxMessageSize = 1024;
+
+// Najwieksza liczba bezczynnych kolejek odpowiedzi, ktore serwer trzyma do ponownego uzycia
+// zamiast zwalniac je w czasie pracy (#603). munmap kolejki >= 2 MiB uniewaznia na Cortex-A72
+// TLB calego procesu, a zwolnienie stron segmentu przy unlink zbiega sie z nadwyzka chybien L2
+// w slocie (R603). Przy jednym podlaczeniu na jedno porzucenie pula ma w stanie ustalonym 0-1
+// wpis; 2 to zapas. Kazdy wpis zajmuje w pamieci dzielonej tyle, co kolejka jego strumienia.
+constexpr int kResponseQueuePoolSegments = 2;
 
 // Miejsce na terminator w buforze odbiorczym kazdej z dwoch kolejek. try_receive moze oddac
 // DOKLADNIE max_message_size bajtow, a odbiorca pisze '\0' pod indeksem recvd_size, czyli
