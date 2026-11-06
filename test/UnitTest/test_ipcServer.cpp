@@ -16,6 +16,7 @@
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
+#include <ctime>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -480,7 +481,7 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
 }
 
 TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue) {
-  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.19~2
+  // covers: ipcserver.ipc-server.8~2, ipcserver.ipc-server.18~1, ipcserver.ipc-server.19~3
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
@@ -567,7 +568,7 @@ TEST_F(IpcServerQueues, end_of_epoch_and_shutdown_release_pending_queues) {
 // #600: watek komunikacyjny budzi sie co kQueuePollInterval. Pusta lista do zwolnienia nie moze
 // brac blokady map - inaczej kazdy obrot konkurowalby o nia ze slotem trzymajacym ja w broadcast().
 TEST_F(IpcServerQueues, empty_release_list_does_not_wait_for_the_broadcast_map_lock) {
-  // covers: ipcserver.ipc-server.19~2
+  // covers: ipcserver.ipc-server.19~3
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, server.subscriptionEpoch()));
   std::promise<void> entered, resume;
@@ -764,7 +765,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_wait_for_the_broadcast_map_lock) {
 // #603: kolejka klienta, ktorego juz nie ma, nie jest zwalniana w czasie pracy (munmap + unlink),
 // tylko czeka pusta w puli i nastepny klient tej samej pojemnosci dostaje TEN SAM segment.
 TEST_F(IpcServerQueues, abandoned_queue_of_dead_client_is_reused_empty_by_next_subscriber) {
-  // covers: ipcserver.ipc-server.19~2, ipcserver.ipc-server.22~2, ipcserver.ipc-server.23~1, ipcserver.ipc-server.25~1
+  // covers: ipcserver.ipc-server.19~3, ipcserver.ipc-server.22~2, ipcserver.ipc-server.23~1, ipcserver.ipc-server.25~1
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 2));
   EXPECT_FALSE(queueExists(kClientA)) << "nazwa porzuconej kolejki zostala";
@@ -910,7 +911,7 @@ IPC::message_queue::size_type pendingMessages(const std::string &name) {
 // #603 R603C: drenaz calej pelnej kolejki jednym ciagiem wydluzal sloty. Kolejka wieksza niz porcja
 // schodzi porcjami w kolejnych obrotach, a do tego czasu wpis puli nie trafia do zadnego klienta.
 TEST_F(IpcServerQueues, abandoned_queue_larger_than_one_batch_is_drained_over_several_turns) {
-  // covers: ipcserver.ipc-server.22~2, ipcserver.ipc-server.27~1
+  // covers: ipcserver.ipc-server.22~2, ipcserver.ipc-server.27~2
   const auto capacity = static_cast<IPC::message_queue::size_type>(kMultiBatchCapacity);
   const auto batch    = static_cast<IPC::message_queue::size_type>(ipc::kResponseQueueDrainBatch);
   IpcServer server;
@@ -940,7 +941,7 @@ TEST_F(IpcServerQueues, abandoned_queue_larger_than_one_batch_is_drained_over_se
 
 // Wpis niegotowy, ktorego muteks porzucil proces zabity miedzy porcjami, zwalnia kolejny obrot.
 TEST_F(IpcServerQueues, dead_mutex_between_drain_batches_releases_the_pool_entry) {
-  // covers: ipcserver.ipc-server.27~1
+  // covers: ipcserver.ipc-server.27~2
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, kMultiBatchCapacity));
@@ -957,9 +958,83 @@ TEST_F(IpcServerQueues, dead_mutex_between_drain_batches_releases_the_pool_entry
   server.removeAllObjects();
 }
 
+// #603 C'': bramka drenazu jako czysta funkcja - termin 0 to brak harmonogramu, a krok z rezerwa musi
+// skonczyc sie PRZED terminem (rownosc zamyka bramke); termin w przeszlosci zamyka ja zawsze.
+TEST(IpcServerGate, window_is_open_without_schedule_or_before_deadline_minus_reserve) {
+  // covers: ipcserver.ipc-server.28~1
+  static_assert(IpcServer::drainWindowOpen(5'000, 0, 200));
+  static_assert(IpcServer::drainWindowOpen(100, 1'000, 200));
+  static_assert(!IpcServer::drainWindowOpen(800, 1'000, 200));
+  static_assert(!IpcServer::drainWindowOpen(2'000, 1'000, 200));
+  static_assert(!IpcServer::drainWindowOpen(1'000, 1'000, 0));
+  SUCCEED();
+}
+
+namespace {
+// Termin niezerowy, ktory zawsze juz minal: CLOCK_MONOTONIC liczy od startu systemu.
+constexpr std::int64_t kPastDeadlineNs = 1;
+
+std::int64_t monotonicNs() {
+  struct timespec now{};
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (static_cast<std::int64_t>(now.tv_sec) * 1'000'000'000) + now.tv_nsec;
+}
+}  // namespace
+
+// Termin w przeszlosci = slot w trakcie liczenia: porcja drenazu czeka. Publikacja 0 (brak harmonogramu)
+// i termin odlegly o wiecej niz rezerwa otwieraja bramke, a po kDrainGateMaxDeferrals odmowach porcja
+// idzie mimo zamknietej bramki i licznik zaczyna od nowa.
+TEST_F(IpcServerQueues, past_deadline_defers_the_drain_batch_until_the_deferral_limit) {
+  // covers: ipcserver.ipc-server.27~2, ipcserver.ipc-server.28~1
+  const auto capacity = static_cast<IPC::message_queue::size_type>(4 * ipc::kResponseQueueDrainBatch);
+  const auto batch    = static_cast<IPC::message_queue::size_type>(ipc::kResponseQueueDrainBatch);
+  IpcServer server;
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, static_cast<int>(capacity)));
+  ASSERT_TRUE(segmentExists(poolNameFor(0)));
+  ASSERT_EQ(pendingMessages(poolNameFor(0)), capacity - batch);
+
+  server.publishNextSlotDeadline(kPastDeadlineNs);
+  for (int turn = 0; turn < ipc::kDrainGateMaxDeferrals; ++turn)
+    server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - batch) << "porcja przeszla zamknieta bramke";
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - (2 * batch)) << "limit odroczen nie przepuscil porcji";
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - (2 * batch)) << "licznik odroczen nie wyzerowal sie";
+
+  server.publishNextSlotDeadline(monotonicNs() + 1'000'000'000);
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), capacity - (3 * batch)) << "termin za 1 s nie otworzyl bramki";
+  server.publishNextSlotDeadline(0);
+  server.releaseAbandonedQueues();
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), 0U) << "publikacja 0 nie otworzyla bramki";
+  server.removeAllObjects();
+}
+
+// To samo dla P0: porzucona kolejka zostaje na liscie do zwolnienia, pod nazwa klienta, poki bramka
+// jest zamknieta; wchodzi do puli po limicie odroczen.
+TEST_F(IpcServerQueues, past_deadline_defers_the_abandoned_queue_until_the_deferral_limit) {
+  // covers: ipcserver.ipc-server.19~3, ipcserver.ipc-server.28~1
+  IpcServer server;
+  server.publishNextSlotDeadline(kPastDeadlineNs);
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, 2));
+  for (int turn = 1; turn < ipc::kDrainGateMaxDeferrals; ++turn)
+    server.releaseAbandonedQueues();
+  EXPECT_TRUE(queueExists(kClientA)) << "porzucona kolejka obsluzona przy zamknietej bramce";
+  EXPECT_FALSE(segmentExists(poolNameFor(0)));
+  server.releaseAbandonedQueues();
+  EXPECT_FALSE(queueExists(kClientA)) << "limit odroczen nie przepuscil P0";
+  EXPECT_TRUE(segmentExists(poolNameFor(0))) << "kolejka martwego klienta nie trafila do puli";
+
+  server.publishNextSlotDeadline(0);
+  ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientB, 1));
+  EXPECT_FALSE(queueExists(kClientB)) << "publikacja 0 nie otworzyla bramki P0";
+  server.removeAllObjects();
+}
+
 // Zamkniecie w trakcie drenazu: removeAllObjects usuwa takze wpis niegotowy.
 TEST_F(IpcServerQueues, removeAllObjects_removes_a_pool_entry_still_being_drained) {
-  // covers: ipcserver.ipc-server.25~1, ipcserver.ipc-server.27~1
+  // covers: ipcserver.ipc-server.25~1, ipcserver.ipc-server.27~2
   IpcServer server;
   ASSERT_NO_FATAL_FAILURE(abandonAndRelease(server, kClientA, kMultiBatchCapacity));
   ASSERT_TRUE(segmentExists(poolNameFor(0)));
@@ -1126,7 +1201,7 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
 // #600: kolejke porzucona w broadcast() zwalnia sam watek komunikacyjny, bez zadnej komendy -
 // klient, ktory odszedl, niczego juz nie wysle.
 TEST(IpcServerLoop, communication_thread_releases_queue_abandoned_in_broadcast) {
-  // covers: ipcserver.ipc-server.19~2
+  // covers: ipcserver.ipc-server.19~3
   RunningServer running;
   ASSERT_TRUE(running.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
   IpcServer &server = running.server();

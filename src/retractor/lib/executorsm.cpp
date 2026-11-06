@@ -625,6 +625,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         slotBench.open();
         clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
         slotBench.anchor(loop_anchor);
+        const std::int64_t loopAnchorNs = (static_cast<std::int64_t>(loop_anchor.tv_sec) * 1'000'000'000) + loop_anchor.tv_nsec;
 
         // Wyjscie przy koncu wejscia (--until-eof) - ta sama droga co przy wyczerpaniu --llimitqry:
         // stop_now zdejmuje czekanie na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
@@ -689,6 +690,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           // Przerwany sen jest ponawiany do tego samego terminu. Zatrzymanie, ktore przyszlo w
           // trakcie snu, konczy epoke przed slotem, ktorego termin jeszcze nie nadszedl.
           if (!no_clock_mode) {
+            // Termin tego slotu dla bramki drenazu watku komunikacyjnego (#603, C''): porcje drenazu
+            // ida tylko w przerwie przed nim. Sama arytmetyka i jeden zapis atomowy - bez wywolania
+            // systemowego w torze RT. Ten sam termin co w rtAbsoluteSleep.
+            ipcServer.publishNextSlotDeadline(loopAnchorNs + (static_cast<std::int64_t>(deadlineMs) * 1'000'000));
             bool stopWhileAsleep = false;
             while (!rtAbsoluteSleep(loop_anchor, deadlineMs))
               if (!lastBudgetSlot && iLoopLimitCnt == executorsm::stop_now) {
@@ -781,6 +786,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           }
           // End of loop while( ! _kbhit(ignoreanykey) )
         }
+        // Poza petla slotow nie ma harmonogramu: termin ostatniego slotu zamykalby bramke drenazu
+        // (koniec epoki, --reset, tryb bezczynny) az do limitu odroczen.
+        ipcServer.publishNextSlotDeadline(0);
         // Blad silnika w slocie przerwal petle slotow; konczy tez petle epok. Licznikow nie
         // raportujemy - opisywalyby przebieg urwany w polowie slotu.
         if (engineError.has_value()) break;

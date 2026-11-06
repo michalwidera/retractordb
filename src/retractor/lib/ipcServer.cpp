@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <format>
 #include <iostream>
 #include <list>
@@ -47,6 +48,14 @@ bool hasInfoDirective(std::string_view text) {
     lineStart = lineEnd + 1;
   }
   return false;
+}
+
+// Ten sam zegar co kotwica slotow w executorsm (rtAbsoluteSleep): na Darwinie steady_clock i
+// CLOCK_MONOTONIC to rozne osie (uspienie), wiec porownanie z terminem idzie przez clock_gettime.
+std::int64_t monotonicNowNs() {
+  struct timespec now{};
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (static_cast<std::int64_t>(now.tv_sec) * 1'000'000'000) + now.tv_nsec;
 }
 
 }  // namespace
@@ -155,6 +164,9 @@ void IpcServer::releaseAbandonedQueues() {
   // Przed wczesnym powrotem: wpis niegotowy postepuje w kazdym obrocie, takze gdy nic nowego nie porzucono.
   drainPooledStep();
   if (!releasePending_.load(std::memory_order_acquire)) return;
+  // P0 (inspectProcess, pierwsza porcja, renameat albo munmap + unlink) to do ~400 us: tylko w przerwie
+  // po slocie. Lista zostaje nietknieta, wiec subscribe nadal przejmuje z niej wpis swojego klienta.
+  if (!passDrainGate(releaseDeferrals_, ipc::kAbandonedQueueSlotReserve)) return;
   decltype(pendingRelease_) released;
   {
     std::scoped_lock lock(clientMapsMutex_);
@@ -233,6 +245,7 @@ IpcServer::DrainStep IpcServer::drainBatch(IPC::message_queue &queue, IPC::messa
 void IpcServer::drainPooledStep() {
   const auto entry = std::ranges::find_if(responsePool_, [](const PooledQueue &candidate) { return !candidate.drained; });
   if (entry == responsePool_.end()) return;
+  if (!passDrainGate(drainDeferrals_, ipc::kDrainBatchSlotReserve)) return;
   const std::string poolName = names_.responsePool(entry->index);
   switch (drainBatch(*entry->queue, entry->left, poolName)) {
     case DrainStep::drained:
@@ -246,6 +259,21 @@ void IpcServer::drainPooledStep() {
       responsePool_.erase(entry);
       break;
   }
+}
+
+bool IpcServer::passDrainGate(int &deferrals, std::chrono::microseconds reserve) {
+  // Termin publikowany przed snem do slotu mija, gdy slot sie zaczyna: w trakcie jego liczenia (i przy
+  // nadrabianiu zaleglosci) bramka jest zamknieta. Bez harmonogramu (--no-clock, poza petla slotow)
+  // zegara nie trzeba czytac.
+  const std::int64_t deadline = nextSlotDeadlineNs_.load(std::memory_order_relaxed);
+  const bool open             = deadline == 0 || drainWindowOpen(monotonicNowNs(), deadline,
+                                                                 std::chrono::duration_cast<std::chrono::nanoseconds>(reserve).count());
+  if (open || deferrals >= ipc::kDrainGateMaxDeferrals) {
+    deferrals = 0;
+    return true;
+  }
+  ++deferrals;
+  return false;
 }
 
 void IpcServer::releaseOldestPooled() {
