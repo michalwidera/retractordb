@@ -970,6 +970,158 @@ TEST_F(IpcServerQueues, removeAllObjects_removes_a_pool_entry_still_being_draine
 
 namespace {
 
+/// Prawdziwy klient sondy zycia (#603, D2s): potomek czekajacy w pause(), ze znacznikiem startu
+/// odczytanym przez rodzica. SIGKILL idzie z rodzica, nie z potomka - inaczej valgrind robi w potomku
+/// kontrole wyciekow na skopiowanej stercie (patrz abandonQueueLock). Destruktor zabija i zbiera
+/// potomka, ktorego test nie zebral, i usuwa nazwe jego kolejki.
+class ChildClient {
+ public:
+  ChildClient() : pid_(fork()) {
+    if (pid_ == 0) {
+      for (;;)
+        pause();
+    }
+    if (pid_ > 0) startTime_ = osplat::inspectProcess(pid_).startTime;
+  }
+  ChildClient(const ChildClient &)            = delete;
+  ChildClient &operator=(const ChildClient &) = delete;
+  ~ChildClient() {
+    if (pid_ > 0 && !reaped_) {
+      ::kill(pid_, SIGKILL);
+      waitpid(pid_, nullptr, 0);
+    }
+    IPC::message_queue::remove(queueNameFor(pid_).c_str());
+  }
+
+  [[nodiscard]] int pid() const { return pid_; }
+  [[nodiscard]] std::uint64_t startTime() const { return startTime_; }
+
+  void kill() const { ASSERT_EQ(::kill(pid_, SIGKILL), 0); }
+
+  /// Zabity, jeszcze niezebrany: wpis procesu ma stan Z.
+  void awaitZombie() const {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!osplat::inspectProcess(pid_).zombie && std::chrono::steady_clock::now() < deadline)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    ASSERT_TRUE(osplat::inspectProcess(pid_).zombie) << "potomek nie zostal zombie";
+  }
+
+  void reap() {
+    int status = 0;
+    ASSERT_EQ(waitpid(pid_, &status, 0), pid_);
+    reaped_ = true;
+    EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) << "status potomka " << status;
+  }
+
+ private:
+  pid_t pid_;
+  std::uint64_t startTime_{0};
+  bool reaped_{false};
+};
+
+const std::array<std::string_view, 1> kProbeStreams{"stream"};
+std::string probeRow(const std::string &) { return "row"; }
+
+}  // namespace
+
+// Klient nie zglasza wyjscia: bez sondy jego kolejka czekalaby na zapelnienie (zapas 10 s). Sonda
+// wypisuje go w pierwszym przebiegu po smierci i oddaje kolejke do puli, ale nie przed uplywem okresu.
+TEST_F(IpcServerQueues, probe_pools_queue_of_dead_witnessed_client_once_per_interval) {
+  // covers: ipcserver.ipc-server.28~1, ipcserver.ipc-server.29~1
+  IpcServer server;
+  ChildClient child;
+  ASSERT_GT(child.pid(), 0);
+  ASSERT_NE(child.startTime(), 0U);
+  ASSERT_TRUE(server.subscribe(child.pid(), "stream", 4, server.subscriptionEpoch(), child.startTime()));
+  server.broadcast(kProbeStreams, probeRow);
+  const auto start = std::chrono::steady_clock::now();
+  server.probeSubscribers(start);
+  EXPECT_EQ(pendingMessages(queueNameFor(child.pid())), 1U) << "sonda ruszyla zywego klienta";
+
+  ASSERT_NO_FATAL_FAILURE(child.kill());
+  ASSERT_NO_FATAL_FAILURE(child.reap());
+  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval - std::chrono::milliseconds(1));
+  EXPECT_TRUE(queueExists(child.pid())) << "sonda zadzialala przed uplywem okresu";
+
+  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval);
+  EXPECT_FALSE(queueExists(child.pid())) << "kolejka martwego klienta zostala pod jego nazwa";
+  ASSERT_TRUE(segmentExists(poolNameFor(0))) << "kolejka martwego klienta nie trafila do puli";
+  EXPECT_EQ(pendingMessages(poolNameFor(0)), 0U) << "kolejka w puli nie zostala oprozniona";
+  server.broadcast(kProbeStreams, probeRow);
+  EXPECT_FALSE(queueExists(child.pid())) << "martwy klient zostal w rejestrze";
+  server.removeAllObjects();
+}
+
+// Znacznik nieznany (0) albo niezgodny z wpisem procesu - klient z innej przestrzeni PID, ponowna
+// subskrypcja bez poswiadczenia - nie wlacza sondy: zywego klienta odcielaby po okresie.
+TEST_F(IpcServerQueues, probe_ignores_client_whose_start_time_was_not_witnessed) {
+  // covers: ipcserver.ipc-server.28~1
+  IpcServer server;
+  ChildClient unknown;
+  ChildClient foreign;
+  ASSERT_GT(unknown.pid(), 0);
+  ASSERT_GT(foreign.pid(), 0);
+  ASSERT_TRUE(server.subscribe(unknown.pid(), "stream", 4, server.subscriptionEpoch(), 0));
+  ASSERT_TRUE(server.subscribe(foreign.pid(), "stream", 4, server.subscriptionEpoch(), foreign.startTime()));
+  ASSERT_TRUE(server.subscribe(foreign.pid(), "stream", 4, server.subscriptionEpoch(), foreign.startTime() + 1));
+  for (ChildClient *child : {&unknown, &foreign}) {
+    ASSERT_NO_FATAL_FAILURE(child->kill());
+    ASSERT_NO_FATAL_FAILURE(child->reap());
+  }
+  server.probeSubscribers(std::chrono::steady_clock::now());
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "sonda porzucila kolejke klienta bez poswiadczenia";
+  server.broadcast(kProbeStreams, probeRow);
+  EXPECT_EQ(pendingMessages(queueNameFor(unknown.pid())), 1U) << "klient bez znacznika wypadl z rejestru";
+  EXPECT_EQ(pendingMessages(queueNameFor(foreign.pid())), 1U) << "klient o niezgodnym znaczniku wypadl z rejestru";
+  server.removeAllObjects();
+}
+
+// Zombie znaczy "nie wiem" (watki grupy moga jeszcze zyc): sonda czeka, az rodzic go zbierze.
+// Zywego klienta sonda nie rusza.
+TEST_F(IpcServerQueues, probe_keeps_live_and_zombie_clients_until_the_zombie_is_reaped) {
+  // covers: ipcserver.ipc-server.29~1
+  IpcServer server;
+  ChildClient child;
+  ASSERT_GT(child.pid(), 0);
+  const std::uint64_t ownStart = osplat::inspectProcess(getpid()).startTime;
+  ASSERT_NE(ownStart, 0U);
+  ASSERT_TRUE(server.subscribe(getpid(), "stream", 4, server.subscriptionEpoch(), ownStart));
+  ASSERT_TRUE(server.subscribe(child.pid(), "stream", 4, server.subscriptionEpoch(), child.startTime()));
+  ASSERT_NO_FATAL_FAILURE(child.kill());
+  ASSERT_NO_FATAL_FAILURE(child.awaitZombie());
+  const auto start = std::chrono::steady_clock::now();
+  server.probeSubscribers(start);
+  EXPECT_TRUE(queueExists(child.pid())) << "sonda porzucila kolejke zombie";
+
+  ASSERT_NO_FATAL_FAILURE(child.reap());
+  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval);
+  EXPECT_FALSE(queueExists(child.pid())) << "zebrany klient zostal w rejestrze";
+  EXPECT_TRUE(segmentExists(poolNameFor(0))) << "kolejka zebranego klienta nie trafila do puli";
+  server.broadcast(kProbeStreams, probeRow);
+  EXPECT_EQ(pendingMessages(queueNameFor(getpid())), 1U) << "sonda wypisala zywego klienta";
+  server.removeAllObjects();
+}
+
+// Koniec epoki usunal juz kolejke; sonda nie siega ani do rejestru nowej epoki, ani do puli.
+TEST_F(IpcServerQueues, probe_after_end_of_epoch_touches_neither_registry_nor_pool) {
+  // covers: ipcserver.ipc-server.29~1
+  IpcServer server;
+  ChildClient child;
+  ASSERT_GT(child.pid(), 0);
+  ASSERT_TRUE(server.subscribe(child.pid(), "stream", 4, server.subscriptionEpoch(), child.startTime()));
+  server.broadcastOutOfBusiness();
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", 4, server.subscriptionEpoch()));
+  ASSERT_NO_FATAL_FAILURE(child.kill());
+  ASSERT_NO_FATAL_FAILURE(child.reap());
+  server.probeSubscribers(std::chrono::steady_clock::now());
+  EXPECT_FALSE(segmentExists(poolNameFor(0))) << "sonda ruszyla kolejke z rozebranej epoki";
+  server.broadcast(kProbeStreams, probeRow);
+  EXPECT_EQ(pendingMessages(queueNameFor(kClientB)), 1U) << "sonda ruszyla rejestr nowej epoki";
+  server.removeAllObjects();
+}
+
+namespace {
+
 // Wlasny obszar nazw: watek komunikacyjny kasuje na wejsciu segment i kolejke komend
 // SWOJEGO serwera, wiec obszar historyczny i obszary kServerA/kServerB zostaja nietkniete.
 constexpr std::string_view kServerLoop = "srvloop";

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -70,6 +71,9 @@
 /// - [ipcserver.ipc-server.26~1] obsługiwać pulę wyłącznie z wątku komunikacyjnego (subscribe, releaseAbandonedQueues) i z removeAllObjects po stop, bez blokady map.
 ///   Kontrola strukturalna: subscribe wolaja tylko commandProcessor w watku komunikacyjnym i testy jednostkowe; broadcast i broadcastOutOfBusiness nie siegaja do responsePool_.
 /// - [ipcserver.ipc-server.27~1] w releaseAbandonedQueues, przed sprawdzeniem listy do zwolnienia, odbierać jedną porcję (najwyżej kResponseQueueDrainBatch komunikatów, nie więcej niż budżet wpisu) z najstarszego niegotowego wpisu puli; wpis, którego kolejka jest po porcji pusta, oznaczać jako gotowy, a wpis, którego odbiór zgłosił błąd albo wyczerpał budżet bez opróżnienia kolejki, zwalniać (zamknięcie mapowania, potem usunięcie nazwy). W subscribe brać z puli i liczyć jako dostępne wyłącznie wpisy gotowe.
+/// - [ipcserver.ipc-server.28~1] w subscribe po udanej rejestracji wpisywać klienta na listę obserwowanych sondy życia, z czasem startu i epoką rejestracji, wyłącznie wtedy, gdy clientStart jest niezerowy, a inspectProcess(clientId) znalazł proces niebędący zombie o startTime równym clientStart; w każdym innym przypadku usuwać klienta z tej listy, tak aby jego śmierć wychodziła tylko przez pełną kolejkę. Odczyt wpisu procesu wypada poza blokadą map.
+/// - [ipcserver.ipc-server.29~1] w probeSubscribers, wołanym przez wątek komunikacyjny w każdym obrocie pętli odbioru przed releaseAbandonedQueues, nie robić nic przed upływem kClientLivenessProbeInterval od poprzedniego przebiegu; w przebiegu usuwać z listy obserwowanych wpisy z epoki innej niż bieżąca, a dla pozostałych wołać inspectProcess. Klienta, którego brak jądro potwierdziło (found i unreadable równe false) albo którego PID ma inny startTime, usuwać z listy i, gdy pod blokadą map jest nadal zarejestrowany w epoce wpisu, wypisywać go z rejestru pod tym jednym zajęciem blokady, a jego kolejkę poza blokadą oddawać do puli albo zwalniać jak w releaseAbandonedQueues. Zombie i wpis nieczytelny zostają na liście. Przebieg bez zgonu nie bierze blokady map.
+///   Zakres testow: smierc, zombie, zly i zerowy clientStart, zywy klient, okres sondy i koniec epoki na prawdziwym procesie potomnym. Ponownego uzycia PID-u (inny startTime) test nie wymusza - kontrola strukturalna warunku w probeSubscribers.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
@@ -129,7 +133,10 @@ class IpcServer {
 
   /// Tworzy kolejke odpowiedzi klienta i rejestruje go na strumieniu, jesli rejestr nie zostal
   /// zamkniety od odczytu @p expectedEpoch. Falsz = odmowa: kolejka usunieta, rejestr nietkniety.
-  bool subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch);
+  /// @p clientStart to znacznik startu, ktory klient odczytal ze swojego wpisu procesu (db.start);
+  /// zgodny z wpisem widzianym przez serwer wlacza klienta do sondy zycia, 0 = nie wiadomo.
+  bool subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch,
+                 std::uint64_t clientStart = 0);
 
   /// Rozsyla biezacy wiersz kazdego z podanych strumieni do jego subskrybentow.
   /// Kazde wystapienie nazwy jest osobna emisja; span nie jest deduplikowany.
@@ -147,6 +154,11 @@ class IpcServer {
   /// Zwalnia kolejki porzucone w broadcast(): zamyka mapowanie, potem usuwa nazwe. Wola go
   /// watek komunikacyjny; pusta lista kosztuje jeden odczyt atomowy, bez blokady map.
   void releaseAbandonedQueues();
+
+  /// Sonda zycia obserwowanych subskrybentow (#603, D2s): co kClientLivenessProbeInterval wypisuje
+  /// klienta, ktorego proces juz nie istnieje, i oddaje jego kolejke do puli albo ja zwalnia. Wola
+  /// go watek komunikacyjny w kazdym obrocie; @p now podaje wolajacy, wiec test nie czeka na okres.
+  void probeSubscribers(std::chrono::steady_clock::time_point now);
 
   /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend
   /// i kolejki odpowiedzi pozostalych klientow. Wolac po stop().
@@ -166,6 +178,10 @@ class IpcServer {
   /// albo jeszcze nie. Falsz = kolejka nadal pod nazwa klienta, z uchwytem w @p queue, i wolajacy
   /// zwalnia ja jak dotad.
   bool poolAbandonedQueue(int clientId, std::unique_ptr<boost::interprocess::message_queue> &queue);
+
+  /// Kolejka porzucona, juz wypisana z rejestru: do puli albo zamkniecie mapowania i usuniecie nazwy.
+  /// @p cause trafia do wpisu w logu.
+  void releaseQueue(int clientId, std::unique_ptr<boost::interprocess::message_queue> &queue, std::string_view cause);
 
   /// Kolejka z puli o pojemnosci @p maxElements, juz pod nazwa @p queueName, albo nullptr.
   std::unique_ptr<boost::interprocess::message_queue> takePooledQueue(int maxElements, const std::string &queueName);
@@ -259,6 +275,17 @@ class IpcServer {
     boost::interprocess::message_queue::size_type left;
   };
   std::vector<PooledQueue> responsePool_;
+
+  // Subskrybenci obserwowani przez sonde zycia (#603, D2s): znacznik startu poswiadczony w subscribe
+  // i epoka rejestracji. Tylko watek komunikacyjny (subscribe, probeSubscribers) - bez blokady. Wpis
+  // klienta wypisanego w broadcast zostaje do jego smierci albo konca epoki: sonda sprawdza wtedy
+  // rejestracje pod blokada map i niczego nie rusza.
+  struct Witness {
+    std::uint64_t startTime;
+    std::uint64_t epoch;
+  };
+  std::map<int, Witness> watched_;
+  std::chrono::steady_clock::time_point nextProbe_{};
 
   // Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
   // mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/
