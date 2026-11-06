@@ -75,8 +75,6 @@ class dataModel;
 /// - [executorsm.executorsm.20~1] przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
 ///   Zakres testow: `it_signal_stop-run` (wyjście kodem 0 we wszystkich trybach; część C: subskrybent kończy się kodem 0 na znaczniku po każdym sygnale i po kill). Kontrola strukturalna: ipcServer.stop() i removeAllObjects() przed `return` w executorsm::run.
 /// - [executorsm.executorsm.21~1] obsługiwać komendę vars: dla każdej zmiennej VAR planu, w kolejności deklaracji, nazwę, typ z deklaracji i wartość zatwierdzoną na końcu ostatniego slotu (NULL jako null), dla planu bez zmiennych pustą listę, a przy braku planu i w trakcie zamykania odpowiedź jak na get.
-/// - [executorsm.executorsm.22~1] w trybie taktowanym tuż przed snem do terminu slotu publikować serwerowi IPC (publishNextSlotDeadline) ten termin jako kotwicę plus czas logiczny slotu w ns CLOCK_MONOTONIC, wyłącznie arytmetyką bez wywołania systemowego, a po wyjściu z pętli slotów publikować 0; w trybie --no-clock nie publikować terminu.
-///   Kontrola strukturalna: publishNextSlotDeadline z loopAnchorNs + deadlineMs w gałęzi `if (!no_clock_mode)` przed rtAbsoluteSleep i publishNextSlotDeadline(0) zaraz za pętlą slotów w executorsm.cpp; terminu nie da się zaobserwować z zewnątrz bez haka w kodzie produkcyjnym, a semantykę bramki pokrywa ipcserver.ipc-server.28~1.
 struct executorsm {
   /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
   rdb::Refusal initializationError;

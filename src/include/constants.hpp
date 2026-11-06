@@ -238,18 +238,6 @@ constexpr int kResponseQueuePoolSegments = 2;
 // na Cortex-A72, a kolejka uc05 schodzi w ~31 obrotach. Liczba, nie budzet czasu: nie zalezy od platformy.
 constexpr int kResponseQueueDrainBatch = 256;
 
-// Rezerwy bramki drenazu (#603, wariant C''): porcja drenazu i pierwsza obsluga porzuconej kolejki
-// (P0) ida tylko wtedy, gdy do terminu nastepnego slotu zostalo wiecej niz rezerwa - w przerwie po
-// slocie, nie w trakcie jego liczenia. Budzety czasu, wiec platformowe; wycena na Cortex-A72 (R603D):
-// p99 porcji 127-134 us, p99 P0 ~400 us (kill, inspectProcess, renameat, pierwsza porcja).
-constexpr std::chrono::microseconds kDrainBatchSlotReserve{200};
-constexpr std::chrono::microseconds kAbandonedQueueSlotReserve{500};
-
-// Najwieksza liczba kolejnych obrotow watku komunikacyjnego z zamknieta bramka drenazu, po ktorej
-// czekajacy krok idzie mimo bramki (~115 ms przy kQueuePollInterval). Bez limitu trwale przeciazony
-// harmonogram (termin zawsze w przeszlosci) nie oddalby zadnej kolejki.
-constexpr int kDrainGateMaxDeferrals = 100;
-
 // Miejsce na terminator w buforze odbiorczym kazdej z dwoch kolejek. try_receive moze oddac
 // DOKLADNIE max_message_size bajtow, a odbiorca pisze '\0' pod indeksem recvd_size, czyli
 // zaraz za nimi. Bufor o rozmiarze samego max_message_size konczy sie zapisem poza tablica.

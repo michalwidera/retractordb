@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -61,7 +60,7 @@
 ///   Sprawdzenie kompilacji: test/UnitTest/test_ipcServer.cpp, static_assert cech kopiowania IpcServer.
 /// - [ipcserver.ipc-server.17~1] odrzucać z wpisem w logu, przed parserem INFO i bez wywołania onCommand, komendę zawierającą linię, której pierwszy znak inny niż biały to '#' (dyrektywa parsera, np. #include otwierająca plik), tak aby treść komendy nie otwierała plików z prawami serwera.
 /// - [ipcserver.ipc-server.18~1] w broadcast nie zamykać mapowania ani nie usuwać nazwy porzuconej kolejki, tylko przenosić jej uchwyt na listę do zwolnienia, tak aby koszt munmap i unlink (do ~50 ms przy kolejce 64 MiB) nie trafiał do slotu.
-/// - [ipcserver.ipc-server.19~3] w releaseAbandonedQueues, wołanym przez wątek komunikacyjny w każdym obrocie pętli odbioru, przy niepustej liście do zwolnienia i bramce drenażu otwartej z rezerwą kAbandonedQueueSlotReserve zabierać listę pod blokadą map i poza nią każdą kolejkę oddawać do puli albo, gdy się to nie uda, zamykać jej mapowanie, a potem usuwać jej nazwę; przy zamkniętej bramce zostawiać listę nietkniętą do następnego obrotu; przy pustej liście nie brać blokady map ani nie pytać bramki.
+/// - [ipcserver.ipc-server.19~2] w releaseAbandonedQueues, wołanym przez wątek komunikacyjny w każdym obrocie pętli odbioru, zabierać listę do zwolnienia pod blokadą map i poza nią każdą kolejkę oddawać do puli albo, gdy się to nie uda, zamykać jej mapowanie, a potem usuwać jej nazwę; przy pustej liście nie brać blokady map.
 /// - [ipcserver.ipc-server.20~1] w subscribe przejmować zaległe zwolnienie kolejki tego samego klienta pod tym samym zajęciem blokady map, pod którym wypisuje go z rejestru, tak aby późniejsze zwolnienie listy nie usunęło nazwy nowej kolejki.
 /// - [ipcserver.ipc-server.21~1] w broadcastOutOfBusiness i removeClientQueues (a przez nią w removeAllObjects i shutdownFromExitHandler) zwalniać także wszystkie kolejki z listy do zwolnienia.
 /// - [ipcserver.ipc-server.22~2] w releaseAbandonedQueues oddawać porzuconą kolejkę do puli zamiast ją zwalniać wyłącznie wtedy, gdy jądro potwierdziło brak procesu klienta (inspectProcess: found i unreadable równe false), pierwsza porcja odbioru przez try_receive na uchwycie serwera, jeszcze pod nazwą klienta i najwyżej kResponseQueueDrainBatch komunikatów, przeszła bez błędu i renameOwned przeniósł jej nazwę na wolną nazwę responsePool; kolejka, której ta porcja nie opróżniła, wchodzi do puli jako wpis niegotowy z budżetem odbiorów równym jej pojemności pomniejszonej o odebrane komunikaty. Pula ma najwyżej kResponseQueuePoolSegments wpisów, gotowych i niegotowych razem, a pełna zwalnia przed zmianą nazwy swój najstarszy wpis. W każdym innym przypadku zwalniać kolejkę jak dotąd.
@@ -70,9 +69,7 @@
 /// - [ipcserver.ipc-server.25~1] w removeAllObjects zamykać mapowania puli i usuwać jej nazwy, a w shutdownFromExitHandler i na starcie wątku komunikacyjnego usuwać nazwy responsePool(0..kResponseQueuePoolSegments-1) bez dotykania struktury puli.
 /// - [ipcserver.ipc-server.26~1] obsługiwać pulę wyłącznie z wątku komunikacyjnego (subscribe, releaseAbandonedQueues) i z removeAllObjects po stop, bez blokady map.
 ///   Kontrola strukturalna: subscribe wolaja tylko commandProcessor w watku komunikacyjnym i testy jednostkowe; broadcast i broadcastOutOfBusiness nie siegaja do responsePool_.
-/// - [ipcserver.ipc-server.27~2] w releaseAbandonedQueues, przed sprawdzeniem listy do zwolnienia, odbierać jedną porcję (najwyżej kResponseQueueDrainBatch komunikatów, nie więcej niż budżet wpisu) z najstarszego niegotowego wpisu puli, gdy bramka drenażu z rezerwą kDrainBatchSlotReserve jest otwarta, a przy zamkniętej odkładać porcję do następnego obrotu; wpis, którego kolejka jest po porcji pusta, oznaczać jako gotowy, a wpis, którego odbiór zgłosił błąd albo wyczerpał budżet bez opróżnienia kolejki, zwalniać (zamknięcie mapowania, potem usunięcie nazwy). W subscribe brać z puli i liczyć jako dostępne wyłącznie wpisy gotowe.
-/// - [ipcserver.ipc-server.28~1] traktować wartość z publishNextSlotDeadline jako bezwzględny termin następnego slotu w ns CLOCK_MONOTONIC, a 0 jako brak harmonogramu; bramka drenażu (drainWindowOpen) jest otwarta, gdy termin wynosi 0 albo teraz + rezerwa < termin. Krok czekający na bramkę (porcja drenażu albo obsługa listy do zwolnienia), który zastał ją zamkniętą w kDrainGateMaxDeferrals kolejnych obrotach, wykonywać w następnym obrocie mimo bramki; każde przejście bramki zeruje licznik odroczeń tego kroku.
-///   Zakres testow: `IpcServerGate.window_is_open_without_schedule_or_before_deadline_minus_reserve`, `IpcServerQueues.past_deadline_defers_the_drain_batch_until_the_deferral_limit`, `IpcServerQueues.past_deadline_defers_the_abandoned_queue_until_the_deferral_limit`. Nieweryfikowane testem: koszt kroku wobec rezerw - budżety pochodzą z pomiaru R603D na Cortex-A72.
+/// - [ipcserver.ipc-server.27~1] w releaseAbandonedQueues, przed sprawdzeniem listy do zwolnienia, odbierać jedną porcję (najwyżej kResponseQueueDrainBatch komunikatów, nie więcej niż budżet wpisu) z najstarszego niegotowego wpisu puli; wpis, którego kolejka jest po porcji pusta, oznaczać jako gotowy, a wpis, którego odbiór zgłosił błąd albo wyczerpał budżet bez opróżnienia kolejki, zwalniać (zamknięcie mapowania, potem usunięcie nazwy). W subscribe brać z puli i liczyć jako dostępne wyłącznie wpisy gotowe.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
@@ -151,18 +148,6 @@ class IpcServer {
   /// watek komunikacyjny; pusta lista kosztuje jeden odczyt atomowy, bez blokady map.
   void releaseAbandonedQueues();
 
-  /// Termin nastepnego slotu w ns CLOCK_MONOTONIC, 0 = brak harmonogramu (#603, C''). Pisze go watek
-  /// slotu tuz przed snem do terminu; jeden zapis atomowy, bez wywolania systemowego w torze RT.
-  /// Wartosc jest wskazowka czasowa dla bramki drenazu, nie synchronizuje zadnych danych.
-  void publishNextSlotDeadline(std::int64_t monotonicNs) { nextSlotDeadlineNs_.store(monotonicNs, std::memory_order_relaxed); }
-
-  /// Bramka drenazu jako czysta funkcja: otwarta bez harmonogramu (termin 0) albo gdy krok z rezerwa
-  /// @p reserveNs konczy sie przed terminem. Termin w przeszlosci (slot w trakcie liczenia, spozniony
-  /// albo nadrabiany) zamyka bramke.
-  [[nodiscard]] static constexpr bool drainWindowOpen(std::int64_t nowNs, std::int64_t deadlineNs, std::int64_t reserveNs) {
-    return deadlineNs == 0 || nowNs + reserveNs < deadlineNs;
-  }
-
   /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend
   /// i kolejki odpowiedzi pozostalych klientow. Wolac po stop().
   void removeAllObjects();
@@ -201,10 +186,6 @@ class IpcServer {
 
   /// Czy pula ma gotowa kolejke o pojemnosci @p maxElements.
   [[nodiscard]] bool poolHas(int maxElements) const;
-
-  /// Czy krok czekajacy na bramke drenazu moze isc w tym obrocie: bramka otwarta z rezerwa @p reserve
-  /// albo @p deferrals doszedl do kDrainGateMaxDeferrals. Przejscie zeruje @p deferrals, odmowa go zwieksza.
-  bool passDrainGate(int &deferrals, std::chrono::microseconds reserve);
 
   /// Nazwy wszystkich miejsc puli, bez dotykania responsePool_ (sciezka atexit, start watku).
   void removePoolNames() const;
@@ -278,13 +259,6 @@ class IpcServer {
     boost::interprocess::message_queue::size_type left;
   };
   std::vector<PooledQueue> responsePool_;
-
-  // Bramka drenazu (#603, C''): termin nastepnego slotu publikowany przez watek slotu i liczniki kolejnych
-  // obrotow, w ktorych krok czekal na zamknietej bramce - osobno porcja puli i lista do zwolnienia.
-  // Liczniki tylko w watku komunikacyjnym, jak responsePool_.
-  std::atomic<std::int64_t> nextSlotDeadlineNs_{0};
-  int drainDeferrals_{0};
-  int releaseDeferrals_{0};
 
   // Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
   // mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/
