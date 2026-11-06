@@ -284,6 +284,12 @@ constexpr int kObjectPermissions = 0600;
 // Używany przez: producenta w ipcClient, pętlę komend w executorsm, pętlę select w qry.
 constexpr std::chrono::milliseconds kQueuePollInterval{1};
 
+// Okres sondy zycia subskrybentow w watku komunikacyjnym (#603, D2s). Klient nie zglasza swojego
+// wyjscia, wiec bez sondy jego smierc wychodzi dopiero przy pelnej kolejce, po zapasie kolejki
+// (domyslnie 10 s), i drenaz czyta wtedy cala kolejke. Sonda co 1 s skraca to do <= 1 s po zebraniu
+// procesu przez rodzica, za cene jednego odczytu wpisu procesu na klienta na sekunde.
+constexpr std::chrono::milliseconds kClientLivenessProbeInterval{1000};
+
 // Czas oczekiwania klienta na odpowiedź serwera w shared memory między próbami.
 // Musi być wystarczająco długi przy pracy serwera pod valgrindem (10 prób × 10 ms).
 constexpr std::chrono::milliseconds kClientResponsePollInterval{10};

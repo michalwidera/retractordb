@@ -294,7 +294,11 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
                std::chrono::steady_clock::now() < deadline)
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
-      if (!ipcServer.subscribe(streamId, streamName, maxElements, subscriptionEpoch)) {
+      // Znacznik startu, ktory klient odczytal ze swojego wpisu procesu: wlacza go do sondy zycia
+      // (#603, D2s). Brak albo zly db.start (starsza binarka) daje 0, czyli klienta bez sondy.
+      std::uint64_t clientStart = 0;
+      boost::conversion::try_lexical_convert(ptInval.get("db.start", "0"), clientStart);
+      if (!ipcServer.subscribe(streamId, streamName, maxElements, subscriptionEpoch, clientStart)) {
         SPDLOG_WARN("commandProcessor: 'show' of stream '{}' for client {} refused: plan epoch ended during subscription",
                     streamName, streamId);
         ptRetval.put("error.response",

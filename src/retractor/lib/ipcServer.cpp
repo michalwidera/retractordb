@@ -165,14 +165,55 @@ void IpcServer::releaseAbandonedQueues() {
   }
   // Poza muteksem: munmap i unlink segmentu to milisekundy, a slot czekalby na nie przy
   // nastepnym broadcast(). Nazwa nalezy wciaz do zwalnianej kolejki - patrz pendingRelease_.
-  for (auto &[clientId, queue] : released) {
-    if (poolAbandonedQueue(clientId, queue)) {
-      SPDLOG_WARN("queue pooled on timeout, procId={}", clientId);
+  for (auto &[clientId, queue] : released)
+    releaseQueue(clientId, queue, "timeout");
+}
+
+void IpcServer::releaseQueue(int clientId, std::unique_ptr<IPC::message_queue> &queue, std::string_view cause) {
+  if (poolAbandonedQueue(clientId, queue)) {
+    SPDLOG_WARN("queue pooled on {}, procId={}", cause, clientId);
+    return;
+  }
+  queue.reset();  // zamknij mapowanie przed unlink
+  ipc::security::removeOwned(names_.responseQueue(clientId));
+  SPDLOG_WARN("queue erased on {}, procId={}", cause, clientId);
+}
+
+void IpcServer::probeSubscribers(std::chrono::steady_clock::time_point now) {
+  if (now < nextProbe_) return;
+  nextProbe_                = now + ipc::kClientLivenessProbeInterval;
+  const std::uint64_t epoch = subscriptionEpoch_.load(std::memory_order_acquire);
+  for (auto it = watched_.begin(); it != watched_.end();) {
+    const auto [clientId, witness] = *it;
+    // Wpis z rozebranej epoki: kolejke usunal juz koniec epoki, a klient moze nie zyc od dawna.
+    if (witness.epoch != epoch) {
+      it = watched_.erase(it);
       continue;
     }
-    queue.reset();  // zamknij mapowanie przed unlink
-    ipc::security::removeOwned(names_.responseQueue(clientId));
-    SPDLOG_WARN("queue erased on timeout, procId={}", clientId);
+    // Martwy tylko na slowo jadra: brak PID-u (ESRCH) albo PID innej inkarnacji. Zombie (watki grupy
+    // moga jeszcze zyc) i nieczytelny wpis znacza "nie wiem" - jak w poolAbandonedQueue.
+    const osplat::ProcessSnapshot process = osplat::inspectProcess(clientId);
+    const bool gone                       = process.found ? process.startTime != witness.startTime : !process.unreadable;
+    if (!gone) {
+      ++it;
+      continue;
+    }
+    it = watched_.erase(it);
+    // Pod blokada tylko wypisanie, jak w broadcast. Klient wypisany juz w broadcast (pelna kolejka,
+    // martwy muteks) albo zastapiony przez nowa subskrypcje w nowej epoce nie jest tu ruszany.
+    std::unique_ptr<IPC::message_queue> queue;
+    {
+      std::scoped_lock lock(clientMapsMutex_);
+      const auto cached = id2QueueCache_.find(clientId);
+      if (subscriptionEpoch_.load(std::memory_order_relaxed) != witness.epoch || cached == id2QueueCache_.end() ||
+          !cached->second)
+        continue;
+      queue = std::move(cached->second);
+      id2QueueCache_.erase(cached);
+      id2StreamNameRelation_.erase(clientId);
+    }
+    // Poza blokada, jak w releaseAbandonedQueues: kolejka ma wiersze z <= okresu sondy, nie z calego zapasu.
+    releaseQueue(clientId, queue, "client death");
   }
 }
 
@@ -278,7 +319,8 @@ std::unique_ptr<IPC::message_queue> IpcServer::takePooledQueue(int maxElements, 
   return queue;
 }
 
-bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch) {
+bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch,
+                          std::uint64_t clientStart) {
   const std::string queueName = names_.responseQueue(clientId);
 
   // Straz miejsca PRZED utworzeniem kolejki. Kolejka boosta powstaje w calosci od razu (segment
@@ -345,10 +387,16 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // Nieudana zmiana nazwy konczy sie zwyklym utworzeniem, juz bez strazy miejsca powyzej.
   auto queueHandle = pooled ? takePooledQueue(maxElements, queueName) : nullptr;
   if (!queueHandle) queueHandle = ipc::security::createQueue(queueName, maxElements, ipc::kResponseQueueMaxMessageSize);
+  // Tozsamosc dla sondy zycia: znacznik, ktory klient odczytal sam, musi zgadzac sie z wpisem widzianym
+  // przez serwer. Klient z innej przestrzeni PID ma tu brak albo cudzy proces, a przy hidepid wpis jest
+  // nieczytelny - taki klient nie jest obserwowany, bo sonda odcielaby go zywego. Odczyt poza blokada map.
+  const osplat::ProcessSnapshot client = clientStart != 0 ? osplat::inspectProcess(clientId) : osplat::ProcessSnapshot{};
+  const bool witnessed                 = client.found && !client.zombie && client.startTime == clientStart;
   // Sprawdzenie epoki i wpis do map pod JEDNYM zajeciem muteksu: broadcastOutOfBusiness bierze
   // ten sam muteks, wiec albo rejestracja wypada przed nim i OOB ja obejmie, albo po nim i widzi
   // nowa epoke. Rejestr zamkniety od odczytu expectedEpoch oznacza, ze strumien, ktorego
   // parametry wolajacy odczytal, nalezy do epoki juz rozebranej.
+  bool registered = false;
   {
     std::scoped_lock lock(clientMapsMutex_);
     if (subscriptionEpoch_.load(std::memory_order_relaxed) == expectedEpoch) {
@@ -356,8 +404,17 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
       id2QueueCache_[clientId]         = std::move(queueHandle);
       // Miejsce na porzucenie kazdej zarejestrowanej kolejki: broadcast() dopisuje bez alokacji.
       pendingRelease_.reserve(pendingRelease_.size() + id2StreamNameRelation_.size());
-      return true;
+      registered = true;
     }
+  }
+  if (registered) {
+    // Poza blokada map: watched_ nalezy tylko do watku komunikacyjnego, a wstawienie alokuje.
+    if (witnessed) {
+      watched_[clientId] = {.startTime = clientStart, .epoch = expectedEpoch};
+    } else {
+      watched_.erase(clientId);
+    }
+    return true;
   }
   // Do puli nie wraca: klient otwiera kolejke, gdy tylko pojawi sie jego nazwa, wiec mogl ja juz zmapowac.
   queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w releaseAbandonedQueues()
@@ -622,6 +679,7 @@ void IpcServer::commandLoop() {
           SPDLOG_ERROR("IPC message dropped: {}", ex.what());
         }
       }
+      probeSubscribers(std::chrono::steady_clock::now());
       releaseAbandonedQueues();
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
