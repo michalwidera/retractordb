@@ -26,6 +26,7 @@
 #include "retractor/lib/executorsmState.hpp"
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/planSource.hpp"
+#include "retractor/lib/processLimits.hpp"
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/RQLParser.hpp"
 
@@ -117,6 +118,9 @@ TEST_F(ExecutorsmCommandsTest, get_lists_every_stream_with_its_parameters) {
 // IpcServer::commandLoop. Przy slocie 32 KiB nie miescila sie: `xqry -d` i `xqry -s` dostawaly
 // "response too large" dla planu, ktory silnik przyjal (#566).
 TEST_F(ExecutorsmCommandsTest, get_for_the_widest_plan_with_long_names_fits_a_response_slot) {
+  // Model trzyma ok. 2 deskryptory na strumien; xretractor podnosi limit przy starcie, test robi to
+  // samo, bo przy domyslnym limicie macOS (256) plan nie miescil sie w nim (job macOS 1257).
+  ASSERT_EQ(proclimits::raiseOpenFilesLimit().err, 0);
   const auto name = [](std::size_t index) {
     const auto prefix = std::format("s{:03}", index);
     return prefix + std::string(200 - prefix.size(), 'x');
