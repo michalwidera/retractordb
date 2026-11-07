@@ -1,7 +1,10 @@
 #include "dataModel.hpp"
 
+#include <sys/resource.h>
+
 #include <algorithm>
 #include <cassert>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -33,6 +36,18 @@ const token &programArg(const query &qry, const int i) { return *std::next(qry.l
 // Nazwa zrodla przez referencje do napisu w tokenie, a nie przez getStr_(), ktore zwraca kopie:
 // nazwy substratow (STREAM_AGSE_1_25_mlii) nie mieszcza sie w SSO, wiec kazde uzycie bylo alokacja.
 const std::string &programNameArg(const query &qry, const int i) { return std::get<std::string>(programArg(qry, i).getVT()); }
+
+// Sam strerror(EMFILE) nie mowi, ktory limit zabraklo ani ze winna jest szerokosc planu: model trzyma
+// ok. 2 deskryptory na strumien magazynowany, a domyslny miekki limit macOS to 256.
+std::string openFilesHint(const std::size_t streams) {
+  struct rlimit limit{};
+  if (::getrlimit(RLIMIT_NOFILE, &limit) != 0) return {};
+  const auto text = [](const rlim_t value) { return value == RLIM_INFINITY ? std::string("unlimited") : std::to_string(value); };
+  return fmt::format(
+      " - open-files limit RLIMIT_NOFILE is {} (hard {}), the plan has {} streams and the model keeps about 2 "
+      "descriptors per stored stream; raise the limit (ulimit -n)",
+      text(limit.rlim_cur), text(limit.rlim_max), streams);
+}
 
 }  // namespace
 
@@ -72,9 +87,11 @@ rdb::Result<std::unique_ptr<dataModel>> dataModel::create(qTree &coreInstance, r
 
   for (auto &qry : coreInstance) {
     auto runtime = streamInstance::create(coreInstance, qry, self->directive_[":STORAGE"], memory);
-    if (!runtime)
-      return rdb::fail(rdb::Error(runtime.error().code(), "dataModel: stream '" + qry.id + "': " + runtime.error().message(),
-                                  runtime.error().err()));
+    if (!runtime) {
+      std::string message = "dataModel: stream '" + qry.id + "': " + runtime.error().message();
+      if (runtime.error().err() == EMFILE) message += openFilesHint(coreInstance.size());
+      return rdb::fail(rdb::Error(runtime.error().code(), message, runtime.error().err()));
+    }
     (*runtime)->logicalIndexBase = qry.logicalOrigin;
     self->qSet.emplace(qry.id, std::move(*runtime));
   }

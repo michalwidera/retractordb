@@ -44,6 +44,7 @@
 #include "lib/persistentCounter.hpp"
 #include "lib/planSource.hpp"
 #include "lib/presenter.hpp"
+#include "lib/processLimits.hpp"
 #include "lib/qTree.hpp"
 #include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
@@ -292,6 +293,16 @@ int main(int argc, char *argv[]) try {
   const bool serviceMode        = serviceLog || systemd.unit.has_value();
 
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
+
+  // Model danych trzyma ok. 2 deskryptory na strumien, a domyslny miekki limit macOS (256) nie
+  // miescil planu o kMaxPlanStreams strumieni. Za niski limit twardy nie konczy startu: plan, ktory
+  // sie nie zmiesci, odmawia przy budowie modelu z komunikatem o RLIMIT_NOFILE (dataModel::create).
+  if (const auto files = proclimits::raiseOpenFilesLimit(); files.err != 0)
+    SPDLOG_WARN("cannot raise RLIMIT_NOFILE: {}", std::strerror(files.err));
+  else if (files.after < proclimits::kOpenFilesTarget)
+    SPDLOG_WARN("RLIMIT_NOFILE is {} (hard limit {}), below {}", files.after, files.hard, proclimits::kOpenFilesTarget);
+  else if (files.after != files.before)
+    SPDLOG_INFO("RLIMIT_NOFILE raised from {} to {}", files.before, files.after);
 
   // Kompilacja z włączoną sondą pomiarową. Ostrzeżenie trafia do logu, a w trybie
   // usługowym (-j) do journald - operator usługi widzi, że to build benchmarkowy, nie produkcyjny.

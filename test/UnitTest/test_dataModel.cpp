@@ -1,11 +1,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
+#include <sys/resource.h>
 
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iterator>
 #include <list>
@@ -687,6 +689,38 @@ TEST(dataModel, initialization_refusal_preserves_class_and_discards_partial_mode
     EXPECT_TRUE((*model)->qSet.contains("src"));
     EXPECT_TRUE((*model)->qSet.contains("good"));
   }
+  std::filesystem::remove_all(directory);
+}
+
+// Plan szerszy niz limit otwartych plikow: blad niesie limit i wskazowke, a kod i errno zostaja.
+TEST(dataModel, open_files_exhaustion_names_the_limit) {
+  // covers: datamodel.data-model.18~1
+  const std::filesystem::path directory("model_open_files");
+  std::filesystem::remove_all(directory);
+  std::filesystem::create_directory(directory);
+  std::ofstream(directory / "source.txt") << "7\n";
+  std::string text =
+      "STORAGE 'model_open_files'\n"
+      "DECLARE v INTEGER STREAM src, 1 TEXTFILE 'model_open_files/source.txt'\n";
+  for (int index = 0; index < 40; ++index)
+    text += std::format("SELECT src[0]+{0} STREAM s{0} FROM src\n", index);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, text).status, "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  struct rlimit saved{};
+  ASSERT_EQ(::getrlimit(RLIMIT_NOFILE, &saved), 0);
+  struct rlimit tight = saved;
+  tight.rlim_cur      = 32;
+  ASSERT_EQ(::setrlimit(RLIMIT_NOFILE, &tight), 0);
+  auto model = dataModel::create(plan);
+  ASSERT_EQ(::setrlimit(RLIMIT_NOFILE, &saved), 0);
+
+  ASSERT_RDB_ERROR(model, rdb::Errc::IO, "RLIMIT_NOFILE is 32");
+  EXPECT_EQ(model.error().err(), EMFILE);
+  EXPECT_THAT(model.error().message(), ::testing::HasSubstr("Too many open files"));
+  EXPECT_THAT(model.error().message(), ::testing::HasSubstr("ulimit -n"));
   std::filesystem::remove_all(directory);
 }
 

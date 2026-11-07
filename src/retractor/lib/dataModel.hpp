@@ -34,6 +34,7 @@
 /// - [datamodel.data-model.15~1] traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
 /// - [datamodel.data-model.16~1] przy create budować wartości bieżące zmiennych VAR z wartości deklaracji qTree::variables (D6, #531) i przekazywać je w processRows wyrażeniom pól i warunkom reguł każdego liczonego strumienia.
 /// - [datamodel.data-model.17~1] w processRows zbierać zapisy reguł SET całego slotu w buforze i dopiero po przesunięciu źródeł deklarowanych, na samym końcu udanego slotu, przepisywać je do wartości bieżących zmiennych VAR (D1, #531); slot przerwany błędem nie zmienia zmiennych, a jego zapisy nie przechodzą do następnego slotu.
+/// - [datamodel.data-model.18~1] gdy otwarcie magazynu w create zawiedzie z EMFILE, dopisywać do błędu bieżący miękki i twardy RLIMIT_NOFILE, liczbę strumieni planu i wskazówkę podniesienia limitu, bez zmiany kodu błędu i errno.
 class dataModel {
  private:
   qTree &coreInstance_;
