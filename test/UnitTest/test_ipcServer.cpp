@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cerrno>
@@ -1022,12 +1023,20 @@ class ChildClient {
 const std::array<std::string_view, 1> kProbeStreams{"stream"};
 std::string probeRow(const std::string &) { return "row"; }
 
+/// Caly przebieg sondy w chwili @p now: jeden klient na obrot (#607), wiec obrotow wiecej niz
+/// obserwowanych w kazdym tescie. Kolejne wywolania z tym samym @p now po koncu przebiegu nic nie robia.
+void completeProbeRound(IpcServer &server, std::chrono::steady_clock::time_point now) {
+  constexpr int kTurns = 8;
+  for (int turn = 0; turn < kTurns; ++turn)
+    server.probeSubscribers(now);
+}
+
 }  // namespace
 
 // Klient nie zglasza wyjscia: bez sondy jego kolejka czekalaby na zapelnienie (zapas 10 s). Sonda
 // wypisuje go w pierwszym przebiegu po smierci i oddaje kolejke do puli, ale nie przed uplywem okresu.
 TEST_F(IpcServerQueues, probe_pools_queue_of_dead_witnessed_client_once_per_interval) {
-  // covers: ipcserver.ipc-server.28~1, ipcserver.ipc-server.29~1
+  // covers: ipcserver.ipc-server.28~1, ipcserver.ipc-server.29~2
   IpcServer server;
   ChildClient child;
   ASSERT_GT(child.pid(), 0);
@@ -1035,15 +1044,15 @@ TEST_F(IpcServerQueues, probe_pools_queue_of_dead_witnessed_client_once_per_inte
   ASSERT_TRUE(server.subscribe(child.pid(), "stream", 4, server.subscriptionEpoch(), child.startTime()));
   server.broadcast(kProbeStreams, probeRow);
   const auto start = std::chrono::steady_clock::now();
-  server.probeSubscribers(start);
+  completeProbeRound(server, start);
   EXPECT_EQ(pendingMessages(queueNameFor(child.pid())), 1U) << "sonda ruszyla zywego klienta";
 
   ASSERT_NO_FATAL_FAILURE(child.kill());
   ASSERT_NO_FATAL_FAILURE(child.reap());
-  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval - std::chrono::milliseconds(1));
+  completeProbeRound(server, start + ipc::kClientLivenessProbeInterval - std::chrono::milliseconds(1));
   EXPECT_TRUE(queueExists(child.pid())) << "sonda zadzialala przed uplywem okresu";
 
-  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval);
+  completeProbeRound(server, start + ipc::kClientLivenessProbeInterval);
   EXPECT_FALSE(queueExists(child.pid())) << "kolejka martwego klienta zostala pod jego nazwa";
   ASSERT_TRUE(segmentExists(poolNameFor(0))) << "kolejka martwego klienta nie trafila do puli";
   EXPECT_EQ(pendingMessages(poolNameFor(0)), 0U) << "kolejka w puli nie zostala oprozniona";
@@ -1068,7 +1077,7 @@ TEST_F(IpcServerQueues, probe_ignores_client_whose_start_time_was_not_witnessed)
     ASSERT_NO_FATAL_FAILURE(child->kill());
     ASSERT_NO_FATAL_FAILURE(child->reap());
   }
-  server.probeSubscribers(std::chrono::steady_clock::now());
+  completeProbeRound(server, std::chrono::steady_clock::now());
   EXPECT_FALSE(segmentExists(poolNameFor(0))) << "sonda porzucila kolejke klienta bez poswiadczenia";
   server.broadcast(kProbeStreams, probeRow);
   EXPECT_EQ(pendingMessages(queueNameFor(unknown.pid())), 1U) << "klient bez znacznika wypadl z rejestru";
@@ -1079,7 +1088,7 @@ TEST_F(IpcServerQueues, probe_ignores_client_whose_start_time_was_not_witnessed)
 // Zombie znaczy "nie wiem" (watki grupy moga jeszcze zyc): sonda czeka, az rodzic go zbierze.
 // Zywego klienta sonda nie rusza.
 TEST_F(IpcServerQueues, probe_keeps_live_and_zombie_clients_until_the_zombie_is_reaped) {
-  // covers: ipcserver.ipc-server.29~1
+  // covers: ipcserver.ipc-server.29~2
   IpcServer server;
   ChildClient child;
   ASSERT_GT(child.pid(), 0);
@@ -1090,11 +1099,11 @@ TEST_F(IpcServerQueues, probe_keeps_live_and_zombie_clients_until_the_zombie_is_
   ASSERT_NO_FATAL_FAILURE(child.kill());
   ASSERT_NO_FATAL_FAILURE(child.awaitZombie());
   const auto start = std::chrono::steady_clock::now();
-  server.probeSubscribers(start);
+  completeProbeRound(server, start);
   EXPECT_TRUE(queueExists(child.pid())) << "sonda porzucila kolejke zombie";
 
   ASSERT_NO_FATAL_FAILURE(child.reap());
-  server.probeSubscribers(start + ipc::kClientLivenessProbeInterval);
+  completeProbeRound(server, start + ipc::kClientLivenessProbeInterval);
   EXPECT_FALSE(queueExists(child.pid())) << "zebrany klient zostal w rejestrze";
   EXPECT_TRUE(segmentExists(poolNameFor(0))) << "kolejka zebranego klienta nie trafila do puli";
   server.broadcast(kProbeStreams, probeRow);
@@ -1104,7 +1113,7 @@ TEST_F(IpcServerQueues, probe_keeps_live_and_zombie_clients_until_the_zombie_is_
 
 // Koniec epoki usunal juz kolejke; sonda nie siega ani do rejestru nowej epoki, ani do puli.
 TEST_F(IpcServerQueues, probe_after_end_of_epoch_touches_neither_registry_nor_pool) {
-  // covers: ipcserver.ipc-server.29~1
+  // covers: ipcserver.ipc-server.29~2
   IpcServer server;
   ChildClient child;
   ASSERT_GT(child.pid(), 0);
@@ -1113,10 +1122,76 @@ TEST_F(IpcServerQueues, probe_after_end_of_epoch_touches_neither_registry_nor_po
   ASSERT_TRUE(server.subscribe(kClientB, "stream", 4, server.subscriptionEpoch()));
   ASSERT_NO_FATAL_FAILURE(child.kill());
   ASSERT_NO_FATAL_FAILURE(child.reap());
-  server.probeSubscribers(std::chrono::steady_clock::now());
+  completeProbeRound(server, std::chrono::steady_clock::now());
   EXPECT_FALSE(segmentExists(poolNameFor(0))) << "sonda ruszyla kolejke z rozebranej epoki";
   server.broadcast(kProbeStreams, probeRow);
   EXPECT_EQ(pendingMessages(queueNameFor(kClientB)), 1U) << "sonda ruszyla rejestr nowej epoki";
+  server.removeAllObjects();
+}
+
+// Przebieg rozlozony na obroty (#607): caly przebieg w jednym obrocie wydluzal obrot o ~72 us na
+// subskrybenta (R603G). Dwoch martwych klientow wychodzi w dwoch kolejnych obrotach, nie w jednym.
+TEST_F(IpcServerQueues, probe_inspects_at_most_one_client_per_turn) {
+  // covers: ipcserver.ipc-server.29~2
+  IpcServer server;
+  ChildClient first;
+  ChildClient second;
+  ASSERT_GT(first.pid(), 0);
+  ASSERT_GT(second.pid(), 0);
+  for (ChildClient *child : {&first, &second}) {
+    ASSERT_TRUE(server.subscribe(child->pid(), "stream", 4, server.subscriptionEpoch(), child->startTime()));
+    ASSERT_NO_FATAL_FAILURE(child->kill());
+    ASSERT_NO_FATAL_FAILURE(child->reap());
+  }
+  const auto now = std::chrono::steady_clock::now();
+  server.probeSubscribers(now);
+  EXPECT_EQ(int{queueExists(first.pid())} + int{queueExists(second.pid())}, 1)
+      << "jeden obrot nie wypisal dokladnie jednego martwego klienta";
+  server.probeSubscribers(now);
+  EXPECT_FALSE(queueExists(first.pid()) || queueExists(second.pid())) << "drugi obrot nie wypisal drugiego klienta";
+  EXPECT_TRUE(segmentExists(poolNameFor(0)) && segmentExists(poolNameFor(1))) << "kolejki martwych nie trafily do puli";
+  server.removeAllObjects();
+}
+
+// Kursor przebiegu to klucz ostatnio sprawdzonego klienta: zgon wpisu pod kursorem, wpis usuniety za
+// kursorem i nowa subskrypcja w trakcie przebiegu nie pomijaja ani nie powtarzaja sprawdzen pozostalych.
+TEST_F(IpcServerQueues, probe_round_survives_removal_and_insertion_of_watched_clients) {
+  // covers: ipcserver.ipc-server.29~2
+  IpcServer server;
+  std::array<ChildClient, 3> children;
+  std::array<ChildClient *, 3> byPid{&children[0], &children[1], &children[2]};
+  std::ranges::sort(byPid, {}, &ChildClient::pid);
+  ChildClient &checked = *byPid[0];  // sprawdzony w pierwszym obrocie
+  ChildClient &dying   = *byPid[1];  // umiera za kursorem
+  ChildClient &dropped = *byPid[2];  // wypada z obserwowanych za kursorem
+  for (ChildClient *child : byPid) {
+    ASSERT_GT(child->pid(), 0);
+    ASSERT_TRUE(server.subscribe(child->pid(), "stream", 4, server.subscriptionEpoch(), child->startTime()));
+  }
+  const auto start = std::chrono::steady_clock::now();
+  server.probeSubscribers(start);  // sprawdza `checked`, zywego
+
+  for (ChildClient *child : {&checked, &dying}) {
+    ASSERT_NO_FATAL_FAILURE(child->kill());
+    ASSERT_NO_FATAL_FAILURE(child->reap());
+  }
+  ASSERT_TRUE(server.subscribe(dropped.pid(), "stream", 4, server.subscriptionEpoch(), 0));
+  ASSERT_NO_FATAL_FAILURE(dropped.kill());
+  ASSERT_NO_FATAL_FAILURE(dropped.reap());
+  const std::uint64_t ownStart = osplat::inspectProcess(getpid()).startTime;
+  ASSERT_NE(ownStart, 0U);
+  ASSERT_TRUE(server.subscribe(getpid(), "stream", 4, server.subscriptionEpoch(), ownStart));
+
+  completeProbeRound(server, start);
+  EXPECT_FALSE(queueExists(dying.pid())) << "zgon za kursorem nie wyszedl w tym samym przebiegu";
+  EXPECT_TRUE(queueExists(checked.pid())) << "przebieg sprawdzil drugi raz klienta sprzed kursora";
+  EXPECT_TRUE(queueExists(dropped.pid())) << "przebieg sprawdzil klienta usunietego z obserwowanych";
+
+  completeProbeRound(server, start + ipc::kClientLivenessProbeInterval);
+  EXPECT_FALSE(queueExists(checked.pid())) << "nastepny przebieg nie wypisal klienta sprzed kursora";
+  EXPECT_TRUE(queueExists(dropped.pid())) << "sonda wypisala klienta bez poswiadczenia";
+  server.broadcast(kProbeStreams, probeRow);
+  EXPECT_EQ(pendingMessages(queueNameFor(getpid())), 1U) << "sonda wypisala klienta dopisanego w trakcie przebiegu";
   server.removeAllObjects();
 }
 

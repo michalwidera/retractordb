@@ -180,41 +180,45 @@ void IpcServer::releaseQueue(int clientId, std::unique_ptr<IPC::message_queue> &
 }
 
 void IpcServer::probeSubscribers(std::chrono::steady_clock::time_point now) {
-  if (now < nextProbe_) return;
-  nextProbe_                = now + ipc::kClientLivenessProbeInterval;
-  const std::uint64_t epoch = subscriptionEpoch_.load(std::memory_order_acquire);
-  for (auto it = watched_.begin(); it != watched_.end();) {
-    const auto [clientId, witness] = *it;
-    // Wpis z rozebranej epoki: kolejke usunal juz koniec epoki, a klient moze nie zyc od dawna.
-    if (witness.epoch != epoch) {
-      it = watched_.erase(it);
-      continue;
-    }
-    // Martwy tylko na slowo jadra: brak PID-u (ESRCH) albo PID innej inkarnacji. Zombie (watki grupy
-    // moga jeszcze zyc) i nieczytelny wpis znacza "nie wiem" - jak w poolAbandonedQueue.
-    const osplat::ProcessSnapshot process = osplat::inspectProcess(clientId);
-    const bool gone                       = process.found ? process.startTime != witness.startTime : !process.unreadable;
-    if (!gone) {
-      ++it;
-      continue;
-    }
-    it = watched_.erase(it);
-    // Pod blokada tylko wypisanie, jak w broadcast. Klient wypisany juz w broadcast (pelna kolejka,
-    // martwy muteks) albo zastapiony przez nowa subskrypcje w nowej epoce nie jest tu ruszany.
-    std::unique_ptr<IPC::message_queue> queue;
-    {
-      std::scoped_lock lock(clientMapsMutex_);
-      const auto cached = id2QueueCache_.find(clientId);
-      if (subscriptionEpoch_.load(std::memory_order_relaxed) != witness.epoch || cached == id2QueueCache_.end() ||
-          !cached->second)
-        continue;
-      queue = std::move(cached->second);
-      id2QueueCache_.erase(cached);
-      id2StreamNameRelation_.erase(clientId);
-    }
-    // Poza blokada, jak w releaseAbandonedQueues: kolejka ma wiersze z <= okresu sondy, nie z calego zapasu.
-    releaseQueue(clientId, queue, "client death");
+  if (!probeRunning_) {
+    if (now < nextProbe_) return;
+    nextProbe_    = now + ipc::kClientLivenessProbeInterval;
+    probeRunning_ = true;
+    probeLast_.reset();
   }
+  const std::uint64_t epoch = subscriptionEpoch_.load(std::memory_order_acquire);
+  auto it                   = probeLast_ ? watched_.upper_bound(*probeLast_) : watched_.begin();
+  // Wpis z rozebranej epoki: kolejke usunal juz koniec epoki, a klient moze nie zyc od dawna.
+  // Usuniecie nie wola jadra, wiec nie liczy sie do jednego klienta na obrot.
+  while (it != watched_.end() && it->second.epoch != epoch)
+    it = watched_.erase(it);
+  if (it == watched_.end()) {
+    probeRunning_ = false;
+    return;
+  }
+  const auto [clientId, witness] = *it;
+  probeLast_                     = clientId;
+  // Martwy tylko na slowo jadra: brak PID-u (ESRCH) albo PID innej inkarnacji. Zombie (watki grupy
+  // moga jeszcze zyc) i nieczytelny wpis znacza "nie wiem" - jak w poolAbandonedQueue.
+  const osplat::ProcessSnapshot process = osplat::inspectProcess(clientId);
+  const bool gone                       = process.found ? process.startTime != witness.startTime : !process.unreadable;
+  if (!gone) return;
+  watched_.erase(it);
+  // Pod blokada tylko wypisanie, jak w broadcast. Klient wypisany juz w broadcast (pelna kolejka,
+  // martwy muteks) albo zastapiony przez nowa subskrypcje w nowej epoce nie jest tu ruszany.
+  std::unique_ptr<IPC::message_queue> queue;
+  {
+    std::scoped_lock lock(clientMapsMutex_);
+    const auto cached = id2QueueCache_.find(clientId);
+    if (subscriptionEpoch_.load(std::memory_order_relaxed) != witness.epoch || cached == id2QueueCache_.end() || !cached->second)
+      return;
+    queue = std::move(cached->second);
+    id2QueueCache_.erase(cached);
+    id2StreamNameRelation_.erase(clientId);
+  }
+  // Poza blokada, jak w releaseAbandonedQueues: kolejka ma wiersze z <= okresu sondy plus N obrotow, nie
+  // z calego zapasu.
+  releaseQueue(clientId, queue, "client death");
 }
 
 bool IpcServer::poolAbandonedQueue(int clientId, std::unique_ptr<IPC::message_queue> &queue) {
