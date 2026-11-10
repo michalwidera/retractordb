@@ -112,40 +112,29 @@ def hash_pick(delta_left, delta_right, n):
     return "left", _floor(zet * n)
 
 
-# SOperations.hpp: kHashPhaseScanLimit
-HASH_PHASE_SCAN_LIMIT = 100_000
+def hash_tail(delta_left, delta_right, tail_left, tail_right):
+    """Ogon przeplotu - replika ``HashStartupLatency()`` (postać zamknięta, #616).
 
-
-def hash_tail(delta_left, delta_right, delta_out, tail_left, tail_right):
-    """Ogon przeplotu - replika ``HashStartupLatency()`` (krok 3c, 2026-08-07).
-
-    Maksimum po jednym okresie fazowym ``p+q`` z warunku dostępności
-    ``W >= ceil((j(i)+1+W_src(i))*D_src(i)/D_c) - 1 - i``. Powyżej progu silnik
-    wraca do postaci O(1) i replika musi wrócić razem z nim - inaczej bramka
-    wierności repliki (test_closedform.py) zgłosiłaby rozjazd, którego w silniku
-    nie ma.
+    Maksimum warunku dostępności ``W >= ceil((j(i)+1+W_src(i))*D_src(i)/D_c) - 1 - i``
+    po jednym okresie fazowym ``L = p+q`` ma postać
+    ``max(ceil(W_A*L/q), ceil(((1+W_B)*L + p - 1)/p) - 1)`` dla skróconego
+    ``p/q = D_left/D_right`` (``exactInterleaveTail_closed`` w
+    ``math_proofs/Profs/InterleaveTailExact.lean``). Do 2026-11-10 replika
+    powtarzała przegląd okresu i powrót do postaci O(1) powyżej progu 100 000.
     """
     ratio = delta_left / delta_right
-    period = ratio.numerator + ratio.denominator
-    if period > HASH_PHASE_SCAN_LIMIT:
-        return hash_tail_o1(delta_left, delta_right, delta_out, tail_left, tail_right)
-
-    result = 0
-    for index in range(period):
-        side, position = hash_pick(delta_left, delta_right, index)
-        delta_src = delta_left if side == "left" else delta_right
-        tail_src = tail_left if side == "left" else tail_right
-        required = _ceil(Fraction(position + 1 + tail_src) * delta_src / delta_out) - 1 - index
-        result = max(result, required)
-    return result
+    p, q = ratio.numerator, ratio.denominator
+    period = p + q
+    return max(_ceil(Fraction(tail_left * period, q)),
+               _ceil(Fraction((1 + tail_right) * period + p - 1, p)) - 1)
 
 
 def hash_tail_o1(delta_left, delta_right, delta_out, tail_left, tail_right, **kwargs):
     """Postać O(1) zastąpiona 2026-08-07: max(conv(W_A), conv(W_B) + own).
 
     Zgadzała się z granicą zdarzeniową w 92,1% węzłów `#` korpusu K24p
-    i zawyżała o slot w pozostałych. Zostaje w replice z dwóch powodów:
-    jest ścieżką powyżej progu przeglądu ORAZ rodziną mutantów (`hash_o1`).
+    i zawyżała o slot w pozostałych. Do 2026-11-10 była też ścieżką powyżej
+    progu przeglądu; zostaje w replice jako rodzina mutantów (`hash_o1`).
     """
     own = hash_own(delta_left, delta_right, **kwargs)
     return max(to_slots(tail_left, delta_left, delta_out),
@@ -377,7 +366,7 @@ def evaluate(plan, mutation=None, given_tails=None):
                     tail_src = w1 if side == "left" else w2
                     result = max(result, _ceil(Fraction(position + 1 + tail_src) * delta_src / node.delta) - 1 - index)
             else:
-                result = hash_tail(first.delta, second.delta, node.delta, w1, w2)
+                result = hash_tail(first.delta, second.delta, w1, w2)
         elif node.kind == ADD:
             second = children[1]
             result = max(add_tail(first.delta, node.delta, w1),

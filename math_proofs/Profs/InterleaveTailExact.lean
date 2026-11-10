@@ -209,4 +209,173 @@ theorem causal_shift_matching_declared (a b i k : ℕ) (ha : 0 < a) (hb : 0 < b)
   omega
 -- ANCHOR_END: causal_r1_declared
 
+/- Postac zamknieta dokladnego ogona przeplotu (#616). Dla wzglednie pierwszych a, b ogon jest
+   wiekszym z dwoch kresow: ceil(W_A*(a+b)/b), osiaganego w ostatniej fazie okresu (rekord b-1
+   lewej skladowej), i ceil(((1+W_B)*(a+b) + a - 1)/a) - 1, osiaganego w fazie czytajacej rekord m
+   prawej skladowej z m*(a+b) = -1 (mod a). Tylko drugi kres wymaga wzglednej pierwszosci.
+   Oba sa zapisane dzieleniem calkowitym w N, tak jak liczy je HashStartupLatency(). -/
+theorem le_phaseMax (phases : List ℕ) (f : ℕ → ℤ) (n : ℕ) (hn : n ∈ phases) :
+    f n ≤ phaseMax phases f :=
+  ((phaseMax_le_iff phases f _).mp le_rfl).2 n hn
+
+theorem phaseRequirement_le_natCast (j W n M L d : ℕ) (hd : 0 < d) :
+    phaseRequirement j W n ((L : ℚ) / d) ≤ M ↔ (j + 1 + W) * L ≤ (M + 1 + n) * d := by
+  have hdq : (0 : ℚ) < d := by exact_mod_cast hd
+  unfold phaseRequirement
+  have h1 : ⌈((j + 1 + W : ℕ) : ℚ) * ((L : ℚ) / d)⌉ - 1 - n ≤ (M : ℤ) ↔
+      ⌈((j + 1 + W : ℕ) : ℚ) * ((L : ℚ) / d)⌉ ≤ ((M + 1 + n : ℕ) : ℤ) := by
+    push_cast
+    omega
+  rw [h1, Int.ceil_le, Int.cast_natCast, mul_div_assoc', div_le_iff₀ hdq]
+  constructor <;> intro h <;> exact_mod_cast h
+
+theorem natCast_le_phaseRequirement (j W n M L d : ℕ) (hd : 0 < d) :
+    (M : ℤ) ≤ phaseRequirement j W n ((L : ℚ) / d) ↔ (M + n) * d < (j + 1 + W) * L := by
+  have hdq : (0 : ℚ) < d := by exact_mod_cast hd
+  unfold phaseRequirement
+  have h1 : (M : ℤ) ≤ ⌈((j + 1 + W : ℕ) : ℚ) * ((L : ℚ) / d)⌉ - 1 - n ↔
+      ((M + n : ℕ) : ℤ) < ⌈((j + 1 + W : ℕ) : ℚ) * ((L : ℚ) / d)⌉ := by
+    push_cast
+    omega
+  rw [h1, Int.lt_ceil, Int.cast_natCast, mul_div_assoc', lt_div_iff₀ hdq]
+  constructor <;> intro h <;> exact_mod_cast h
+
+theorem progress_succ_le (a b n : ℕ) (ha : 0 < a) (hb : 0 < b) :
+    progress a b (n + 1) ≤ progress a b n + 1 := by
+  have hs : 0 < a + b := by omega
+  unfold progress
+  calc (n + 1) * b / (a + b) ≤ (n * b + (a + b)) / (a + b) :=
+        Nat.div_le_div_right (by nlinarith)
+    _ = n * b / (a + b) + 1 := Nat.add_div_right _ hs
+
+theorem progress_mono_succ (a b n : ℕ) :
+    progress a b n ≤ progress a b (n + 1) :=
+  Nat.div_le_div_right (by nlinarith)
+
+theorem exactInterleaveTail_closed (a b WA WB : ℕ) (ha : 0 < a) (hb : 0 < b)
+    (hab : Nat.Coprime a b) :
+    exactInterleaveTail a b WA WB =
+      (max ((WA * (a + b) + b - 1) / b) (((1 + WB) * (a + b) + a - 2) / a) : ℕ) := by
+  have hs : 0 < a + b := by omega
+  set A := (WA * (a + b) + b - 1) / b with hAdef
+  set B := ((1 + WB) * (a + b) + a - 2) / a with hBdef
+  -- Wlasnosci dzielenia, z ktorych biora sie oba kresy.
+  have hA1 : A * b ≤ WA * (a + b) + b - 1 := Nat.div_mul_le_self _ _
+  have hA2 : WA * (a + b) + b - 1 < A * b + b := Nat.lt_div_mul_add hb
+  have hB1 : B * a ≤ (1 + WB) * (a + b) + a - 2 := Nat.div_mul_le_self _ _
+  have hB2 : (1 + WB) * (a + b) + a - 2 < B * a + a := Nat.lt_div_mul_add ha
+  have hY : 2 ≤ (1 + WB) * (a + b) := by nlinarith
+  apply le_antisymm
+  · -- Gorne ograniczenie: kazda faza okresu spelnia wymaganie przy W = max A B.
+    unfold exactInterleaveTail
+    refine (phaseMax_le_iff _ _ _).mpr ⟨by positivity, ?_⟩
+    intro n _
+    unfold selectedRequirement selectedIndex
+    by_cases hsel : selectsA a b n = true
+    · simp only [hsel, ↓reduceIte]
+      have hne : progress a b n ≠ progress a b (n + 1) := by
+        simpa [selectsA] using hsel
+      have hstep : progress a b (n + 1) = progress a b n + 1 := by
+        have := progress_succ_le a b n ha hb
+        have := progress_mono_succ a b n
+        omega
+      have hfloor : progress a b (n + 1) * (a + b) ≤ (n + 1) * b := Nat.div_mul_le_self _ _
+      rw [hstep] at hfloor
+      unfold ratioA
+      rw [phaseRequirement_le_natCast _ _ _ _ _ _ hb]
+      have hM : A * b ≤ max A B * b := Nat.mul_le_mul_right _ (le_max_left _ _)
+      have hWA : WA * (a + b) ≤ A * b := by omega
+      nlinarith
+    · have hsel' : selectsA a b n = false := Bool.eq_false_of_not_eq_true hsel
+      simp only [hsel', Bool.false_eq_true, ↓reduceIte]
+      have heq : progress a b n = progress a b (n + 1) := by
+        simpa [selectsA] using hsel'
+      have hle := progress_le_slot a b n ha hb
+      have hceil : (n + 1) * b < progress a b (n + 1) * (a + b) + (a + b) :=
+        Nat.lt_div_mul_add hs
+      rw [← heq] at hceil
+      unfold ratioB
+      rw [phaseRequirement_le_natCast _ _ _ _ _ _ ha]
+      have hM : B * a ≤ max A B * a := Nat.mul_le_mul_right _ (le_max_right _ _)
+      have hWB : (1 + WB) * (a + b) ≤ B * a + 1 := by omega
+      generalize progress a b n = p at hceil hle ⊢
+      obtain ⟨k, rfl⟩ : ∃ k, n = p + k := ⟨n - p, by omega⟩
+      have hidx : p + k - p = k := by omega
+      rw [hidx]
+      nlinarith
+  · rw [Nat.cast_max]
+    apply max_le
+    · -- Kres A: ostatnia faza okresu, n = a+b-1, czyta rekord b-1 lewej skladowej.
+      obtain ⟨b', rfl⟩ : ∃ b', b = b' + 1 := ⟨b - 1, by omega⟩
+      obtain ⟨a', rfl⟩ : ∃ a', a = a' + 1 := ⟨a - 1, by omega⟩
+      have hp0 : progress (a' + 1) (b' + 1) (a' + b' + 1) = b' := by
+        unfold progress
+        apply Nat.div_eq_of_lt_le <;> nlinarith
+      have hp1 : progress (a' + 1) (b' + 1) (a' + b' + 1 + 1) = b' + 1 := by
+        unfold progress
+        rw [show a' + b' + 1 + 1 = a' + 1 + (b' + 1) by omega]
+        exact Nat.mul_div_cancel_left _ hs
+      have hsel : selectsA (a' + 1) (b' + 1) (a' + b' + 1) = true := by
+        simp [selectsA, hp0, hp1]
+      have hmem : a' + b' + 1 ∈ List.range (a' + 1 + (b' + 1)) := List.mem_range.mpr (by omega)
+      have h := le_phaseMax _ (selectedRequirement (a' + 1) (b' + 1) WA WB (selectsA (a' + 1) (b' + 1))
+        (selectedIndex (a' + 1) (b' + 1))) _ hmem
+      unfold exactInterleaveTail
+      refine le_trans ?_ h
+      unfold selectedRequirement selectedIndex
+      simp only [hsel, ↓reduceIte, hp0]
+      unfold ratioA
+      rw [natCast_le_phaseRequirement _ _ _ _ _ _ hb]
+      have hA1' : A * (b' + 1) ≤ WA * (a' + 1 + (b' + 1)) + b' := by omega
+      nlinarith
+    · -- Kres B: faza, w ktorej czytany rekord m prawej skladowej spelnia m*(a+b) = -1 (mod a).
+      clear hA1 hA2 hB2
+      obtain ⟨m, hm_lt, hm⟩ := Nat.exists_mul_mod_eq_of_coprime (a - 1) hab.symm ha.ne'
+      obtain ⟨a', rfl⟩ : ∃ a', a = a' + 1 := ⟨a - 1, by omega⟩
+      simp only [Nat.add_sub_cancel] at hm hB1
+      rw [Nat.mod_eq_of_lt (by omega : a' < a' + 1)] at hm
+      have hmL : m * (a' + 1 + b) % (a' + 1) = a' := by
+        rw [show m * (a' + 1 + b) = (a' + 1) * m + b * m by ring, Nat.mul_add_mod]
+        exact hm
+      obtain ⟨c, hdiv⟩ : ∃ c, (a' + 1) * c + a' = m * (a' + 1 + b) :=
+        ⟨_, by have := Nat.div_add_mod (m * (a' + 1 + b)) (a' + 1); rwa [hmL] at this⟩
+      have hcm : m ≤ c := by
+        by_contra hlt
+        have h1 : (a' + 1) * (c + 1) ≤ (a' + 1) * m := Nat.mul_le_mul_left _ (by omega)
+        have h3 : 0 ≤ m * b := Nat.zero_le _
+        linarith
+      have hcL : c < a' + 1 + b := by
+        by_contra hge
+        have h1 : (a' + 1) * (a' + 1 + b) ≤ (a' + 1) * c := Nat.mul_le_mul_left _ (by omega)
+        have h2 : m * (a' + 1 + b) ≤ a' * (a' + 1 + b) := Nat.mul_le_mul_right _ (by omega)
+        linarith
+      obtain ⟨k, rfl⟩ : ∃ k, c = k + m := ⟨c - m, by omega⟩
+      have hkb : (a' + 1) * k + a' = m * b := by linarith
+      have hcb : (k + m) * b = k * (a' + 1 + b) + a' := by linarith
+      have hpc : progress (a' + 1) b (k + m) = k := by
+        unfold progress
+        apply Nat.div_eq_of_lt_le
+        · rw [hcb]; omega
+        · rw [hcb]; linarith
+      have hpc1 : progress (a' + 1) b (k + m + 1) = k := by
+        unfold progress
+        have hcb1 : (k + m + 1) * b = k * (a' + 1 + b) + a' + b := by rw [Nat.add_mul, hcb, one_mul]
+        apply Nat.div_eq_of_lt_le
+        · rw [hcb1]; omega
+        · rw [hcb1]; linarith
+      have hsel : selectsA (a' + 1) b (k + m) = false := by
+        simp [selectsA, hpc, hpc1]
+      have hmem : k + m ∈ List.range (a' + 1 + b) := List.mem_range.mpr hcL
+      have h := le_phaseMax _ (selectedRequirement (a' + 1) b WA WB (selectsA (a' + 1) b)
+        (selectedIndex (a' + 1) b)) _ hmem
+      unfold exactInterleaveTail
+      refine le_trans ?_ h
+      unfold selectedRequirement selectedIndex
+      simp only [hsel, Bool.false_eq_true, ↓reduceIte, hpc]
+      rw [show k + m - k = m by omega]
+      unfold ratioB
+      rw [natCast_le_phaseRequirement _ _ _ _ _ _ ha]
+      have hB' : B * (a' + 1) + 1 ≤ (1 + WB) * (a' + 1 + b) + a' := by omega
+      linarith
+
 end Profs

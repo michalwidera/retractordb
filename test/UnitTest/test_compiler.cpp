@@ -3058,6 +3058,28 @@ TEST(xcompiler, agse_logical_origin_beyond_int_is_a_plan_error) {
   EXPECT_EQ(compileRql(source + "SELECT * STREAM w2 FROM w1@(65536,1)\n"), "OK");
 }
 
+// Ogon przeplotu spoza int to blad planu (#616). Do 2026-11-10 HashStartupLatency() rzutowal wynik
+// na int bez kontroli. Ogon razy interwal (glebokosc czasowa) rosnie tylko przez prawy argument `#`,
+// wiec swiadek sklada najpierw lancuch x_k = s#x_(k-1) nad zrodlem o interwale 1: x10 ma interwal 1/11
+// i ogon 29. Przeplot z fast daje kres A = 29 * (p+q)/q dla p/q = Delta_x10/Delta_fast: przy
+// fast = 1/999999989 interwal z wynosi 1/10^9, a ogon 2636363637 > INT_MAX; przy fast = 1/100000000
+// ogon wynosi 263636393 i plan przechodzi. Liczby policzono niezaleznie, dokladnie, w Pythonie.
+TEST(xcompiler, hash_startup_latency_beyond_int_is_a_plan_error) {
+  // covers: compiler.compiler.7~1, soperations.hash-startup-latency.2~2
+  const auto plan = [](const std::string &fastInterval) {
+    std::string text =
+        "DECLARE a INTEGER STREAM s, 1 TEXTFILE 'a.txt'\n"
+        "DECLARE b INTEGER STREAM fast, " +
+        fastInterval + " TEXTFILE 'b.txt'\nSELECT * STREAM x1 FROM s#s\n";
+    for (int k = 2; k <= 10; ++k)
+      text += "SELECT * STREAM x" + std::to_string(k) + " FROM s#x" + std::to_string(k - 1) + "\n";
+    return text + "SELECT * STREAM z FROM x10#fast\n";
+  };
+  const std::string verdict = compileRql(plan("1/999999989"));
+  EXPECT_TRUE(verdict.contains("Stream 'z' has a startup latency of 2636363637 slots; the limit is 2147483647")) << verdict;
+  EXPECT_EQ(compileRql(plan("1/100000000")), "OK");
+}
+
 // Petla okresu AGSE w computeRequiredCapacities liczyla (n+1+Wout)*step w int: przy F = 65536 i kroku
 // 65535 to ok. 2^32 (A2 M11). Wartosc oczekiwana policzona niezaleznie, liczbami calkowitymi Pythona.
 TEST(xcompiler, agse_capacity_period_is_computed_without_int_overflow) {

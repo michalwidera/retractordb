@@ -54,7 +54,7 @@ bool interleaveReady(std::int64_t a, std::int64_t b, std::int64_t wa, std::int64
 int hashTail(int a, int b, int wa, int wb, int d = 1) {
   const rational<int> deltaA(a, d);
   const rational<int> deltaB(b, d);
-  return HashStartupLatency(deltaA, deltaB, deltaA * deltaB / (deltaA + deltaB), wa, wb);
+  return static_cast<int>(HashStartupLatency(deltaA, deltaB, wa, wb));
 }
 
 void compilePlan(qTree &instance, const std::string &rql) {
@@ -222,11 +222,26 @@ TEST(ProofOracle, rateDiff_table) {
 
 // Definicja dokladnego ogona przeplotu (exactInterleaveTail) wobec HashStartupLatency.
 TEST(ProofOracle, exactInterleaveTail_table) {
-  // covers: soperations.hash-startup-latency.1~1
+  // covers: soperations.hash-startup-latency.1~2
   for (int d : kScales)
     for (const auto &row : kTailRows)
       ASSERT_EQ(hashTail(row.a, row.b, row.wa, row.wb, d), row.tail)
           << "a=" << row.a << " b=" << row.b << " WA=" << row.wa << " WB=" << row.wb << " d=" << d;
+}
+
+// Postac zamknieta ogona (exactInterleaveTail_closed): dla wzglednie pierwszych a, b ogon z tablicy
+// Lean jest wiekszym z kresow ceil(W_A*(a+b)/b) i ceil(((1+W_B)*(a+b) + a - 1)/a) - 1. Wzor jest tu
+// przepisany niezaleznie od SOperations.hpp, wiec test sprawdza wypowiedz twierdzenia, nie silnik.
+TEST(ProofOracle, exactInterleaveTail_closed) {
+  int checked = 0;
+  for (const auto &row : kTailRows) {
+    if (std::gcd(row.a, row.b) != 1) continue;
+    const int boundA = (row.wa * (row.a + row.b) + row.b - 1) / row.b;
+    const int boundB = ((1 + row.wb) * (row.a + row.b) + row.a - 2) / row.a;
+    ASSERT_EQ(std::max(boundA, boundB), row.tail) << "a=" << row.a << " b=" << row.b << " WA=" << row.wa << " WB=" << row.wb;
+    ++checked;
+  }
+  EXPECT_GT(checked, 0);
 }
 
 // Kazdy rekord A i kazdy rekord B pojawia sie w przeplocie dokladnie raz, w kolejnosci.
@@ -306,7 +321,7 @@ TEST(ProofOracle, event_order_counterexample) {
 // od dowolnego progu N0, a przy W = ogon-1 pada na ktoryms z nich. Z okresowosci wymagan
 // (tailRequirement_period) wystarczy jeden okres a+b od progu.
 TEST(ProofOracle, exactInterleaveTail_exact) {
-  // covers: soperations.hash-startup-latency.1~1, soperations.hash-startup-latency.3~1
+  // covers: soperations.hash-startup-latency.1~2, soperations.hash-startup-latency.3~1
   for (int a = 1; a <= 40; ++a)
     for (int b = 1; b <= 40; ++b)
       for (int wa = 0; wa <= 3; ++wa)

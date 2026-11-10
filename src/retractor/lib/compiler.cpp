@@ -2332,11 +2332,16 @@ std::string compiler::computeStartupLatency() {
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
         const auto delta2 = deltaOf(second->getStr_());
-        // Ogon przeplotu liczy się DOKŁADNIE, przeglądem jednego okresu fazowego -
+        // Ogon przeplotu liczy się DOKŁADNIE, postacią zamkniętą maksimum po okresie fazowym -
         // patrz HashStartupLatency() w SOperations.hpp. Do 2026-08-07 stała tu postać O(1)
         // max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)); kampania K24 zmierzyła jej zgodność
         // z granicą zdarzeniową na 92,1% węzłów `#`, z zawyżeniem o slot w pozostałych.
-        result = HashStartupLatency(delta1, delta2, q.rInterval, w1, w2);
+        // Ta sama straż zakresu co przy AGSE: ogon spoza int to błąd planu (#616).
+        const std::int64_t tail = HashStartupLatency(delta1, delta2, w1, w2);
+        if (tail > std::numeric_limits<int>::max())
+          return std::format("Stream '{}' has a startup latency of {} slots; the limit is {}", q.id, tail,
+                             std::numeric_limits<int>::max());
+        result = static_cast<int>(tail);
       } else if (op == STREAM_ADD) {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;

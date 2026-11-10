@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <tuple>
 #include <vector>
@@ -351,137 +352,151 @@ TEST(xSOperations, dehash_startup_latency_follows_the_phase_bound) {
 }
 
 // =====================================================================================
-// Rachunek ogona przeplotu: gałąź awaryjna i arytmetyka 64-bitowa (luka L3).
+// Rachunek ogona przeplotu: postać zamknięta wobec przeglądu okresu fazowego (#616).
 //
-// Obie były w ctest NIEOSIĄGALNE. Postać O(1) powyżej kHashPhaseScanLimit nie wykonuje
-// się nigdy w korpusie kampanijnym (maksimum okresu 24 557 wobec progu 100 000), a
-// rachunek w int64 wprowadzono świadomie - komentarz przy HashStartupLatency() mówi, że
-// rational<int> mnoży przed skróceniem i wychodzi poza zakres int. Powrót do rational<int>
-// nie zapalał dotąd w ctest ani jednej lampki.
+// HashStartupLatency() liczy ogon postacią zamkniętą, udowodnioną w Lean
+// (exactInterleaveTail_closed). Do 2026-11-10 liczył go przegląd jednego okresu do progu
+// p+q = 100 000, a powyżej postać O(1), która zawyżała. Przegląd wołał Hash() w
+// rational<int> i przy q*(p+q) > 2^31 ZANIŻAŁ ogon - dlatego przegląd testowy niżej nie
+// woła Hash(), tylko liczy wybór składowej z definicji w __int128.
 // =====================================================================================
 
 namespace {
 
-// Niezależny przegląd okresu fazowego w 64 bitach. Powtarza WARUNEK DOSTĘPNOŚCI
-// z definicji, nie implementację: wybór składowej bierze z Hash() (tu chodzi
-// o arytmetykę, nie o regułę wyboru - tę strzeże ut_h10aGate).
-std::int64_t hashTailByScan(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB,
-                            const boost::rational<int> &deltaOut, int latencyA, int latencyB, std::int64_t period) {
-  std::int64_t result = 0;
-  for (std::int64_t index = 0; index < period; ++index) {
-    int position         = 0;
-    const bool fromB     = Hash(deltaA, deltaB, static_cast<int>(index), position);
-    const auto &deltaSrc = fromB ? deltaB : deltaA;
-    const int latencySrc = fromB ? latencyB : latencyA;
-    const auto numerator = static_cast<std::int64_t>(position + 1 + latencySrc) * deltaSrc.numerator() * deltaOut.denominator();
-    const auto denominator = static_cast<std::int64_t>(deltaSrc.denominator()) * deltaOut.numerator();
-    result                 = std::max(result, (numerator + denominator - 1) / denominator - 1 - index);
+// Niezależny przegląd jednego okresu fazowego w __int128. Powtarza WARUNEK DOSTĘPNOŚCI
+// z definicji: rekord i niesie rekord j(i) składowej wybranej przez zet = Db/(Da+Db),
+// określony w chwili (j+1+W_src)*D_src, a slot i kończy się w (i+1+W)*D_c, gdzie
+// D_c = Da*Db/(Da+Db). Wystarcza jeden okres p+q - okresowość wymagań dowodzi
+// tailRequirement_period w math_proofs/Profs/InterleaveTailExact.lean.
+std::int64_t hashTailByScan(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, int latencyA, int latencyB) {
+  using wide        = __int128;
+  const wide an     = deltaA.numerator();
+  const wide ad     = deltaA.denominator();
+  const wide bn     = deltaB.numerator();
+  const wide bd     = deltaB.denominator();
+  const wide sum    = an * bd + bn * ad;  // (Da+Db) * ad * bd
+  const wide zetN   = bn * ad;            // zet = zetN / sum
+  const auto ratio  = deltaA / deltaB;
+  const wide period = static_cast<wide>(ratio.numerator()) + ratio.denominator();
+  wide result       = 0;
+  for (wide index = 0; index < period; ++index) {
+    const wide before = zetN * index / sum;
+    const bool fromB  = before == zetN * (index + 1) / sum;
+    const wide pos    = fromB ? index - before : before;
+    // D_src / D_c = sum / (ad*bn) dla A i sum / (bd*an) dla B.
+    const wide num  = (pos + 1 + (fromB ? latencyB : latencyA)) * sum;
+    const wide den  = fromB ? bd * an : ad * bn;
+    const wide need = (num + den - 1) / den - 1 - index;
+    result          = std::max(result, need);
   }
-  return result;
+  return static_cast<std::int64_t>(result);
 }
 
-boost::rational<int> interleavedInterval(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB) {
-  // Delta_c = Da*Db/(Da+Db), liczone w 64 bitach - tak jak robi to kompilator przez
-  // widen()/narrowInterval(). Bez tego świadkiem byłby błąd aparatury testu.
-  const auto numerator   = static_cast<std::int64_t>(deltaA.numerator()) * deltaB.numerator();
-  const auto denominator = static_cast<std::int64_t>(deltaA.numerator()) * deltaB.denominator() +
-                           static_cast<std::int64_t>(deltaB.numerator()) * deltaA.denominator();
-  const auto divisor = std::gcd(numerator, denominator);
-  return {static_cast<int>(numerator / divisor), static_cast<int>(denominator / divisor)};
+// Zastąpiona 2026-08-07 postać O(1): max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)), do #616
+// gałąź powyżej progu przeglądu. Liczona tu wprost, w 64 bitach.
+std::int64_t replacedO1Tail(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, int latencyA, int latencyB) {
+  const auto ratio     = deltaA / deltaB;
+  const std::int64_t p = ratio.numerator();
+  const std::int64_t q = ratio.denominator();
+  const auto toSlots = [](std::int64_t w, std::int64_t num, std::int64_t den) { return w <= 0 ? 0 : (w * num + den - 1) / den; };
+  const std::int64_t ownPhaseTerm = (q + p - 2) / p + 1;
+  // D_A/D_c = (p+q)/q, D_B/D_c = (p+q)/p.
+  return std::max(toSlots(latencyA, p + q, q), toSlots(latencyB, p + q, p) + ownPhaseTerm);
 }
 
 }  // namespace
 
+// Zgodność z przeglądem na siatce: p, q <= 30 względnie pierwsze, trzy skale interwałów,
+// ogony składowych do 5 - siatka modelu K1.3 (#615), który znalazł postać, z trzecią skalą.
+TEST(xSOperations, hash_startup_latency_matches_phase_scan_on_grid) {
+  // covers: soperations.hash-startup-latency.1~2, soperations.hash-startup-latency.3~1
+  int checked = 0;
+  for (int p = 1; p <= 30; ++p)
+    for (int q = 1; q <= 30; ++q) {
+      if (std::gcd(p, q) != 1) continue;
+      for (const boost::rational<int> scale : {boost::rational<int>(1), boost::rational<int>(1, 7), boost::rational<int>(5, 2)})
+        for (int latencyA = 0; latencyA <= 5; ++latencyA)
+          for (int latencyB = 0; latencyB <= 5; ++latencyB) {
+            const boost::rational<int> deltaA = scale * p;
+            const boost::rational<int> deltaB = scale * q;
+            ASSERT_EQ(HashStartupLatency(deltaA, deltaB, latencyA, latencyB), hashTailByScan(deltaA, deltaB, latencyA, latencyB))
+                << "p=" << p << " q=" << q << " scale=" << scale << " W_A=" << latencyA << " W_B=" << latencyB;
+            ++checked;
+          }
+    }
+  EXPECT_EQ(checked, 555 * 3 * 36);  // 555 par wzglednie pierwszych, 3 skale, 6 x 6 ogonow
+}
+
+// Powyżej dawnego progu przeglądu (p+q > 100 000) wynik jest dokładny i nie większy niż
+// dawna gałąź zastępcza. Para 2/99997 jest poniżej progu, ale tam dawny przegląd zaniżał
+// ogon przez przepełnienie w Hash() - 99998 zamiast 99999 przy W_B = 1.
+TEST(xSOperations, hash_startup_latency_is_exact_above_former_scan_limit) {
+  // covers: soperations.hash-startup-latency.1~2, soperations.hash-startup-latency.3~1
+  for (const auto &[a, b] : {std::pair{1, 100001}, std::pair{100001, 1}, std::pair{99999, 2}, std::pair{2, 99999},
+                             std::pair{100003, 7}, std::pair{2, 99997}, std::pair{3, 99997}})
+    for (int latencyA : {0, 1, 5})
+      for (int latencyB : {0, 3}) {
+        const boost::rational<int> deltaA{a, 3};
+        const boost::rational<int> deltaB{b, 3};
+        const auto tail = HashStartupLatency(deltaA, deltaB, latencyA, latencyB);
+        EXPECT_EQ(tail, hashTailByScan(deltaA, deltaB, latencyA, latencyB))
+            << a << "/" << b << " W_A=" << latencyA << " W_B=" << latencyB;
+        EXPECT_LE(tail, replacedO1Tail(deltaA, deltaB, latencyA, latencyB))
+            << a << "/" << b << " W_A=" << latencyA << " W_B=" << latencyB;
+      }
+  EXPECT_EQ(HashStartupLatency(boost::rational<int>(2), boost::rational<int>(99997), 0, 1), 99999);
+}
+
 // Arytmetyka pośrednia musi być 64-bitowa. Świadek wyszukany wyczerpująco 2026-08-07:
-// dla Da = Db = 99991/100000 i ogona składowej 30 000 iloczyn (pos+1+W)*num_src*den_out
-// wynosi ~6e14, a już pierwszy człon (1+W)*99991 przekracza zakres int mimo skracania,
-// które boost::rational wykonuje przed mnożeniem. Postać rational<int> zwraca w tym
-// przypadku 17 047 zamiast 60 000 - czyli ZANIŻA ogon o ponad 42 000 slotów.
+// dla Da = Db = 99991/100000 i ogona składowej 30 000 rachunek w rational<int> zwracał
+// 17 047 zamiast 60 000 - czyli ZANIŻAŁ ogon o ponad 42 000 slotów.
 //
 // Zaniżenie jest tą klasą defektu, której cały reżim bezpieczny ma nie dopuszczać:
 // oznacza rekord wydany, zanim jego zależności są określone.
 TEST(xSOperations, hash_startup_latency_uses_64bit_intermediate_arithmetic) {
-  // covers: soperations.hash-startup-latency.1~1
+  // covers: soperations.hash-startup-latency.1~2, soperations.hash-startup-latency.2~2
   const boost::rational<int> deltaA{99991, 100000};
   const boost::rational<int> deltaB{99991, 100000};
-  const auto deltaOut = interleavedInterval(deltaA, deltaB);
-  ASSERT_EQ(deltaOut, boost::rational<int>(99991, 200000));
-
-  const auto ratio          = deltaA / deltaB;
-  const std::int64_t period = static_cast<std::int64_t>(ratio.numerator()) + ratio.denominator();
-  ASSERT_LE(period, kHashPhaseScanLimit) << "swiadek ma badac galaz DOKLADNA, nie awaryjna";
-
   const int latencyA  = 30000;
-  const auto expected = hashTailByScan(deltaA, deltaB, deltaOut, latencyA, 0, period);
-  // Świadek jest świadkiem tylko wtedy, gdy iloczyn naprawdę wychodzi poza int.
+  const auto expected = hashTailByScan(deltaA, deltaB, latencyA, 0);
   ASSERT_GT(expected, 20000) << "przypadek przestal byc swiadkiem przepelnienia";
-  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, deltaOut, latencyA, 0), static_cast<int>(expected));
+  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, latencyA, 0), expected);
 }
 
-// Gałąź awaryjna powyżej progu przeglądu. Reżim deklarowany w komentarzu przy
-// kHashPhaseScanLimit: postać O(1) ZAWYŻA, więc jest bezpieczna. Test wymaga tego wprost
-// - wartość zwrócona nie może spaść poniżej granicy zdarzeniowej wyliczonej przeglądem
-// całego okresu. Bez tego testu gałąź nie wykonuje się w ctest ani razu.
-TEST(xSOperations, hash_startup_latency_above_scan_limit_stays_safe) {
-  // covers: soperations.hash-startup-latency.2~1, soperations.hash-startup-latency.3~1
-  const boost::rational<int> deltaA{1, 1};
-  const boost::rational<int> deltaB{1, 100001};
-  const auto deltaOut = interleavedInterval(deltaA, deltaB);
-  ASSERT_EQ(deltaOut, boost::rational<int>(1, 100002));
-
-  const auto ratio          = deltaA / deltaB;
-  const std::int64_t period = static_cast<std::int64_t>(ratio.numerator()) + ratio.denominator();
-  ASSERT_GT(period, kHashPhaseScanLimit) << "przypadek nie wchodzi w galaz awaryjna";
-
-  for (int latencyA : {0, 1, 5})
-    for (int latencyB : {0, 3}) {
-      const auto exact    = hashTailByScan(deltaA, deltaB, deltaOut, latencyA, latencyB, period);
-      const int fromLimit = HashStartupLatency(deltaA, deltaB, deltaOut, latencyA, latencyB);
-      EXPECT_GE(fromLimit, static_cast<int>(exact)) << "W_A=" << latencyA << " W_B=" << latencyB;
-    }
+// Kraniec zakresu: p, q i ogony równe INT_MAX. Wartości wyliczone ręcznie, L = 2^31:
+//   Da/Db = INT_MAX/1: kres A = INT_MAX * 2^31 = 2^62 - 2^31, kres B = 2^31 + 1;
+//   Da/Db = 1/INT_MAX: kres A = 2^31, kres B = 2^31 * 2^31 - 1 = 2^62 - 1.
+// Przepełnienie członu (1+W)*L w int albo w int64 dałoby tu wartość ujemną lub obciętą.
+TEST(xSOperations, hash_startup_latency_handles_the_int_range_edge) {
+  // covers: soperations.hash-startup-latency.2~2
+  constexpr int big            = std::numeric_limits<int>::max();
+  constexpr std::int64_t two31 = std::int64_t{1} << 31;
+  EXPECT_EQ(HashStartupLatency(boost::rational<int>(big), boost::rational<int>(1), big, big), (two31 << 31) - two31);
+  EXPECT_EQ(HashStartupLatency(boost::rational<int>(1), boost::rational<int>(big), big, big), (two31 << 31) - 1);
+  EXPECT_GT(HashStartupLatency(boost::rational<int>(1), boost::rational<int>(big), 0, 1), std::int64_t{big});
 }
 
-// Kontrola progu. Sam próg nie jest strzeżony ani przez test dokładności, ani przez test
-// bezpieczeństwa: gałąź awaryjna ZAWYŻA, więc obniżenie kHashPhaseScanLimit do zera nie
-// złamałoby żadnego z nich - po cichu cofnęłoby tylko klasę `#` z reżimu dokładnego do
-// zawyżającego, czyli o krok 3c z 2026-08-07.
-//
-// Świadkiem jest przypadek, w którym obie postacie DAJĄ RÓŻNE liczby: Da=1, Db=2/5,
-// W_B=1 - przegląd okresu daje 3, zastąpiona postać O(1) daje 4. Test wymaga od silnika
-// wartości dokładnej i osobno sprawdza, że postać O(1) jest tu naprawdę wyższa; bez
-// drugiej połowy pierwsza sprawdzałaby zgodność dwóch identycznych liczb.
-TEST(xSOperations, hash_scan_limit_keeps_the_exact_branch_in_use) {
+// Świadek, w którym postać zamknięta i zastąpiona postać O(1) DAJĄ RÓŻNE liczby: Da=1,
+// Db=2/5, W_B=1 - przegląd okresu daje 3, postać O(1) daje 4. Test wymaga wartości
+// dokładnej i osobno sprawdza, że postać O(1) jest tu naprawdę wyższa; bez drugiej połowy
+// pierwsza sprawdzałaby zgodność dwóch identycznych liczb.
+TEST(xSOperations, hash_startup_latency_differs_from_the_replaced_o1_form) {
+  // covers: soperations.hash-startup-latency.1~2
   const boost::rational<int> deltaA{1, 1};
   const boost::rational<int> deltaB{2, 5};
-  const auto deltaOut = interleavedInterval(deltaA, deltaB);
-  ASSERT_EQ(deltaOut, boost::rational<int>(2, 7));
-
-  const auto ratio          = deltaA / deltaB;
-  const std::int64_t period = static_cast<std::int64_t>(ratio.numerator()) + ratio.denominator();
-  ASSERT_LE(period, kHashPhaseScanLimit);
-
   const int latencyB = 1;
-  const auto exact   = hashTailByScan(deltaA, deltaB, deltaOut, 0, latencyB, period);
-  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, deltaOut, 0, latencyB), static_cast<int>(exact));
-
-  // Zastąpiona postać O(1): max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)). Liczona tu wprost,
-  // żeby świadek nie opierał się na komentarzu, tylko na liczbie.
-  const auto swapped     = deltaB / deltaA;
-  const int ownPhaseTerm = (swapped.denominator() + swapped.numerator() - 2) / swapped.denominator() + 1;
-  const auto toSlots     = [](int latency, const boost::rational<int> &source, const boost::rational<int> &target) {
-    return latency <= 0 ? 0 : ceilR(boost::rational<int>(latency) * source / target);
-  };
-  const int replaced = std::max(toSlots(0, deltaA, deltaOut), toSlots(latencyB, deltaB, deltaOut) + ownPhaseTerm);
-  EXPECT_GT(replaced, static_cast<int>(exact)) << "przypadek przestal odrozniac obie postacie";
+  const auto exact   = hashTailByScan(deltaA, deltaB, 0, latencyB);
+  EXPECT_EQ(exact, 3);
+  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, 0, latencyB), exact);
+  EXPECT_GT(replacedO1Tail(deltaA, deltaB, 0, latencyB), exact) << "przypadek przestal odrozniac obie postacie";
 }
 
-TEST(xSOperations, hash_scan_limit_boundary_has_an_exact_witness) {
-  // covers: soperations.hash-startup-latency.1~1, soperations.hash-startup-latency.2~1
-  // Niezalezna tablica zdarzen: W_A=0, W_B=1. Dla kazdej pary minimalny ogon
-  // wynosi 3, a oszacowanie zachowawcze 4. Tylko ostatni okres przekracza prog.
-  for (const auto &[a, b, expected] : {std::tuple{99997, 2, 3}, std::tuple{99997, 3, 3}, std::tuple{99999, 2, 4}}) {
+TEST(xSOperations, hash_former_scan_limit_boundary_is_exact) {
+  // covers: soperations.hash-startup-latency.1~2
+  // Niezalezna tablica zdarzen: W_A=0, W_B=1. Dla kazdej pary minimalny ogon wynosi 3.
+  // Ostatni okres przekracza dawny prog przegladu; dawna galaz zastepcza dawala tam 4.
+  for (const auto &[a, b, expected] : {std::tuple{99997, 2, 3}, std::tuple{99997, 3, 3}, std::tuple{99999, 2, 3}}) {
     SCOPED_TRACE(a + b);
-    EXPECT_EQ(HashStartupLatency(boost::rational<int>(a), boost::rational<int>(b), boost::rational<int>(a * b, a + b), 0, 1),
-              expected);
+    EXPECT_EQ(HashStartupLatency(boost::rational<int>(a), boost::rational<int>(b), 0, 1), expected);
   }
 }
