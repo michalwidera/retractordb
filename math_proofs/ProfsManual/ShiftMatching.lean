@@ -221,6 +221,18 @@ theorem exactInterleaveTail_exact (a b WA WB W N0 : ℕ) (ha : 0 < a) (hb : 0 < 
     omega
 ```
 
+Maksimum po okresie ma postać zamkniętą (`exactInterleaveTail_closed`).
+Dla względnie pierwszych `a`, `b` i `L = a+b` jest ono większym z dwóch
+kresów. Pierwszy, `ceil(W_A*L/b)`, jest osiągany w ostatniej fazie okresu
+`n = L-1`, która czyta rekord `b-1` lewej składowej. Drugi,
+`ceil(((1+W_B)*L + a - 1)/a) - 1`, jest osiągany w fazie czytającej rekord
+`m` prawej składowej, dla którego `m*L ≡ -1 (mod a)`. Górne ograniczenie
+zachodzi w każdej fazie: w fazie lewej składowej o indeksie `j` jest
+`(j+1)*L ≤ (n+1)*b`, a w fazie prawej składowej o indeksie `k` jest
+`k*L ≤ (n+1)*a - 1`. Względnej pierwszości wymaga tylko istnienie `m`.
+Twierdzenie zapisuje oba kresy dzieleniem całkowitym w `ℕ`, tak jak liczy
+je `HashStartupLatency()`.
+
 Dla `N₀` równego początkowi logicznemu otrzymujemy wersję przyczynową:
 ogon `causalInterleave` jest najmniejszym ogonem, przy którym każdy
 istniejący rekord wyjścia jest emitowany nie wcześniej, niż określony jest
@@ -342,9 +354,10 @@ sprawdzane przez Lean, lecz przez porównanie kodu z definicjami:
 * przepisanie wykonywane przez `compiler::factorMatchedHashTimeMoves()`
   zamienia dokładnie stronę `lhs` twierdzenia na stronę `rhs`.
 
-Odwołania dotyczą repozytorium `retractordb` w wersji `36625de`. Jeśli
-któryś z wymienionych fragmentów kodu się zmieni, ten rozdział trzeba
-porównać z nim ponownie.
+Odwołania dotyczą repozytorium `retractordb` w wersji `36625de`; opis
+ogona przeplotu porównano ponownie po zmianie z #616. Jeśli któryś
+z wymienionych fragmentów kodu się zmieni, ten rozdział trzeba porównać
+z nim ponownie.
 
 ## Interwały wymierne a parametry naturalne
 
@@ -359,7 +372,7 @@ przez ten stosunek:
 * `Δ_A/Δ_out = (a+b)/b = ratioA a b` oraz `Δ_B/Δ_out = (a+b)/a = ratioB a b`,
   bo `compiler::resolveStreamIntervals()` nadaje węzłowi `#` interwał
   `Δ_A*Δ_B/(Δ_A+Δ_B)`, zgodny z `causalInterleave_interval`;
-* okres przeglądu `period = p+q = a+b` w `HashStartupLatency()`;
+* okres fazowy `L = p+q = a+b` w postaci zamkniętej w `HashStartupLatency()`;
 * warunek reguły `Δ_A*i = Δ_B*k`, równoważny `i*a = k*b`, czyli `hmatch`.
 
 Węzeł `>N` dziedziczy interwał producenta (`resolveStreamIntervals()`,
@@ -395,25 +408,24 @@ gałąź `STREAM_TIMEMOVE`), tak jak `causalShift` zachowuje parametr `Δ`.
   a najmniejszy element ich przecięcia jest większym z dwóch progów.
   `interleaveOrigin_le_iff` charakteryzuje ten sam najmniejszy element,
   więc kod liczy `interleaveOrigin`.
-* Ogon: gałąź przeglądu w `HashStartupLatency()` dla każdej fazy
-  `index < period` wyznacza pozycję i składową przez `Hash()` i liczy
-  `ceil((position+1+W_src)*Δ_src/Δ_out) - 1 - index`. Sufit jest liczony
-  w 64 bitach wzorem `(x+y-1)/y`, poprawnym dla dodatnich `x`, `y`. Wynik
-  startuje od `0` i bierze maksimum. To `selectedRequirement` z
-  `phaseRequirement`, złożone przez `phaseMax` (fałd z wartością
-  początkową `0`) i obcięte `toNat`, czyli ogon `causalInterleave`.
-  Na mocy `causalInterleave_tail_exact` ta gałąź zwraca najmniejszy ogon
-  spełniający zdarzeniowy warunek dostępności dla wszystkich istniejących
-  rekordów.
+* Ogon: `HashStartupLatency()` liczy w 64 bitach
+  `max((W_A*L + q - 1)/q, ((1+W_B)*L + p - 2)/p)` dla `L = p+q`, czyli prawą
+  stronę `exactInterleaveTail_closed` przy `a = p`, `b = q`; ułamek jest
+  nieskracalny, więc założenie `Nat.Coprime a b` jest spełnione. Przy
+  `p, q, W ≤ INT_MAX` żaden człon pośredni nie przekracza `2^63`, a ogon
+  spoza zakresu `int` `computeStartupLatency()` odrzuca jako błąd planu. Na
+  mocy `exactInterleaveTail_closed` i `causalInterleave_tail_exact` wynik
+  jest najmniejszym ogonem spełniającym zdarzeniowy warunek dostępności dla
+  wszystkich istniejących rekordów. Do #616 ogon liczył przegląd okresu,
+  a powyżej `p+q = 100 000` zawyżające oszacowanie O(1). Przegląd wołał
+  `Hash()`, który liczy w `rational<int>`; dla `q*(p+q) > 2^31` iloczyn się
+  przepełniał i przegląd zaniżał ogon.
 
 ## Źródła deklarowane
 
 Założenia `hA` i `hB` twierdzenia `causal_shift_matching_declared`
 odpowiadają temu, że `computeStartupLatency()` nadaje każdej deklaracji
-ogon `0`. W gałęzi powyżej progu przeglądu (niżej) teza zachodzi tak samo:
-obie strony mają składowe o ogonie `0`, więc strona niesfaktoryzowana
-dostaje `F(0, 0) = own ≥ 1`, a sfaktoryzowana `max(0, own - L)`. Tego
-przypadku Lean nie obejmuje.
+ogon `0`.
 
 ## Emisja a dostępność
 
@@ -450,27 +462,6 @@ Z powyższych odpowiedniości i z `causal_shift_matching` wynika, że
 przepisany węzeł ma ten sam interwał, ten sam początek logiczny i tę samą
 treść rekordu pod każdym indeksem logicznym, a ogon nie większy. W języku
 `def:observable`: `Val` jest równe, a `Lat` nie rośnie.
-
-## Gałąź powyżej progu przeglądu
-
-Dla `period > kHashPhaseScanLimit` `HashStartupLatency()` zwraca
-`F(W_A, W_B) = max(C_A(W_A), C_B(W_B) + own)`, gdzie
-`C_A(w) = ceil(w*(a+b)/b)`, `C_B(w) = ceil(w*(a+b)/a)` (zero dla `w ≤ 0`),
-a `own = ceil((a+b-1)/a) ≥ 1` zależy tylko od stosunku interwałów. Obie
-strony reguły mają te same interwały składowych, więc obie trafiają do tej
-samej gałęzi. Poniższy argument jest ręczny i nie ma go w Lean.
-
-Dla `W_A ≥ i` mamy `C_A(W_A - i) = C_A(W_A) - (i+k)`, bo
-`i*(a+b)/b = i + i*a/b = i+k` jest liczbą całkowitą. Dla `W_A < i` mamy
-`W_A ≤ i-1`, więc `C_A(W_A) ≤ (i+k) - floor((a+b)/b) < i+k` i
-`C_A(0) = 0 ≥ C_A(W_A) - (i+k)`. W obu przypadkach
-`C_A(max(0, W_A - i)) ≥ C_A(W_A) - (i+k)`; analogicznie
-`C_B(max(0, W_B - k)) ≥ C_B(W_B) - (i+k)`, bo `k*(a+b)/a = k+i`. Stąd
-`F(max(0,W_A-i), max(0,W_B-k)) ≥ F(W_A, W_B) - (i+k)`, a ponieważ lewa
-strona jest nie mniejsza niż `own ≥ 1`, jest też nie mniejsza niż
-`max(0, F(W_A, W_B) - (i+k))`, czyli ogon strony `rhs`. Nierówność ogonów
-zachodzi więc także w tej gałęzi. Czy `F` ogranicza granicę zdarzeniową
-z góry, to osobna własność tej gałęzi, której ten rozdział nie dowodzi.
 
 ## Poza zakresem
 

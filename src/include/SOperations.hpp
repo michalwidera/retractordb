@@ -248,15 +248,9 @@ constexpr int NThetaStartupLatency(const rational<int> &deltaSource, const ratio
   return PhaseStartupLatency(rational<int>(0), deltaTarget / deltaSource, sourceLatency);
 }
 
-// Najdłuższy okres fazowy przeplotu, dla którego ogon liczy się DOKŁADNIE.
-// Powyżej rachunek wraca do postaci O(1), która zawyża - koszt przeglądu rośnie
-// liniowo z p+q, a p+q jest iloczynem liczników i mianowników delt składowych.
-// Korpus kampanijny K24 ma maksimum 24 557, więc próg nie jest w nim osiągany.
-constexpr std::int64_t kHashPhaseScanLimit = 100'000;
-
 /// Funkcja HashStartupLatency powinna:
-/// - [soperations.hash-startup-latency.1~1] dla okresu fazowego p+q nie większego niż kHashPhaseScanLimit (p/q to skrócone deltaA/deltaB) zwracać dokładny ogon przeplotu: maksimum po i z [0, p+q) wartości ceil((j(i) + 1 + W_src(i)) * Delta_src(i) / deltaOut) - 1 - i, gdzie składową i jej indeks j(i) wybiera Hash, liczone w int64.
-/// - [soperations.hash-startup-latency.2~1] powyżej kHashPhaseScanLimit zwracać oszacowanie O(1) max(conv(latencyA), conv(latencyB) + ceil((p+q-1)/p)), gdzie conv(W) = ceilR(W * Delta_src / deltaOut) dla W > 0 i 0 w przeciwnym razie.
+/// - [soperations.hash-startup-latency.1~2] dla każdego okresu fazowego L = p+q (p/q to skrócone deltaA/deltaB) zwracać dokładny ogon przeplotu w postaci zamkniętej max(ceil(W_A*L/q), ceil(((1+W_B)*L + p - 1)/p) - 1), równej maksimum po i z [0, L) wartości ceil((j(i) + 1 + W_src(i)) * Delta_src(i) / Delta_c) - 1 - i, gdzie składową i jej indeks j(i) wybiera Hash, a Delta_c = deltaA*deltaB/(deltaA+deltaB).
+/// - [soperations.hash-startup-latency.2~2] liczyć w int64 bez przepełnienia dla wszystkich p, q, W_A, W_B z zakresu int i zwracać wynik w int64; wynik spoza zakresu int odrzuca wołający.
 /// - [soperations.hash-startup-latency.3~1] nigdy nie zaniżać ogona: zaniżenie oznacza rekord wyemitowany przed określeniem zależności.
 ///
 /// Ogon przeplotu (`#`). Rekord i strumienia C = A#B niesie treść rekordu j(i)
@@ -264,51 +258,34 @@ constexpr std::int64_t kHashPhaseScanLimit = 100'000;
 /// (j(i)+1+W_src(i))*Delta_src(i), a slot i konsumenta kończy się w chwili
 /// (i+1+W)*Delta_c. Warunek dostępności dla każdego i:
 ///   W >= ceil( (j(i)+1+W_src(i)) * Delta_src(i) / Delta_c ) - 1 - i.
-/// Wybór składowej i reszta i*z powtarzają się z okresem p+q, gdzie
-/// Delta_a/Delta_b = p/q po skróceniu, więc maksimum po JEDNYM okresie jest
-/// maksimum po wszystkich rekordach. Przegląd zaczyna się od zera: origin
-/// przesuwa i indeks konsumenta, i indeks składowej o tyle samo, a kampania K24p
-/// potwierdziła, że okno [0, p+q) i [O_c, O_c+p+q) dają tę samą wartość.
+/// Wymaganie powtarza się z okresem L = p+q, a maksimum po jednym okresie ma postać
+/// zamkniętą. Kres A, ceil(W_A*L/q), wypada w ostatniej fazie okresu, która czyta
+/// rekord q-1 lewej składowej. Kres B, ceil(((1+W_B)*L + p - 1)/p) - 1, wypada w fazie
+/// czytającej rekord k prawej składowej z k*L = -1 (mod p); takie k istnieje, bo
+/// gcd(p, q) = 1. Dowód równości z maksimum po okresie: exactInterleaveTail_closed
+/// w math_proofs/Profs/InterleaveTailExact.lean; exactInterleaveTail_exact w tym samym
+/// pliku mówi, że to maksimum jest najmniejszym ogonem spełniającym warunek dostępności.
 ///
-/// Wynik jest DOKŁADNY: 5960/5960 i 5998/5998 węzłów `#` korpusu K24p wobec
-/// niezależnego modelu zdarzeniowego, zero zaniżeń (dwa ziarna). Zastąpiona
-/// postać O(1) - max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)) - zgadzała się
-/// z granicą zdarzeniową w 92,1% węzłów i zawyżała ogon o slot w pozostałych:
-/// człon fazowy chroni najgorszą fazę odczytu drugiego argumentu, ale nie wie,
-/// czy ta faza w ogóle wypada na rekord, który czeka najdłużej.
+/// Zakres: p, q <= INT_MAX, więc L < 2^32, a (1+W)*L + p < 2^31 * 2^32 = 2^63 dla
+/// W <= INT_MAX - żaden człon pośredni nie przepełnia int64. Sam wynik może wyjść poza
+/// int (np. W_A*L/q przy q = 1); nie jest obcinany, odmawia compiler::computeStartupLatency().
 ///
-/// Powyżej kHashPhaseScanLimit wraca postać O(1) - zawyżająca, więc bezpieczna:
-/// zaniżenie ogona oznacza rekord wyemitowany przed określeniem zależności,
-/// zawyżenie tylko slot opóźnienia.
-inline int HashStartupLatency(const rational<int> &deltaA, const rational<int> &deltaB, const rational<int> &deltaOut,
-                              const int latencyA, const int latencyB) {
+/// Do 2026-08-07 stała tu postać O(1) max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)); kampania
+/// K24p zmierzyła jej zgodność z granicą zdarzeniową na 92,1% węzłów `#`, z zawyżeniem
+/// o slot w pozostałych. Do 2026-11-10 (#616) ogon liczył przegląd jednego okresu fazowego,
+/// a powyżej p+q = 100 000 wracała tamta postać. Przegląd wołał Hash(), który liczy w
+/// rational<int>; przy q*(p+q) > 2^31 iloczyn się przepełniał i przegląd ZANIŻAŁ ogon
+/// (np. deltaA = 2, deltaB = 99997, W_B = 1: 99998 zamiast 99999).
+inline std::int64_t HashStartupLatency(const rational<int> &deltaA, const rational<int> &deltaB, const int latencyA,
+                                       const int latencyB) {
+  assert(latencyA >= 0 && latencyB >= 0);
   const auto ratio          = deltaA / deltaB;
-  const std::int64_t period = static_cast<std::int64_t>(ratio.numerator()) + ratio.denominator();
-
-  if (period > kHashPhaseScanLimit) {
-    const auto swapped = deltaB / deltaA;
-    const auto denom   = static_cast<std::int64_t>(swapped.denominator());
-    const auto advance = static_cast<std::int64_t>(swapped.numerator());
-    const int own      = static_cast<int>(((denom + advance - 2) / denom) + 1);
-    const auto toSlots = [](const int w, const rational<int> &dSrc, const rational<int> &dDst) {
-      return w <= 0 ? 0 : ceilR(rational<int>(w) * dSrc / dDst);
-    };
-    return std::max(toSlots(latencyA, deltaA, deltaOut), toSlots(latencyB, deltaB, deltaOut) + own);
-  }
-
-  std::int64_t result = 0;
-  for (int index = 0; index < static_cast<int>(period); ++index) {
-    int position         = 0;
-    const bool fromB     = Hash(deltaA, deltaB, index, position);
-    const auto &deltaSrc = fromB ? deltaB : deltaA;
-    const int latencySrc = fromB ? latencyB : latencyA;
-    // Rachunek w 64 bitach: (position+1+W)*num*den przekracza zakres int już dla
-    // umiarkowanych delt, a rational<int> mnoży przed skróceniem. Oba człony są
-    // dodatnie, więc ceil(a/b) = (a+b-1)/b.
-    const auto numerator = static_cast<std::int64_t>(position + 1 + latencySrc) * deltaSrc.numerator() * deltaOut.denominator();
-    const auto denominator = static_cast<std::int64_t>(deltaSrc.denominator()) * deltaOut.numerator();
-    const auto required    = ((numerator + denominator - 1) / denominator) - 1 - index;
-    result                 = std::max(result, required);
-  }
-  return static_cast<int>(result);
+  const std::int64_t p      = ratio.numerator();
+  const std::int64_t q      = ratio.denominator();
+  const std::int64_t period = p + q;
+  // Liczniki są nieujemne, a mianowniki dodatnie, więc ceil(x/y) = (x+y-1)/y.
+  // Kres B: ceil(((1+W_B)*L + p - 1)/p) - 1 = ((1+W_B)*L + p - 2)/p.
+  const std::int64_t boundA = (latencyA * period + q - 1) / q;
+  const std::int64_t boundB = ((1 + static_cast<std::int64_t>(latencyB)) * period + p - 2) / p;
+  return std::max(boundA, boundB);
 }
