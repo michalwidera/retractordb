@@ -1,4 +1,10 @@
-DECLARE a INTEGER STREAM core0, 0.5 BINFILE 'datafile3.dat'
+# Znak szerokosci odwraca kolejnosc pol tego samego okna.
+# Uruchomienie i podglad wynikow: bash test-mwnd2.sh
+# datafile3.dat: osiem liczb INTEGER (int32) 1..8, zapetlanych po EOF.
+# @(2,3): (3,2,1), (5,4,3), ...; @(2,-3): (1,2,3), (3,4,5), ...
+# @(1,2): (2,1), (3,2), ...; @(1,-2): (1,2), (2,3), ...
+# Pierwszy argument jest krokiem w elementach, abs(drugiego) szerokoscia.
+DECLARE a INTEGER STREAM core0, 1/2 BINFILE 'datafile3.dat'
 
 SELECT * STREAM str1 FROM core0@(2,3)
 SELECT * STREAM str2 FROM core0@(2,-3)

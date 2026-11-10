@@ -1,10 +1,10 @@
-DECLARE a INTEGER STREAM core, 0.5 TEXTFILE 'datafile.txt'
-
-# SELECT * STREAM agregation FROM core@(2,2)
-#SELECT * STREAM agregationSerialization FROM core@(1,2)
+# Okna po dwa elementy, krok 2; znak minus zachowuje kolejnosc naplywu.
+# Uruchomienie i podglad wynikow: bash test-mwnd.sh
+# Dla 10,20,...,90 pierwsze okna to (20,30), (40,50), (60,70).
+# Okno konczy sie na pozycji n*2; origin=1 pomija niepelne okno n=0.
+# Serializacja @(1,1) daje 20,30,40,50,60,70,..., z interwalem 1/2 s.
+# Wejscie zapetla sie po EOF.
+DECLARE a INTEGER STREAM core, 1/2 TEXTFILE 'datafile.txt'
 
 SELECT * STREAM agregationMirror FROM core@(2,-2)
 SELECT * STREAM serialization FROM agregationMirror@(1,1)
-
-#SELECT * STREAM agregationSelective FROM core@(3,-2)
-

@@ -1,6 +1,12 @@
-# declaration of input time series
+# Dwa zrodla DEVICE: po dwa losowe bajty, co 1 s i co 1/2 s.
+# Uruchom z tego katalogu: xretractor -q query.rql -f -m 30 -k
+# -f wykonuje ograniczony przebieg bez czekania na zegar; bez -f jest pokaz na zywo.
+# str1 przeplata rekordy obu zrodel, str2 laczy je i oblicza wyrazenia.
+# Wartosci /dev/urandom zmieniaja sie w kazdym przebiegu; nie sa wzorcem regresji.
+# SELECT * wybiera wspolny schemat po #. Zapis str1[0],str1[1] tez jest legalny:
+# to odwolanie do schematu FROM, a nie cykl zaleznosci strumieni.
 DECLARE a BYTE , b BYTE STREAM core0, 1 DEVICE '/dev/urandom'
-DECLARE c BYTE , d BYTE STREAM core1, 0.5 DEVICE '/dev/urandom'
+DECLARE c BYTE , d BYTE STREAM core1, 1/2 DEVICE '/dev/urandom'
 
-SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
+SELECT * STREAM str1 FROM core0#core1
 SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0

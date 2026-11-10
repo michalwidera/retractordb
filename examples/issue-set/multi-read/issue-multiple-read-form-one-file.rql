@@ -1,19 +1,18 @@
-# this is issue when one file - (file.dat) is read by two
-# declarations with different speed
-# this leads to problems in operators execution
-# some data are loos.
-#
-# THIS IS A BUG and needs investigation
-#
-# probably addiational layer of file management (ex. file.dat access)
-# should appear in system to cover such issue.
+# Dwie deklaracje czytaja ten sam plik niezaleznie: co 1/5 s i co 1 s.
+# file.dat zawiera osiem liczb INTEGER (int32): 1..8, zapetlanych po EOF.
+# Uruchom z tego katalogu: xretractor -q issue-multiple-read-form-one-file.rql -f -m 2000 -k
+# fast i slow maja te same kolejne wartosci, ale rozne liczby rekordow.
+# d1 przeplata piec wartosci adata ze stalym 77; d2 odzyskuje adata,
+# a d3 odzyskuje d0. Argument & / % to interwal USUWANEGO skladnika.
+# Ogon rozplotu ogranicza dlugosc d2 przy skonczonym budzecie iteracji;
+# nie oznacza to luk w jego sekwencji wartosci.
 
-DECLARE a INTEGER STREAM datacrc,1/5 BINFILE 'datacrc.dat'
-DECLARE e INTEGER STREAM datadat,1/4 BINFILE 'datanocrc.dat'
-DECLARE b INTEGER STREAM adata,0.2 BINFILE 'file.dat'
+DECLARE b INTEGER STREAM adata,1/5 BINFILE 'file.dat'
 DECLARE d INTEGER STREAM bdata,1 BINFILE 'file.dat'
 
-SELECT 77 STREAM d0 FROM bdata 
-SELECT d1[0] STREAM d1 FROM adata#d0
-SELECT d1[0] STREAM d2 FROM d1&1
-SELECT d1[0] STREAM d3 FROM d1%1
+SELECT * STREAM fast FROM adata
+SELECT * STREAM slow FROM bdata
+SELECT 77 STREAM d0 FROM bdata
+SELECT * STREAM d1 FROM adata#d0
+SELECT * STREAM d2 FROM d1&1
+SELECT * STREAM d3 FROM d1%1/5
