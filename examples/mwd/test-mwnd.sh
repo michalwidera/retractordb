@@ -1,57 +1,49 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Pokaz wsadowy czterech przykladow query-mwnd*.rql, bez zaleznosci od tmux.
+# Uzycie: test-mwnd.sh [plik.rql] [liczba-iteracji | x | --compile-only]
+# Domyslnie: query-mwnd.rql, 30 iteracji; x zachowuje dawny tryb kompilacji.
+set -euo pipefail
 
-if [ "$1" != "" ]; then
-FILE=$1
-else
-FILE=query-mwnd.rql
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+query=${1:-"$script_dir/query-mwnd.rql"}
+if [[ ! -f "$query" && -f "$script_dir/$query" ]]; then
+  query="$script_dir/$query"
+fi
+query_dir=$(cd -- "$(dirname -- "$query")" && pwd)
+query_name=$(basename -- "$query")
+mode=${2:-30}
+if [[ $# -gt 2 || ! "$mode" =~ ^([1-9][0-9]*|x|--compile-only)$ ]]; then
+  echo 'Uzycie: test-mwnd.sh [plik.rql] [dodatnia liczba iteracji | x | --compile-only]' >&2
+  exit 2
 fi
 
-if ! xretractor $FILE -c ; then exit 1 ; fi
+# Rozwiaz sciezki do binarek przed zmiana katalogu roboczego.
+xretractor=$(command -v "${XRETRACTOR:-xretractor}")
+[[ "$xretractor" = /* ]] || xretractor="$PWD/$xretractor"
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/rdb-mwnd.XXXXXXXX")
+trap 'rm -rf -- "$work_dir"' EXIT
+shopt -s nullglob
+cp -- "$query_dir"/*.txt "$query_dir"/*.dat "$query_dir/$query_name" "$work_dir/"
+mkdir "$work_dir/.config"
+export XDG_CONFIG_HOME="$work_dir/.config"
+export RDB_NAMESPACE=${RDB_NAMESPACE:-mwd$$}
 
-echo 'file:' $FILE
-
-if [ "$2" == "x" ]; then exit 1 ; fi
-
-tmux has-session -t dev
-if [ $? != 0 ]
-then
-    tmux new-session -s dev -n "TEST" -d
-    tmux split-window -v
-    tmux resize-pane -t dev:0.0 -y 6
-    tmux split-window -h
-    tmux split-window -h
-    tmux split-window -h
-    tmux split-window -h
-    tmux split-window -h
-
-    tmux set -g pane-border-status top
-    tmux set -g pane-border-format "#{pane_index}"
-
-    tmux resize-pane -t dev:0.1 -x 12
-    tmux resize-pane -t dev:0.2 -x 12
-    tmux resize-pane -t dev:0.3 -x 12
-    tmux resize-pane -t dev:0.4 -x 12
-    tmux resize-pane -t dev:0.5 -x 12
-    tmux resize-pane -t dev:0.6 -x 12
-
-    # https://github.com/tmux/tmux/issues/1778
-    # "Probably the enter is being sent before the shell
-    # has started and it is eating it."
-    # Therefore sleep 5 here.
-    sleep 5
-
-    tmux send-keys -t dev:0.0 'xretractor ' $FILE Enter
-    sleep 1
-    tmux send-keys -t dev:0.1 'clear; xqry -s core' Enter
-    sleep 1
-    tmux send-keys -t dev:0.2 'clear; xqry -s agregation' Enter
-    sleep 1
-    tmux send-keys -t dev:0.3 'clear; xqry -s agregationSerialization' Enter
-    sleep 1
-    tmux send-keys -t dev:0.4 'clear; xqry -s agregationMirror' Enter
-    sleep 1
-    tmux send-keys -t dev:0.5 'clear; xqry -s agregationSelective' Enter
-    sleep 1
-    tmux send-keys -t dev:0.6 'clear; xqry -s serialization' Enter
+if [[ "$mode" = x || "$mode" = --compile-only ]]; then
+  cd -- "$work_dir"
+  "$xretractor" -c -q "$query_name"
+  exit 0
 fi
-tmux attach -t dev
+xtrdb=$(command -v "${XTRDB:-xtrdb}")
+[[ "$xtrdb" = /* ]] || xtrdb="$PWD/$xtrdb"
+cd -- "$work_dir"
+"$xretractor" -c -q "$query_name"
+"$xretractor" -q "$query_name" -f -m "$mode" -k
+
+# Przyklady maja po jednej instrukcji SELECT w wierszu. Pokaz tylko strumienie
+# wynikowe, ktore rzeczywiscie deklaruje wybrany plik, po osiem rekordow.
+{
+  while IFS= read -r stream; do
+    printf 'echo %s\nopen %s\nsize\nlist 8\n' "$stream" "$stream"
+  done < <(awk '$1 == "SELECT" {for (i=2; i<NF; i++) if ($i == "STREAM") {print $(i+1); break}}' "$query_name")
+  printf 'quit\n'
+} | "$xtrdb" --noprompt
