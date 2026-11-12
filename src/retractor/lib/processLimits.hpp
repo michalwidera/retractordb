@@ -15,7 +15,7 @@ namespace proclimits {
 /// miekki limit Linuksa: na macOS (domyslnie 256) plan o kMaxPlanStreams strumieni nie miescil sie
 /// w limicie (job macOS 1257, 2026-11-05), a po podniesieniu obie platformy pracuja z ta sama wartoscia.
 inline constexpr rlim_t kOpenFilesTarget = 1024;
-static_assert(2 * rdb::limits::kMaxPlanStreams + rdb::limits::kMaxDumpRetention < kOpenFilesTarget,
+static_assert((2 * rdb::limits::kMaxPlanStreams) + rdb::limits::kMaxDumpRetention < kOpenFilesTarget,
               "kOpenFilesTarget must cover the widest plan and the largest DUMP RETENTION");
 
 struct OpenFilesLimit {

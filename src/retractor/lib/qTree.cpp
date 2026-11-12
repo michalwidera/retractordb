@@ -28,7 +28,7 @@ qTree::qTree(qTree &&other) noexcept { *this = std::move(other); }
 
 qTree &qTree::operator=(qTree &&other) noexcept {
   if (this == &other) return *this;
-  std::vector<query>::operator=(std::move(other));
+  std::vector<query>::operator=(std::move(static_cast<std::vector<query> &>(other)));
   visited_      = std::move(other.visited_);
   adj_          = std::move(other.adj_);
   ans_          = std::move(other.ans_);

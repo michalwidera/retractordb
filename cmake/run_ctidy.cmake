@@ -14,7 +14,7 @@ foreach(ctidy_source IN LISTS ctidy_sources)
 endforeach()
 
 execute_process(
-  COMMAND xargs -r -P 4 "${CLANG_TIDY}" -quiet "-p=${COMPDB_DIR}"
+  COMMAND xargs -r -n 1 -P 4 "${CLANG_TIDY}" -quiet "-p=${COMPDB_DIR}"
   WORKING_DIRECTORY "${SOURCE_DIR}"
   INPUT_FILE "${ctidy_source_list}"
   RESULT_VARIABLE ctidy_result
