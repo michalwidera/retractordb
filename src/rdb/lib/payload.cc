@@ -675,10 +675,10 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
     case rdb::NULLTYPE:
       break;
     case rdb::STRING: {
-      const auto len  = descriptor[position].rlen * descriptor[position].rarray;
-      const auto data = std::get<std::string>(value);
-      auto lenr       = std::min(len, static_cast<int>(data.length()));
-      auto dest       = span().subspan(offsetFlat, len);
+      const auto len   = descriptor[position].rlen * descriptor[position].rarray;
+      const auto &data = std::get<std::string>(value);
+      auto lenr        = std::min(len, static_cast<int>(data.length()));
+      auto dest        = span().subspan(offsetFlat, len);
       RDB_ASSERT(offsetFlat + len <= descriptor.getSizeInBytes(),
                  "payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat, len,
                  descriptor.getSizeInBytes());

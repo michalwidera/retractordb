@@ -96,7 +96,7 @@ else:
     else:
         for i in range(100000 if stream == 'flood' else 3):
             os.write(2, b'diagnostic\n' * 1000)
-            emit('record', stream=stream, values=['10', None, 'null\n"\\ world', '1/3'])
+            emit('record', stream=stream, values=['10', None, 'null\n"\\ world, napis dluzszy niz SSO', '1/3'])
         emit('end', reason='limit')
 '''
 
@@ -165,7 +165,8 @@ def python_fake(binary):
             rows = list(samples)
             assert len(rows) == 3
             assert rows[0]["a"] == [10, None]
-            assert rows[0]["s"] == 'null\n"\\ world'
+            # Napis dluzszy niz bufor SSO: Value przejmuje bufor sterty, a nie kopiuje znaki.
+            assert rows[0]["s"] == 'null\n"\\ world, napis dluzszy niz SSO'
             assert rows[0]["r"] == Fraction(1, 3)
             assert samples.end_reason == "limit"
         reaped(pid)

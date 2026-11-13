@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
           require(row.has_value(), "missing record");
           require(std::get<std::int64_t>(row->values.at("a")[0]) == 10, "array[0]");
           require(std::holds_alternative<std::monostate>(row->values.at("a")[1]), "array NULL");
-          require(std::get<std::string>(row->values.at("s")[0]) == "null\n\"\\ world", "escaped string");
+          require(std::get<std::string>(row->values.at("s")[0]) == "null\n\"\\ world, napis dluzszy niz SSO", "escaped string");
           require(std::get<retractordb::Rational>(row->values.at("r")[0]) == retractordb::Rational{1, 3}, "rational");
         }
         require(!samples.next(2s), "missing end");

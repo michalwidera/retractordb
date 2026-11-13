@@ -131,6 +131,35 @@ TEST(xqry, test_detailShow_found) {
             "core0.rname2 | FLOAT\n");
 }
 
+// Fake z polem o nazwie dluzszej niz bufor SSO: detailShow przenosi nazwe kwalifikowana
+// do wiersza tabeli, wiec przeniesienie dotyczy bufora ze sterty, a nie kopii znakow.
+class qry_fake_long_field : public qry_fake_detail {
+ public:
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override {
+    auto retval = qry_fake_detail::netClient(cmd, arg);
+    if (cmd == "detail") {
+      retval.get_child("db").erase("field");
+      retval.get_child("db").erase("field_type");
+      retval.put("db.field.pole_o_dlugiej_nazwie", "pole_o_dlugiej_nazwie");
+      retval.put("db.field_type.pole_o_dlugiej_nazwie", "INTEGER");
+    }
+    return retval;
+  }
+};
+
+TEST(xqry, test_detailShow_long_field_name) {
+  // covers: qry.qry.13~1
+  qry_fake_long_field obj_detail;
+  EXPECT_EQ(obj_detail.detailShow("core0").value(),
+            "name  | delta | query\n"
+            "------+-------+----------------------------------\n"
+            "core0 | 1     | SELECT * STREAM core0 FROM source\n"
+            "\n"
+            "field                       | type\n"
+            "----------------------------+--------\n"
+            "core0.pole_o_dlugiej_nazwie | INTEGER\n");
+}
+
 // Verify both detail forms return an empty string when the queried stream does not exist -
 // the empty result is what makes the launcher report "no such stream"
 TEST(xqry, test_detailShow_not_found) {

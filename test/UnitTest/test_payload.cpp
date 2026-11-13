@@ -121,6 +121,25 @@ TEST(payload, nullopt_writes_string_fallback_to_memory) {
   EXPECT_FALSE(payload.getItem(0).has_value());
 }
 
+// Napisy dluzsze niz bufor SSO: setItemVT czyta napis przez referencje do wartosci, wiec
+// przyciecie i dopelnienie zerami musza dzialac takze na buforze ze sterty.
+TEST(payload, string_truncated_then_overwritten_with_shorter_is_zero_padded) {
+  // covers: payload.payload.6~1
+  auto desc = rdb::Descriptor("name", 1, 8, rdb::STRING);
+  rdb::payload payload(desc);
+
+  payload.setItem(0, std::string("abcdefghijklmnopqrstuvwxyz0123"));
+  const auto truncated = payload.span().subspan(0, 8);
+  EXPECT_EQ(std::string(truncated.begin(), truncated.end()), "abcdefgh");
+
+  payload.setItem(0, std::string("ab"));
+  const auto padded = payload.span().subspan(0, 8);
+  EXPECT_EQ(padded[0], 'a');
+  EXPECT_EQ(padded[1], 'b');
+  EXPECT_TRUE(std::all_of(padded.begin() + 2, padded.end(), [](uint8_t b) { return b == 0; }));
+  EXPECT_EQ(std::any_cast<std::string>(payload.getItem(0).value()), "ab");
+}
+
 TEST(payload, null_type_round_trips_as_monostate) {
   // covers: payload.payload.3~1, payload.payload.13~1
   auto desc = rdb::Descriptor("nothing", 0, 1, rdb::NULLTYPE);

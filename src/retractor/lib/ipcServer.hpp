@@ -190,7 +190,7 @@ class IpcServer {
 
   /// Wynik jednej porcji drenazu: kolejka pusta, jeszcze nie, albo nie do ponownego uzycia
   /// (blad odbioru, np. not_recoverable, lub budzet odbiorow wyczerpany przed oproznieniem).
-  enum class DrainStep { drained, pending, failed };
+  enum class DrainStep : std::uint8_t { drained, pending, failed };
 
   /// Najwyzej kResponseQueueDrainBatch odbiorow przez uchwyt kolejki, kazdy pomniejsza @p left.
   static DrainStep drainBatch(boost::interprocess::message_queue &queue, boost::interprocess::message_queue::size_type &left,
@@ -287,7 +287,7 @@ class IpcServer {
     std::uint64_t epoch;
   };
   std::map<int, Witness> watched_;
-  std::chrono::steady_clock::time_point nextProbe_{};
+  std::chrono::steady_clock::time_point nextProbe_;
   // Przebieg sondy rozlozony na obroty (#607): caly przebieg w jednym obrocie wydluzal go o ~72 us na
   // subskrybenta (R603G). Kursorem jest klucz ostatnio sprawdzonego klienta, nie iterator - wstawienie
   // i usuniecie wpisu w watched_ w trakcie przebiegu go nie uniewaznia. Pusty: przebieg od poczatku.
