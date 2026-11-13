@@ -85,7 +85,8 @@ Schema schema(const json::object &event) {
 
 Value value(const json::value &raw, const std::string &type) {
   if (raw.is_null()) return std::monostate{};
-  const auto text = string(raw);
+  // Bez const: return text w galezi STRING przenosi napis do Value zamiast go kopiowac.
+  auto text = string(raw);
   if (type == "BYTE" || type == "INTEGER" || type == "UINT") return integer(text);
   if (type == "FLOAT" || type == "DOUBLE") {
     std::size_t end;

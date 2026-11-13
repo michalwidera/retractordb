@@ -588,7 +588,13 @@ std::expected<std::string, selectResult> qry::detailShow(const std::string &inpu
     qualifiedName += name;
     std::string typePath = "db.field_type.";
     typePath += name;
-    fields.push_back({std::move(qualifiedName), ptsh->get<std::string>(typePath)});
+    // push_back({...}) budowal wektor wiersza z initializer_list, ktorej elementy sa const.
+    // std::move(qualifiedName) pozwalalo przeniesc napis do tej listy, ale wektor kopiowal
+    // z niej oba napisy. Budowa wiersza w miejscu pozwala przeniesc je bezposrednio do wektora.
+    auto &row = fields.emplace_back();
+    row.reserve(2);
+    row.emplace_back(std::move(qualifiedName));
+    row.emplace_back(ptsh->get<std::string>(typePath));
   }
 
   // Naglowek strumienia i lista pol to dwie osobne tabele: ich kolumny nie maja ze soba
