@@ -17,6 +17,7 @@ set -euo pipefail
 eproto=$(errno_value EPROTO)
 enoent=$(errno_value ENOENT)
 echild=$(errno_value ECHILD)
+eintr=$(errno_value EINTR)
 
 # expect_exit <nazwa> <kod> <fragment stderr albo ""> <polecenie...>
 expect_exit() {
@@ -55,6 +56,16 @@ printf 'open bad\nquit\n' >xtrdb_cmds.txt
 expect_exit xtrdb_bad_desc 0 "Syntax error @Descriptor" xtrdb <xtrdb_cmds.txt
 grep -qF "descriptor parse failed in 'bad.desc'" xtrdb_bad_desc.out
 cmp bad.desc bad.desc.orig
+
+# (2a) xtrdb z bledna opcja wiersza polecen: komunikat i kod EINTR, jak xretractor i xqry. Do #621
+# wyjatek boost::program_options wychodzil z main i konczyl xtrdb przez terminate (SIGABRT, 134).
+expect_exit xtrdb_unknown_option "$eintr" "unrecognised option '--nosuch'" xtrdb --nosuch </dev/null
+expect_exit xtrdb_missing_value "$eintr" "the required argument for option '--storagemap' is missing" xtrdb -s </dev/null
+if grep -qF 'terminate' xtrdb_unknown_option.err xtrdb_missing_value.err; then
+  echo "xtrdb: bledna opcja zakonczona przez terminate"
+  cat xtrdb_unknown_option.err xtrdb_missing_value.err
+  exit 1
+fi
 
 # (3) Blad skladni w pliku planu: EPROTO i pozycja bledu w `Parse result:`, w -c i w -u.
 # adhoc_parse_error sprawdza start z pliku tylko dla bledow wartosci, nie skladni.
