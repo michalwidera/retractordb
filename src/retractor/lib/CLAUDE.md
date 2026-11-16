@@ -24,7 +24,7 @@ Function names are **not** grammar literals. `function_call` takes a plain `ID`,
 
 **Two-argument functions.** The grammar has exactly two shapes - `f(expr)` and `f(expr : int_const)`. The second belongs to `to_string` alone: `N` (a literal or a `LET` constant `?NAME`, #440) is the declared output field width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two **evaluated** arguments needs one more grammar alternative (`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the arity row - never a `COMMA` separator, see the rule above.
 
-**`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer tokens ahead of `ID` (stream reducers), so they never lex as a function name. A scalar minimum must be called something else.
+**`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer tokens ahead of `ID`, so they never lex as a function name. A scalar minimum must be called something else. The tokens serve two rules, neither of them `function_call`: the stream reducer `MIN(s)` in `FROM`, and the record-window aggregate `MIN(expr : N)` in a `SELECT` expression (`window_agg`, an alternative of `term`), which shares the `expr : N` shape with `to_string` but not its meaning.
 
 ### Descriptor field sizes for STRING expressions in SELECT
 

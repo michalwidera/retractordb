@@ -32,24 +32,11 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
-**macOS**: building there (`scripts/macos-build.sh`) and the differences to keep in mind when reading results (no Valgrind, weaker real time, launchd) are in the `macos-build` skill (`.claude/skills/macos-build/SKILL.md`). Two rules apply to all platform code, and one to its verification:
+**macOS**: building there (`scripts/macos-build.sh`) and the differences to keep in mind when reading results (no Valgrind, weaker real time, launchd) are in the `macos-build` skill (`.claude/skills/macos-build/SKILL.md`). One rule applies to all platform code:
 - **The platform branch is chosen** not by OS name but through `RDB_HAS_*` from `generated/platformConfig.h` (compile probes in `cmake/PlatformChecks.cmake`). New platform code follows the same rule: `#if RDB_HAS_X`, never `#ifdef __APPLE__`.
-- **Exception: canaries.** An OS name may state an expectation, never choose a branch: a check that fails loudly (`#error`, `static_assert`, a failing test, CMake `FATAL_ERROR`) when a probe or a library macro gives a different result than expected on that OS, so that a vanished or renamed macro cannot silently switch the build to a fallback branch and compile its tests out. Use `RDB_OS_LINUX` / `RDB_OS_DARWIN` from `generated/platformConfig.h`, not `__linux__`, and prefer a C++ expression to a preprocessor condition: `static_assert(!RDB_OS_LINUX || RDB_HAS_X, "...")`. In C++ a misspelt or missing constant is a compile error; in `#if` it silently evaluates to 0 (the build has no `-Wundef`), which would switch the canary off. A canary only fails; it never computes, selects or skips anything.
-- **A fallback branch only by declaration**: a probe whose 0 selects the weaker branch must have that 0 declared in `RDB_PLATFORM_FALLBACKS` (empty on Linux; on Darwin it holds the zeros measured on Apple silicon); any undeclared 0 stops the configuration. A new fallback branch means a new entry in the list of controlled probes in `cmake/PlatformChecks.cmake`.
-- **Darwin is not a verification target for platform probes or the ablation floor.** A change to `cmake/PlatformChecks.cmake` or to the probe placement in `CMakeLists.txt`, and the ablation floor, need no run on macOS: the Linux results decide. The report names the Darwin branch as not verified and states its risk in one sentence; that is not a blocker.
+- **Before writing or reviewing platform code, a probe or a fallback branch**, read *Platform code* in that skill: canaries (the only place an OS name may appear), fallback branches declared in `RDB_PLATFORM_FALLBACKS`, and Darwin not being a verification target for probes or the ablation floor.
 
-**CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
-```bash
-ninja test-ci        # = test-ci-commit: the only job CircleCI runs after a push
-ninja test-ci-nightly-debug # Debug job from run_manual_nightly_full, including Valgrind
-ninja test-ci-fast   # same job, build/ kept between runs - quick, NOT a faithful CI run
-scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
-```
-Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`; the exception is `make-build`, which mirrors a job on stock `cimg/base:current`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
-
-By default, local CI profiles start with a fresh build directory and an empty ccache. CircleCI's `build-debug-ninja-mydocker` and `build-release-ninja-mydocker` jobs instead restore ccache by build type, branch and revision, falling back to the branch and then master; before saving they evict entries older than 7200 seconds. The other jobs do not use those restore/save steps. A fresh checkout therefore does not imply a cold compiler cache.
-
-`scripts/test-ci.sh --profile <name> --ccache-volume <volume>` keeps ccache in a named Docker volume across local runs. This models cache reuse, but its contents are independent of CircleCI's cache, so local build times do not establish CI build times. Separately, `test-ci-fast` keeps `build/` in a per-profile Docker volume; use it to check a change before committing, not as evidence of a fresh CI build. `scripts/test-ci.sh --profile <name> --reset-build` drops that kept build directory without clearing an explicitly selected ccache volume.
+**CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker): `ninja test-ci` runs the only job CircleCI runs after a push in a container built from the CI image. It stays outside `all` and outside `ninja test`. The other profiles, the fast variant, ccache volumes and what a local run does not establish about CI are in the `local-ci` skill (`.claude/skills/local-ci/SKILL.md`). Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
 
 Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and adds the `-vg-` integration memory checks (ctest label `valgrind`). When each must be run is in *Session end*. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
@@ -103,7 +90,7 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 How to run one family, and the traps of an A/B comparison, are in the `comparative-measurement` skill (`.claude/skills/comparative-measurement/SKILL.md`).
 
-**Publication embargo.** The corpus is unpublished material awaiting the DEBS submission (`paper-arXiv/debs`). Nothing FROM it leaves this machine: no plan text, no generated data, no generator source, no README prose - not into this repository, not into an issue comment, not into any artifact that gets published. What may be published, and is expected in issue comments, is a REFERENCE to a family by id and domain (`uc02`, mikrosiec) together with measurements DERIVED from it: node counts, instruction counts, times, p-values. The embargo lifts when the paper is out; until then, treat a request to include corpus content as a question for the human.
+**Publication embargo.** The corpus is unpublished research material, and the embargo protects the novelty of its later publication. It covers public material only: nothing FROM the corpus - no plan text, no generated data, no generator source, no README prose - goes into this repository or another public one, into an issue or pull-request comment, or into any artifact that gets published. Private storage is not covered: the `paper-arXiv` repository, local and scratch directories and the measurement worker's disk may hold corpus files and results. What may be published, and is expected in issue comments, is a REFERENCE to a family by id and domain (`uc02`, mikrosiec) together with measurements DERIVED from it: node counts, instruction counts, times, p-values. Only the human lifts the embargo; until then, treat a request to put corpus content into public material as a question for the human.
 
 ## Collaboration Rules
 
@@ -134,30 +121,15 @@ Delegation is the exception, not the default. Measured on 2026-10-03 (the #269 s
 
 **The main session keeps** the goal, the plan, design decisions, root-cause analysis, every conclusion reported to the human, and the commit or handoff; it reads every diff an agent produced before the handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `high` is the default, `xhigh` is for planning compiler or concurrency changes and goes back to `high` for the execution.
 
-Delegate only this:
-
-| Work | Agent | Model |
-|---|---|---|
-| A check that runs 10 minutes or longer (`ninja test-valgrind`, `ninja test_gate`, the ablation suite, a full `ctest`), in the background | `test-runner` | Sonnet |
-| A large, mechanical change under an approved plan (the same edit across many files, a batch of similar tests), outside the engine core | `implementer` | Sonnet |
-| A search across the sibling repositories or deep in the git history that would take the main session more than ~5 searches | `scout` | Sonnet |
-| A rule-conformance review of a finished diff, when the human asks for one | `reviewer` | Sonnet |
-| Settling one stated hypothesis about a hard defect (rare race, flaky test, divergent results), when the human asks for it; one copy per competing hypothesis, run in parallel | `investigator` | Opus |
+Before any Agent call, invoke the `delegation` skill (`.claude/skills/delegation/SKILL.md`): it holds the table of what may be delegated to which agent and the rules for prompts, waiting and reading reports. An agent's report is evidence, not a verdict, and agents never commit, push, open pull requests or touch CI.
 
 **No Haiku.** No agent and no session in this repository runs on Haiku (decision of 2026-10-04). Haiku wrote a plan despite *Who plans* (2026-10-03) and, as `test-runner` in the #374 session, ran its check in the foreground against its own definition, then started a full `ctest` beside the still running `ninja test-valgrind`; the overlapping runs collided on the namespace pool and the result had to be thrown away and repeated. A model that does not keep the rules disrupts the process and costs more than it saves. A new agent definition takes `sonnet` or a more capable model.
 
-Everything else stays in the main session: a short build and `ninja test` (run them plain - the `PreToolUse` hook described under *Build* keeps the full output in a log and returns only the tail; a hand-written `| tail` bypasses the hook and loses the log), searches inside this repository, ordinary edits, debug loops that need the raw output, and the pre-handoff check, which is a script: `scripts/hygiene-check.sh [working|staged|tree]` (exit code 0 = clean, 1 = hits).
+Everything else stays in the main session: a short build and `ninja test` (run them plain - the `PreToolUse` hook described under *Build* keeps the full output in a log and returns only the tail; a hand-written `| tail` bypasses the hook and loses the log), searches inside this repository, ordinary edits, debug loops that need the raw output, and the pre-handoff check, which is a script: `scripts/hygiene-check.sh [working|staged|tree]` (exit code 0 = clean, 1 = hits, 2 = tool or argument error - not a clean result).
 
 **The engine core** is the code that decides what the engine computes or when - `compiler.*`, `SOperations.hpp`, `query.*`, `expressionEvaluator.cpp`, `exprSimplify.*`, `expressionShape.*`, `RQLParser.cpp`, `dataModel.cpp`, `streamInstance.cpp`, `executor_rt.cpp` and anything behind an `RDB_OPT_*` switch - and the code that runs concurrently: `bus.*`, `executorsm*.cpp`, `ipcServer.cpp`, `lockManager.cpp` and signal handlers. The history of semantic and race fixes concentrates there, and an error in it passes compilation and most tests. Core code is written by the main session on Opus; a large mechanical change in it may go to `implementer` with `model: opus`.
 
-- The delegation prompt is short: goal, paths, exact commands or acceptance criteria, expected report. The agent's definition already carries its rules - do not repeat them.
-- Agents load only at session start. If `.claude/agents/` changed during the session, do the work in place - never emulate an agent by pasting its definition into a `general-purpose` prompt.
 - One build or test run at a time on the machine: never let two agents, or an agent and the main session, build, install or test concurrently - not even in different `build/<cfg>` directories, because they share `~/.local/bin` and the `RDB_NAMESPACE` pool (in the #269 session a Debug run in parallel with a Release run tested the Release binaries). `investigator` copies are the exception, because they never touch a shared build directory or install.
-- While an agent runs in the background, wait for its notification: do not poll it (`ps`, `kill -0`, reading its output file), and do not run the same check in the main session. A check is either delegated or run in place - never both.
-- An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run. Reading those lines is the verification - do not repeat the check.
-- Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
-- Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
-- A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
 - Build, test, read-only git commands and `scripts/hygiene-check.sh` are pre-approved in `.claude/settings.json`, so neither the main session nor an agent prompts for them; `git add` / `commit` / `push`, `ninja cformat`, `cmake .` (a reconfigure deletes `build/<cfg>/test`) and `sed` (its `e` command runs a shell command, `w` and `-i` write files) are not, on purpose. The hook refuses `ctest` in script or dashboard mode (`-S`, `-D`, `--script`, `--build-and-test`), which `Bash(ctest *)` would otherwise let through. A permission prompt raised by an agent is a stop signal: read the command before approving it.
 
 ### AI watermark hygiene (text)
@@ -180,14 +152,8 @@ Consequences for the assistant:
 
 - **Never paste model, browser or chat output straight into a source file.** Retype it as ASCII, or clean it before it lands on disk.
 - **Check code immediately after editing it** - right after the edit, before `ninja cformat` and before the build, not at commit time. A defect found at push has already been built and tested against.
-- Code uses **strict mode**, which the default check does not cover:
-
-```bash
-WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
-python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
-```
-
-- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep the file with `--in-place`. The targeted repair is `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by a `git diff` confirming that only the offending codepoint changed.
+- Code uses **strict mode** (`inspect_text.py --aggressive --strip-emoji-glue`), which the default check does not cover; the commands are in the `watermark-check` skill.
+- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep the file with `--in-place`. The targeted repair is in the same skill and ends with a `git diff` confirming that only the offending codepoint changed.
 - Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
 
 ### Commits, push and CI
@@ -196,7 +162,7 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 - **No commit without human review, on any branch.** After verification the assistant shows the diff and stops; `git commit` runs only after an explicit go-ahead for that specific diff, and the go-ahead does not carry over to the next change. Green tests are not the go-ahead: they say the change works, not that it is the change the human wants in the history.
 - **`master`** - protected: nobody commits or pushes to it directly, the human included; changes reach it only through a merged pull request.
 - **`dev/muro`** - takes over the role of `master` locally: side branches start from it, and commits and pushes on it are performed by the human only.
-- **`[DEV:BRANCH]` freezes `master`.** While any issue labelled `[DEV:BRANCH]` is open, its developer branch (`dev/<name>`, named in the epic, e.g. `dev/445-jupyter-epic` for #445) is the main development branch: side branches start from it and their pull requests take it as base. Work and merges into `master` stop, so that `master` cannot drift away from the developer branch; `master` next receives the developer branch itself, through one pull request, when the epic's goal is reached. Work on `master` resumes only after every issue labelled `[DEV:BRANCH]` is closed - one open issue keeps the freeze. A change that must reach `master` during the freeze needs an explicit human decision, recorded in the epic, and is merged into the developer branch right after.
+- **A `[DEV:BRANCH_*]` label freezes `master`.** The label carries the epic's suffix - the only one so far is `[DEV:BRANCH_WHEELS]`, and no label is spelled exactly `[DEV:BRANCH]`, so search by the prefix. While any issue with such a label is open, its developer branch (`dev/<name>`, named in the epic; `dev/445-jupyter-epic` served #445 until that epic closed on 2026-10-13) is the main development branch: side branches start from it and their pull requests take it as base. Work and merges into `master` stop, so that `master` cannot drift away from the developer branch; `master` next receives the developer branch itself, through one pull request, when the epic's goal is reached. Work on `master` resumes only after every issue with such a label is closed - one open issue keeps the freeze. A change that must reach `master` during the freeze needs an explicit human decision, recorded in the epic, and is merged into the developer branch right after.
 - **Side branches** - the assistant may commit locally on that go-ahead. Pushing, opening a pull request or invoking CI needs a separate explicit request; anything that would trigger CI is handed over to the human.
 
 ### Session end
@@ -224,42 +190,13 @@ A check runs because it can see the change: a run that the diff cannot turn red 
 
 A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
 
-**Python binding (#447): mandatory local check.** The binding is maintained, with `xretractor` taking priority. Its check runs locally before the handoff, commit and push under the condition above; it adds no job or step to the `commit` or `manual-nightly-full` workflows, whose builds keep `RDB_PYTHON=OFF`.
+**Python binding (#447): mandatory local check.** The binding is maintained, with `xretractor` taking priority. Its check runs locally before the handoff, commit and push under the condition above; it adds no job or step to the `commit` or `manual-nightly-full` workflows, whose builds keep `RDB_PYTHON=OFF`. Skipped tests are unperformed coverage and must be reported with their reasons. The two routes (`RDB_PYTHON=ON` in `build/Debug`, or `scripts/check-python.sh`), the venv, the explicit mode of the test suite and what to record with the result are in the `python-binding-check` skill (`.claude/skills/python-binding-check/SKILL.md`).
 
-Prepare Debug Conan dependencies and a Python 3.10+ venv with nanobind, NumPy, pytest and torch. `scripts/python-venv.sh` prepares the first three; install torch separately in that venv (CPU is sufficient, no GPU is required).
-
-**Preferred route: `RDB_PYTHON=ON` in `build/Debug`.** Configure it once with `cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE=<repo>/.venv-python/bin/python3 .` (a reconfigure deletes `build/Debug/test`; run `ninja` before `ctest`). Every `ninja` then builds `_core` next to the engine, and `ninja test` runs the binding as two ctest entries labelled `python`: `python_stage` refreshes the package's `.py`/`.pyi` copies next to `_core` (its `POST_BUILD` copy runs only when `_core` relinks), and `python_binding` runs `pytest api/python/tests`. That costs seconds and no second compilation of the engine. `ninja test-valgrind` does not include them. A build without `RDB_PYTHON=ON` registers neither entry.
-
-**Fallback: `scripts/check-python.sh`** for a `build/Debug` that keeps `RDB_PYTHON=OFF`:
-
-```bash
-scripts/check-python.sh --python .venv-python/bin/python3 --jobs 4
-```
-
-The script keeps the separate `build/Check-Python` directory with `RDB_PYTHON=ON`, configures it only on the first run or when the interpreter changes (ninja reconfigures it after CMake changes), rebuilds `_core`, reference `xretractor` and `xqry` and the core no-exceptions compile checks, and runs `ctest -L python` there. Measured on 2026-10-21: a first run from an empty directory takes about 3 min (4 jobs, no ccache), a run with nothing to rebuild about 6 s. It does not install project binaries.
-
-On both routes the ctest entry sets `RDB_PYTHON_MODULE_DIR` and `RDB_XRETRACTOR`, which put `api/python/tests/conftest.py` into explicit mode: missing NumPy or torch, a `_core` from another directory, a stale package copy, or an `xretractor`/`xqry` in `PATH` other than the build's targets fails the run instead of skipping tests. Skipped tests are unperformed coverage and must be reported with their reasons. Record the source revision, build directory, interpreter, pytest summary and elapsed time; `ctest -N -V -R python_binding` shows the interpreter, `_core` directory and reference paths, and JUnit results are stored in `<build>/python-test-results.xml`.
-
-**Why Valgrind runs locally.** The commit workflow on CircleCI does not run Valgrind (executor resource limits); only `run_manual_nightly_full` does, so without the local run a memory defect can sit in the history for up to two weeks.
+**Why Valgrind runs locally.** The commit workflow on CircleCI does not run Valgrind (executor resource limits); only the `manual-nightly-full` workflow does (pipeline parameter `run_manual_nightly_full`), so without the local run a memory defect can sit in the history for up to two weeks.
 
 **Research gate.** Deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it implicitly. It is directional: a result worse than the reference is an **error**; equal passes; better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as passed - report it as such.
 
-**Ablation floor.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there, and that invariant rots silently (the `>N` tail rule change of 2026-08-07 broke it unnoticed for twelve days). Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite:
-
-```bash
-scripts/buildrdb.sh release-ablation     # interactive: set every RDB_OPT_* switch OFF, probe OFF
-A=<directory printed by the script>
-(
-  export PATH="$A/src/retractor:$A/src/rdb:$A/src/qry:$PATH"
-  command -v xretractor xtrdb xqry &&   # each must print a path under $A/src/
-  xretractor --build-info &&          # every RDB_OPT_* and RDB_BENCH_PROBE must be OFF
-  ctest --test-dir "$A/test" -j 4 --output-on-failure
-)
-```
-
-`release-ablation` prints this command with the selected build's paths after building and verifying its configuration. Run it after the executable/fixture provenance checks above and in `test/CLAUDE.md`, including byte comparisons and inspection of explicit build-tree paths. The subshell keeps the ablation PATH local to this run; before ordinary Debug integration and Valgrind tests, follow the build/install sequence in `test/CLAUDE.md`.
-
-**The floor tests the all-off binaries only with that `PATH` prefix.** Integration tests call `xretractor`, `xqry` and `xtrdb` by name, and the CTest file of every build directory only *appends* the install directory to the caller's `PATH`, so a plain `ctest --test-dir "$A/test"` runs whatever the caller's `PATH` finds first - normally the Debug install in `~/.local/bin`. On 2026-10-04 (#328) a 348/348 green ablation run turned out to have tested the Debug engine in every by-name integration test. Report the three resolved paths with the result. Never `ninja install` the ablation directory instead: it would overwrite `~/.local/bin` with a Release build and break the next Debug `ctest` (see *Namespaces* in `test/CLAUDE.md`).
+**Ablation floor.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there, and that invariant rots silently (the `>N` tail rule change of 2026-08-07 broke it unnoticed for twelve days). Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite against it. The commands, the `PATH` prefix without which the run tests the Debug install instead of the all-off engine (#328), and the provenance checks are in the `ablation-floor` skill (`.claude/skills/ablation-floor/SKILL.md`): invoke it before the run, and report the three resolved program paths with the result.
 
 Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. Any difference the switches do show belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (`paper-arXiv/debs/research_plan.md` §14.20). CI runs the same floor as `ablation-all-off` in `manual-nightly-full` on the 5th and 20th of every month - up to two weeks too late to replace the local run.
 

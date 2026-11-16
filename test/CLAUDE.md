@@ -55,49 +55,19 @@ Two traps it works around, both found the hard way:
 - `ctest --show-only` (used to map test names to working directories) **overwrites `LastTest.log`**, so the log is read into memory before that call and copied into the report.
 - CTest does **not** clear `LastTestsFailed.log` after a green run, so a stale entry would produce a report for a test that just passed. The CI status is passed in explicitly, and entries are cross-checked against `LastTest.log`.
 
-### A handler that fails silently
+### Fault hooks for races - where the test histories are
 
-`it_show_handler_failure` guards the other half of that same 2026-09-04 investigation. The `show` command writes nothing into its reply even when the subscription **succeeds**, so a swallowed exception produced a reply indistinguishable from success: the client started its producer thread and reported a missing response queue a second later, one step away from the cause. The reply now carries `error.response`, and the client checks it exactly as it already checked the reply to `get`.
+A race cannot be ordered on demand, and a timing probe measures whether the window closed in time, not whether it is gone. A test that guards a race therefore opens the window through a fault hook read by the engine (`git grep -o 'RDB_FAULT_[A-Z_]*' -- src` lists them) and asserts on an observable that cannot lie. Do not assert on the server's stdout redirected to a file: it is block-buffered, and a grep reports a gate that is merely unflushed as a gate that is stuck. A fix with two sides gets one check per side, including the mirror defect, so that a "refuse always" fix cannot pass.
 
-A CI race cannot be ordered on demand, so the test forces the failure through the `RDB_FAULT_SHOW` hook read by the handler. Without the fix the test goes red on both counts: the client's log lacks the server's reason and still carries `did not appear after`.
+The history of each such test - the defect, the window, the hook, what the test does not cover - is in the `README.md` of its directory under `test/IntegrationTest/`; read it before changing the test or the code it guards:
 
-### The `--xqrywait` gate
-
-`it_xqrywait_gate` guards two properties of the `-x` gate, both broken until 2026-09-04 and both fixed by the same change (the gate now waits on its own latch instead of borrowing `iLoopLimitCnt`).
-
-- **A command from the startup window must lift the gate.** The lock file's `PID:` line - the `server_start` contract - is published well before `dataModel` is built, and the gate flag was set only after. The window measured ~90 ms for a 120-stream plan, and a command landing in it was lost: the server waited for the *next* one. Reproduced 5/5.
-- **`--llimitqry` must survive the gate.** The gate flag lived in the slot-budget counter, so lifting it wrote back "unbounded": `xretractor -m 5` exited on its own, `xretractor -x -m 5` ran forever. Deterministic, no race involved.
-
-The observable for both is the same and unambiguous: with `-m 5` a server whose gate was lifted exits by itself. Do **not** assert on the server's stdout instead - redirected to a file it is block-buffered, and a grep will report a gate that is merely unflushed as a gate that is stuck. That mistake produced a false 5/5 during this investigation before it was caught.
-
-Part A is timing-assisted: it can pass falsely if the window closes before `xqry` starts, but it cannot fail falsely, so it is repeated three times.
-
-A third property was added on 2026-09-06: **a stop signal must lift the gate too.** The wait was untimed and watched only the first-command latch, while `handleSignal` sets nothing but the loop counter (`notify_all` is not async-signal-safe), so nothing could interrupt it: `xretractor -x` that never received a command survived `SIGTERM` and needed `SIGKILL` - systemd waited out the whole `TimeoutStopSec`. The gate now waits in 100 ms steps and also watches `stop_now`. The test sends **no** command at all, and additionally asserts the storage file stays empty: a server stopped at the gate must not compute the ZERO-step record nobody asked for.
-
-### The lost first row
-
-`it_xqrywait_first_row` guards the other end of that same gate. The command that *lifts* the gate and the command that *creates the client's response queue* were two different commands: `xqry -s` sent `get` first (to validate the stream name) and subscribed only with the later `show`, while the queue is created server-side inside the `show` handler. Between the two the server was already computing and broadcasting to nobody, and at a 1/8 s tick every 125 ms of that gap is one row lost for good. Locally the gap is milliseconds; on a loaded CI container it exceeded the tick, and on 2026-09-08 `it_null_divide_by_zero` received rows 2-4 (`null, 20, null`) instead of 1-3.
-
-The fix has two halves that break separately, so the test has a part for each:
-
-- **The client subscribes with its first command** - `show` before `get` (`qry.cpp`), and before `detail` on the JSON path (`jsonOutput.cpp`).
-- **The gate is lifted by a command that has been *handled*, not merely received** (`ipcServer.cpp`, callback `onCommandHandled`). The reorder alone is not enough: signalling on receipt let the processing loop past the gate before the `show` handler registered the subscriber. `subscribe()` then ran under `plan_epoch_mutex`, the same lock a slot takes, so that residual race was decided on acquiring the lock - nanoseconds, and unorderable by hand. Since #283 `subscribe()` runs outside that lock, and the order still holds because registration finishes before the handler returns.
-
-Neither window can be opened with a clock, so each part widens its own through a fault hook, the same route as `RDB_FAULT_PLAN_SWAP_DELAY`: `RDB_FAULT_GET_AWAIT_EPOCH_SWAP` for the client half and `RDB_FAULT_SHOW_DELAY` (a sleep at the top of `commandProcessor`, *before* the epoch lock is taken - inside it, the sleep would stall the slot and hide the very window under test) for the server half. A timing probe would be worthless here: it would measure whether the window closed in time, not whether it is gone.
-
-What this test does **not** cover: the gate is still lifted by *any* command, including someone else's (`hello` from a neighbouring `xqry -l`) - that is the contract `it_xqrywait_gate` pins. A server whose gate was lifted by another process computes without a subscriber and its rows are lost exactly as before. The fix covers the case where the client is first, which is all fourteen `-x` + `ONESHOT` tests in this tree.
-
-### The double plan reload
-
-`it_service_reset_double` guards the bus reservation against two reloads overlapping in time. A bus slot holds **exactly one** reservation; `resetCommit` took it at *accept* time, while the request flag was cleared at the *start* of `applyPendingPlan`, ~60 lines before `activateReservedPlan`. A reload accepted inside that window overwrote the reservation of the plan then being installed: the outgoing plan activated a foreign reservation (advertising streams it does not compute) and the next epoch found nothing to activate - `FatalError`, which under `--service` also clears the query file, so the unit came back **with no plan**. Two operators running `xqry --reset` at once were enough.
-
-Racing it by hand cost a stagger sweep (one hit in fourteen), so the window is opened by the `RDB_FAULT_PLAN_SWAP_DELAY` hook, the same route as `RDB_FAULT_GET_AWAIT_EPOCH_SWAP`. The test checks four things, because the fix has two sides that break separately: a reload sent before the swap starts is refused, one sent **inside** the window is refused (the regression proper), the server survives and the accepted plan really took over, and - the mirror defect - a reload sent **after** the swap is accepted again. Without that last check, a "refuse always" fix would pass.
-
-### The signal handler that logged
-
-`it_signal_stop` guards #284: `handleSignal` may only store two lock-free atomics - the signal number (`receivedSignal`) and `stop_now` - and `run()` logs `Received SIG..., initiating shutdown...` after the epoch loop. Until 2026-10-04 the handler logged through `SPDLOG_WARN`, which takes the sink mutex: a signal delivered to a thread already inside a log call deadlocked the handler, `stop_now` was never set, and the process survived until `SIGKILL`.
-
-Part A sends `SIGTERM`, `SIGINT` and `SIGHUP` from outside in each mode - idle, the `-x` gate, the slot loop - and requires a self-exit with code 0 (the unchanged contract) plus, outside Release, the log line. It proves stopping works, not that the deadlock is gone: an external `kill` lands in the logging window only by chance. Part B opens that window deterministically through the `RDB_FAULT_SIGNAL_IN_LOG=<signum>` hook, a sink that raises the signal from inside `sink_it_`, i.e. with the sink mutex held. Against the old handler in Debug it hangs every run. In Release `SPDLOG_WARN` is compiled out, so part B passes even without the fix - the defect is visible only in Debug and RelWithDebInfo.
+| Test | Guards | Hook |
+|---|---|---|
+| `it_show_handler_failure` | the `show` reply carries `error.response` instead of failing silently | `RDB_FAULT_SHOW` |
+| `it_xqrywait_gate` | the `-x` gate is lifted by a command from the startup window and by a stop signal, and keeps `--llimitqry` | none; part A is timing-assisted and repeated three times |
+| `it_xqrywait_first_row` | no row is lost between lifting the gate and the client's subscription | `RDB_FAULT_GET_AWAIT_EPOCH_SWAP`, `RDB_FAULT_SHOW_DELAY` |
+| `it_service_reset_double` | two plan reloads overlapping in time | `RDB_FAULT_PLAN_SWAP_DELAY` |
+| `it_signal_stop` | the signal handler stores two atomics and logs nothing (#284); part B bites only outside Release | `RDB_FAULT_SIGNAL_IN_LOG` |
 
 ### Namespaces
 
@@ -111,7 +81,7 @@ cmake . && ninja && ninja install && ctest
 ```
 Before `ctest`, confirm with `cmp -s` that each installed project binary selected by the test matches its final build target, as required above.
 
-Not every call goes by name. As of 2026-10-03 the build-tree target is named directly - `${CMAKE_BINARY_DIR}/src/<dir>/<program>` in the command, or `$<TARGET_FILE:...>` passed to a script - for `xtrdb` in 29 directories, `xretractor` in 13 and `xqry` in 3, often next to a by-name call of another program in the same test. A list of such directories went stale within weeks (it named four), so the provenance check decides per program, from the registered command (`ctest -N -V -R '<test name>'`) and the scripts it runs: a build-tree path is checked as that path, a bare name through the CTest `PATH` lookup above. Cases with a known history:
+Not every call goes by name. Many directories name the build-tree target directly - `${CMAKE_BINARY_DIR}/src/<dir>/<program>` in the command, or `$<TARGET_FILE:...>` passed to a script - for `xtrdb`, `xretractor` or `xqry`, often next to a by-name call of another program in the same test. Neither a list of such directories nor a count of them survives here: the list went stale within weeks (it named four) and the count of 2026-10-03 within six, so the provenance check decides per program, from the registered command (`ctest -N -V -R '<test name>'`) and the scripts it runs: a build-tree path is checked as that path, a bare name through the CTest `PATH` lookup above. Cases with a known history:
 
 - `service_idle` passes `$<TARGET_FILE:xretractor>` to `service-idle.sh`, deliberately. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression.
 - `ipc_identity_lock` and `leftover_sweep` (both since `5853a83e`, #241) pass `$<TARGET_FILE:xretractor>` and `$<TARGET_FILE:xqry>` to `verify.py`. The tree records no reason for that choice.
