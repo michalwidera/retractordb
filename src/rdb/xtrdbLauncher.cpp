@@ -45,8 +45,9 @@ namespace {
 constexpr int kHelpColumnWidth = 32;
 }
 
-// Jedyna ścieżka wyjątku to std::format_error z std::print w nagłówkach systemowych <print>/<format>;
-// łańcuchy formatujące są stałymi compile-time i nie rzucają.
+// Błędy wiersza poleceń (po::error) łapie blok przy parsowaniu opcji; do #621 wychodziły z main
+// i kończyły proces przez terminate. Pozostała ścieżka wyjątku to std::format_error z std::print
+// w nagłówkach systemowych <print>/<format>; łańcuchy formatujące są stałymi compile-time i nie rzucają.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char *argv[]) {
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
@@ -72,8 +73,15 @@ int main(int argc, char *argv[]) {
   }
 
   po::variables_map vm;
-  po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
-  po::notify(vm);
+  try {
+    po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
+    po::notify(vm);
+  } catch (const po::error &e) {
+    // Ten sam kod co xretractor i xqry przy blednej opcji (EINTR).
+    std::println(std::cerr, "{}: {}", argv[0], e.what());
+    spdlog::shutdown();
+    return static_cast<int>(std::errc::interrupted);
+  }
 
   if (vm.contains("noprompt")) cliNoPrompt = true;
 
