@@ -1,0 +1,35 @@
+# Plan testu it_issue626_r1_var_guard-value (#626). Kazda para ref_* / opt_* liczy to samo:
+# ref_* czyta przeplot NAZWANYCH przesuniec (nie sa substratami, wiec R1 ich nie dopasuje),
+# opt_* - przeplot anonimowych (A>2)#(B>1), ktory R1 przepisalby na (A#B)>3 z ogonem 0 zamiast 2.
+# Straznik #626 wylacza R1 w planie z VAR, wiec obie strony maja byc bajtowo rowne.
+DEFAULT VOLATILE
+DECLARE value INTEGER STREAM A, 1/10 TEXTFILE 'source.txt'
+DECLARE value INTEGER STREAM B, 1/5 TEXTFILE 'source.txt'
+DECLARE pulse INTEGER STREAM clock_src, 1/15 TEXTFILE 'source.txt'
+
+VAR ticks = 0
+VAR ref_hits = 0
+VAR opt_hits = 0
+
+# Licznik niezalezny od przepisywanego podplanu: rosnie o 1 w kazdym slocie 1/15.
+SELECT clock_src.pulse STREAM ticker FROM clock_src
+RULE tick_counter ON ticker WHEN ticker[0] >= 0 DO SET ?ticks = ?ticks + 1
+
+SELECT * STREAM shifted_a FROM A>2
+SELECT * STREAM shifted_b FROM B>1
+
+# 1. Odczyt VAR w przepisywanym SELECT.
+SELECT ?ticks STREAM ref_read FROM shifted_a#shifted_b PERSISTENT
+SELECT ?ticks STREAM opt_read FROM (A>2)#(B>1) PERSISTENT
+
+# 2. Odczyt VAR u konsumenta wezla, ktory sam VAR nie czyta.
+SELECT * STREAM ref_plain FROM shifted_a#shifted_b
+SELECT * STREAM opt_plain FROM (A>2)#(B>1)
+SELECT ?ticks STREAM ref_down FROM ref_plain PERSISTENT
+SELECT ?ticks STREAM opt_down FROM opt_plain PERSISTENT
+
+# 3. Regula DO SET na przepisywanym strumieniu zmienia wynik strumienia spoza podplanu.
+RULE ref_mark ON ref_plain WHEN ref_plain[0] >= 0 DO SET ?ref_hits = ?ref_hits + 1
+RULE opt_mark ON opt_plain WHEN opt_plain[0] >= 0 DO SET ?opt_hits = ?opt_hits + 1
+SELECT ?ref_hits STREAM ref_hits_out FROM clock_src PERSISTENT
+SELECT ?opt_hits STREAM opt_hits_out FROM clock_src PERSISTENT

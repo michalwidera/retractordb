@@ -2395,6 +2395,15 @@ std::string compiler::computeStartupLatency() {
 }
 
 std::string compiler::factorMatchedHashTimeMoves() {
+  // Strażnik #626. R1 zachowuje interwał i origin, ale może skrócić ogon, a rekord n powstaje
+  // w slocie (n+1+W)*Delta. Odczyt ?VAR zwraca wartość zatwierdzoną na końcu poprzedniego slotu
+  // (#531, D1), więc krótszy ogon zmienia WARTOŚĆ rekordu, nie tylko opóźnienie - a przełącznik
+  // RDB_OPT_* wolno zmieniać tylko to drugie. Tak samo przesuwa się chwila reguły DO SET na
+  // przepisanym strumieniu lub za nim. Plan bez SET nie wystarcza jako warunek: ad hoc dołącza
+  // RULE ... DO SET do strumienia planu w locie (D7), choć nowej VAR nie zadeklaruje. Dlatego
+  // każda zadeklarowana VAR wyłącza regułę w całym planie.
+  if (!coreInstance.variables.empty()) return {"OK"};
+
   auto findUniqueQueryIndex = [this](const std::string &id) {
     size_t found = coreInstance.size();
     for (size_t i = 0; i < coreInstance.size(); ++i) {

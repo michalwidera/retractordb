@@ -1,0 +1,7 @@
+# Plan testu it_issue626_r1_var_guard-fires (#626): ten sam przeplot co w var.rql, ale bez
+# zadnej VAR - straznik #626 nie moze tu wylaczyc R1.
+DEFAULT VOLATILE
+DECLARE value INTEGER STREAM A, 1/10 TEXTFILE 'source.txt'
+DECLARE value INTEGER STREAM B, 1/5 TEXTFILE 'source.txt'
+
+SELECT * STREAM opt_plain FROM (A>2)#(B>1)
