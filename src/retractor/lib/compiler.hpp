@@ -63,6 +63,7 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 ///   a plan, w którym jego typ nie jest typem zmiennej z deklaracji albo nie daje się ustalić, odrzucać z pozycją celu, nazwą reguły i oboma typami (D4);
 ///   regułę SET na rodzinie generatora strumieni odrzucać, bo jej kopie w instancjach pisałyby jedną zmienną z tym samym numerem w tekście.
 /// - [compiler.compiler.16~1] w odmowie niezgodnego typu prawej strony SET (D4) podpowiadać deklarację `VAR <nazwa> : <typ wyrażenia> = ...`, gdy typ wyrażenia jest skalarem INTEGER, UINT, FLOAT, DOUBLE albo RATIONAL (#546, H4); dla innych typów zostawiać komunikat bez podpowiedzi.
+/// - [compiler.compiler.17~1] nie stosować faktoryzacji przesunięć przez przeplot w planie deklarującym choćby jedną zmienną VAR (#626), bo skrócony ogon zmieniałby wartość odczytu ?VAR i chwilę wykonania reguły DO SET, także reguły dołączonej później ad hoc.
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
   compiler() = delete;
