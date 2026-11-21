@@ -115,13 +115,13 @@ def make_sub(name, src, target):
 def _dehash_delta(src, other, symbol):
     if other == src.delta:
         raise PlanError(f"{symbol} wymaga argumentu różnego od interwału źródła")
-    delta = src.delta * other / abs(src.delta - other)
-    # Składowa rozplotu nie może być szybsza od strumienia rozplatanego -
-    # kompilator odrzuca taki plan ("You cannot make faster div from slower
-    # source", compiler.cpp:103 i :123).
-    if src.delta > delta:
-        raise PlanError(f"{symbol} nie może dać składowej szybszej od źródła")
-    return delta
+    # Argument to interwał drugiej składowej przeplotu, a przeplot jest szybszy od
+    # obu składowych - kompilator odrzuca argument krótszy od interwału źródła
+    # ("shorter than the source interval", compiler.cpp, gałęzie STREAM_DEHASH_DIV
+    # i STREAM_DEHASH_MOD). Wynik jest wtedy zawsze wolniejszy od źródła.
+    if other < src.delta:
+        raise PlanError(f"{symbol} wymaga argumentu dłuższego od interwału źródła")
+    return src.delta * other / (other - src.delta)
 
 
 def make_theta(name, src, other):
