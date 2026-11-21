@@ -41,6 +41,34 @@ def tailRows : List String := Id.run do
           rows := rows ++ [s!"    \{{a}, {b}, {wa}, {wb}, {tail}},"]
   return rows
 
+/- Mapy odczytu operatorow afinicznych: c = 0 (Add, Mod, AGSE), c = q-1 (Subtract), c = p-1 (Div). -/
+def affineReadRows : List String := Id.run do
+  let mut rows := []
+  for p in List.range' 1 8 do
+    for q in List.range' 1 8 do
+      for c in [0, q - 1, p - 1].eraseDups do
+        for n in List.range 24 do
+          rows := rows ++ [s!"    \{{p}, {q}, {c}, {n}, {affineRead p q c n}},"]
+  return rows
+
+def affineTailRows : List String := Id.run do
+  let mut rows := []
+  for p in List.range' 1 8 do
+    for q in List.range' 1 8 do
+      for c in List.range 12 do
+        for ws in List.range 4 do
+          rows := rows ++ [s!"    \{{p}, {q}, {c}, {ws}, {affineTail p q c ws}},"]
+  return rows
+
+def agseOriginRows : List String := Id.run do
+  let mut rows := []
+  for f in List.range' 1 6 do
+    for h in List.range' 1 6 do
+      for w in List.range' 1 6 do
+        for os in List.range 4 do
+          rows := rows ++ [s!"    \{{f}, {h}, {w}, {os}, {agseOrigin f h w os}},"]
+  return rows
+
 def emitTable (decl : String) (rows : List String) : IO Unit := do
   IO.println s!"inline constexpr {decl}[] = \{"
   for row in rows do
@@ -66,6 +94,24 @@ def main : IO Unit := do
   IO.println "  int a, b, wa, wb, tail;"
   IO.println "};"
   IO.println ""
+  IO.println "// affineRead p q c n = (n*p + c)/q."
+  IO.println "struct AffineReadRow {"
+  IO.println "  int p, q, c, n, read;"
+  IO.println "};"
+  IO.println ""
+  IO.println "// affineTail p q c Ws."
+  IO.println "struct AffineTailRow {"
+  IO.println "  int p, q, c, ws, tail;"
+  IO.println "};"
+  IO.println ""
+  IO.println "// agseOrigin F h w Os."
+  IO.println "struct AgseOriginRow {"
+  IO.println "  int f, h, w, os, origin;"
+  IO.println "};"
+  IO.println ""
   emitTable "InterleaveRow kInterleaveRows" interleaveRows
   emitTable "SubtractRow kSubtractRows" subtractRows
   emitTable "TailRow kTailRows" tailRows
+  emitTable "AffineReadRow kAffineReadRows" affineReadRows
+  emitTable "AffineTailRow kAffineTailRows" affineTailRows
+  emitTable "AgseOriginRow kAgseOriginRows" agseOriginRows

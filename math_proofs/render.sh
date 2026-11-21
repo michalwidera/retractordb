@@ -24,7 +24,7 @@ mkdir -p build/verso/text
 python3 render_text.py build/verso/html-single/index.html \
   build/verso/text/all-proofs.txt
 
-for chapter in interleave-covering deinterleave exact-invertibility event-order sum-commutativity shift-matching; do
+for chapter in interleave-covering deinterleave exact-invertibility event-order sum-commutativity shift-matching startup-boundaries; do
   python3 render_text.py "build/verso/html-multi/$chapter/index.html" \
     "build/verso/text/$chapter.txt"
 done

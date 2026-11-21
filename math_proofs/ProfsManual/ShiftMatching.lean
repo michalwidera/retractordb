@@ -249,7 +249,10 @@ theorem causalInterleave_tail_exact (a b : ℕ) (ha : 0 < a) (hb : 0 < b)
 ```
 
 Teza łączna używa już operatora przyczynowego `causalShift`.
-`causal_shift_matching_read` przenosi pomocniczą tożsamość indeksową na
+`delayed_interleave_values` przepisuje pomocniczą tożsamość na indeksy
+opóźnione: dla `i+k ≤ n` przeplot składowych czytanych pod `j-i` i `j-k`
+w slocie `n` daje to samo co przeplot nieprzesunięty w slocie `n-(i+k)`.
+`causal_shift_matching_read` przenosi ją na
 odczyt starszych rekordów i porównuje `Option` pod każdym indeksem,
 również przed początkiem. `available n slot` oznacza, że rekord istnieje
 oraz `n+1+tail ≤ slot`; dla dodatniego wspólnego interwału slot wyznacza

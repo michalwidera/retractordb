@@ -5,6 +5,7 @@ import ProfsManual.ExactInvertibility
 import ProfsManual.EventOrder
 import ProfsManual.SumCommutativity
 import ProfsManual.ShiftMatching
+import ProfsManual.StartupBoundaries
 
 open Verso.Genre Manual
 
@@ -26,3 +27,5 @@ dowodem zgodności całej implementacji C++ z tym modelem.
 {include 1 ProfsManual.SumCommutativity}
 
 {include 1 ProfsManual.ShiftMatching}
+
+{include 1 ProfsManual.StartupBoundaries}

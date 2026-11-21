@@ -23,7 +23,7 @@ składową z funkcją sufitu. Symetryczna różnica obu zbiorów pozycji jest
 równa zbiorowi dodatnich liczb całkowitych, więc zbiory są rozłączne i
 razem pokrywają wszystkie dodatnie pozycje. Moduł pomocniczy
 `Profs/BeattyPartition.lean` dowodzi też, że obie funkcje pozycji są
-ściśle rosnące, a pozycja zero należy do reszty.
+ściśle rosnące, a pozycja zero należy do reszty (`zero_is_residue`).
 
 ```anchor partition -showProofStates (module := Profs.BeattyPartition)
 theorem positive_positions_partition (a b : ℕ) (ha : 0 < a) (hb : 0 < b) :

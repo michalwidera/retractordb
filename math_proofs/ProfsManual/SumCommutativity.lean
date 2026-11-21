@@ -13,7 +13,9 @@ file := "sum-commutativity"
 Suma strumieni pobiera próbki obu argumentów z odstępu wyjściowego
 równego minimum ich odstępów. Wynikiem jest para atrybutów; po zamianie
 argumentów zmienia się tylko kolejność pól w tej parze. `sample_self`
-potwierdza, że szybszy strumień jest próbkowany bez zmiany indeksu.
+potwierdza, że szybszy strumień jest próbkowany bez zmiany indeksu, a
+`sum_fast_left` zapisuje sumę przy `Δ_A ≤ Δ_B` wprost: ma odstęp `Δ_A` i czyta
+`A` pod indeksem `n`, a `B` pod indeksem `sampleIndex Δ_B Δ_A n`.
 
 Formalizacja dotyczy wartości i odstępu. Taki sam porządek pól,
 nazwy deskryptora oraz mapy `NULL` wymagają dodatkowych założeń o
