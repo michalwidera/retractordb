@@ -1277,3 +1277,298 @@ TEST(ProofOracle, recordWindowTail_exact) {
     }
   }
 }
+
+namespace {
+
+// Plan ze wszystkimi wierszami Tabeli 1 (PlanInstances.lean) do osmiu poziomow, z niezerowymi
+// poczatkami i ogonami: przesuniecie, przeplot, AGSE, projekcja, Theta, ~Theta, redukcja krotek,
+// okno rekordowe, suma i roznica. Przeplot wymaga tych samych schematow, wiec jego strony sa
+// wyrownane projekcja do jednego pola. Niepusty dir poprzedza nazwy plikow zrodel i jest katalogiem
+// STORAGE wykonania.
+std::string deepPlanText(const std::string &dir) {
+  return (dir.empty() ? std::string() : std::format("STORAGE '{}'\n", dir)) + std::format(R"(
+DECLARE v INTEGER STREAM pa, 2/10 TEXTFILE '{0}a.txt'
+DECLARE v INTEGER STREAM pb, 3/10 TEXTFILE '{0}b.txt'
+DECLARE x INTEGER, y INTEGER, z INTEGER STREAM pc, 1/10 TEXTFILE '{0}c.txt'
+SELECT * STREAM b2 FROM pb>2
+SELECT * STREAM h1 FROM pa#b2
+SELECT * STREAM g1 FROM pc@(2,4)
+SELECT * STREAM h1s FROM h1>1
+SELECT h1[0]+1 STREAM p2 FROM h1
+SELECT * STREAM t2 FROM h1&3/10
+SELECT * STREAM m2 FROM h1%3/10
+SELECT * STREAM r2 FROM MIN(g1)
+SELECT MIN(g1[0] : 3), SUMC(g1[1] : 5) STREAM w2 FROM g1
+SELECT * STREAM s3 FROM t2+h1s
+SELECT * STREAM d3 FROM p2-3/10
+SELECT w2[0]+w2[1] STREAM w3 FROM w2
+SELECT * STREAM x3 FROM w3#m2
+SELECT s3[0]+s3[1] STREAM s4 FROM s3
+SELECT * STREAM y4 FROM s4#d3
+SELECT * STREAM z4 FROM x3>2
+SELECT * STREAM a5 FROM y4@(1,2)
+SELECT MAX(y4[0] : 4) STREAM r5 FROM y4
+SELECT * STREAM q5 FROM a5+z4
+)",
+                                                                                          dir);
+}
+
+// Odczyt w modelu PlanComposition.lean: wezel wejsciowy i indeks jego rekordu (ujemny nie istnieje).
+struct PlanRead {
+  std::string input;
+  std::int64_t index;
+};
+
+// reads n (deps = false) albo deps n (deps = true) wezla q w postaci z PlanInstances.lean, z map
+// silnika (dataModel::queryInputsAvailable). Rozni je tylko przeplot: czyta jeden rekord, a jego
+// poczatek to wspolny prog obu wejsc (originReady).
+std::vector<PlanRead> planReads(qTree &instance, const query &q, int n, bool deps) {
+  const auto &op          = q.lProgram.back();
+  const std::string first = q.lProgram.begin()->getStr_();
+  const auto second       = [&] { return std::next(q.lProgram.begin()); };
+  const auto deltaOf      = [&](const std::string &id) { return instance.getQuery(id).rInterval; };
+  std::vector<PlanRead> reads;
+  switch (op.getCommandID()) {
+    case PUSH_STREAM: {
+      // Projekcja czyta rekord n, okno rekordowe rekordy n-(N-1) ... n przy najszerszym N.
+      int width = 1;
+      for (const auto &group : q.windowGroups)
+        width = std::max(width, group.width);
+      for (int k = 0; k < width; ++k)
+        reads.push_back({first, n - k});
+    } break;
+    case STREAM_TIMEMOVE:
+      reads.push_back({first, n - std::get<int>(op.getVT())});
+      break;
+    case STREAM_SUM:
+    case STREAM_AVG:
+    case STREAM_MIN:
+    case STREAM_MAX:
+      reads.push_back({first, n});
+      break;
+    case STREAM_SUBTRACT:
+      reads.push_back({first, Subtract(deltaOf(first), op.getRI(), n)});
+      break;
+    case STREAM_DEHASH_DIV:
+      reads.push_back({first, Div(q.rInterval, second()->getRI(), n)});
+      break;
+    case STREAM_DEHASH_MOD:
+      reads.push_back({first, Mod(second()->getRI(), q.rInterval, n)});
+      break;
+    case STREAM_ADD:
+      reads.push_back({first, Add(q.rInterval, deltaOf(first), n)});
+      reads.push_back({second()->getStr_(), Add(q.rInterval, deltaOf(second()->getStr_()), n)});
+      break;
+    case STREAM_AGSE: {
+      const auto [step, length] = std::get<std::pair<int, int>>(op.getVT());
+      const int fields          = instance.getQuery(first).descriptorStorage().flatElementCount();
+      for (int k = 0; k < std::abs(length); ++k)
+        reads.push_back({first, floorDiv(static_cast<std::int64_t>(n) * step - k, fields)});
+    } break;
+    case STREAM_HASH: {
+      const std::string other = second()->getStr_();
+      if (deps) {
+        const auto [a, b] = ratioOf(deltaOf(first), deltaOf(other));
+        reads.push_back({first, indexA(a, b, n)});
+        reads.push_back({other, indexB(a, b, n)});
+      } else {
+        int position          = 0;
+        const bool takeSecond = Hash(deltaOf(first), deltaOf(other), n, position);
+        reads.push_back({takeSecond ? other : first, position});
+      }
+    } break;
+    default:
+      ADD_FAILURE() << q.id << ": operator spoza Tabeli 1";
+  }
+  return reads;
+}
+
+// Rekord n wezla q jest okreslony, gdy kazdy rekord z deps lezy w okreslonej czesci wejscia
+// (OriginRule). Wejscie bez policzonego poczatku znaczy, ze plan nie jest topologiczny.
+bool depsDefined(qTree &instance, const query &q, const std::map<std::string, int> &origin, int n) {
+  return std::ranges::all_of(planReads(instance, q, n, true), [&](const PlanRead &read) {
+    const auto it = origin.find(read.input);
+    if (it == origin.end()) ADD_FAILURE() << q.id << " czyta " << read.input << ", ktory stoi dalej w planie";
+    return it != origin.end() && read.index >= it->second;
+  });
+}
+
+// Liczba rekordow, na ktorej powtarza sie warunek gotowosci kazdego wezla planow ponizej.
+constexpr int kPlanSpan = 240;
+
+// Poczatki z samych deps i poczatkow zrodel, wezel po wezle w kolejnosci planu.
+std::map<std::string, int> modelOrigins(qTree &instance) {
+  std::map<std::string, int> origin;
+  for (const auto &q : instance) {
+    int o = q.logicalOrigin;
+    if (!q.isDeclaration())
+      for (o = 0; o < kPlanSpan && !depsDefined(instance, q, origin, o); ++o) {}
+    origin[q.id] = o;
+  }
+  return origin;
+}
+
+// Najmniejsze ogony spelniajace localOK przy ogonach wejsc z tego samego przypisania: rekord n
+// czytajacy rekord j wejscia i wymaga (n+1+w)*Delta >= (j+1+W_i)*Delta_i.
+std::map<std::string, int> modelTails(qTree &instance, const std::map<std::string, int> &origin) {
+  std::map<std::string, int> tail;
+  for (const auto &q : instance) {
+    int w = q.startupLatency;
+    if (!q.isDeclaration()) {
+      w = 0;
+      for (int n = origin.at(q.id); n < origin.at(q.id) + kPlanSpan; ++n)
+        for (const auto &read : planReads(instance, q, n, false)) {
+          const auto ready = rational<int>(static_cast<int>(read.index) + 1 + tail.at(read.input)) *
+                             instance.getQuery(read.input).rInterval / q.rInterval;
+          const auto slots = -floorDiv(-ready.numerator(), ready.denominator());
+          w                = std::max(w, static_cast<int>(slots) - n - 1);
+        }
+    }
+    tail[q.id] = w;
+  }
+  return tail;
+}
+
+void compileDeepPlan(qTree &instance, const std::string &dir) {
+  compilePlan(instance, deepPlanText(dir));
+  if (::testing::Test::HasFatalFailure()) return;
+  // Plan obejmuje kazdy wiersz Tabeli 1, takze okno rekordowe w liscie SELECT.
+  std::set<command_id> operators;
+  bool window = false;
+  for (const auto &q : instance)
+    if (!q.isDeclaration()) {
+      operators.insert(q.lProgram.back().getCommandID());
+      window = window || !q.windowGroups.empty();
+    }
+  for (const auto cmd : {PUSH_STREAM, STREAM_TIMEMOVE, STREAM_HASH, STREAM_DEHASH_DIV, STREAM_DEHASH_MOD, STREAM_ADD,
+                         STREAM_SUBTRACT, STREAM_AGSE, STREAM_MIN})
+    ASSERT_TRUE(operators.contains(cmd)) << static_cast<int>(cmd);
+  ASSERT_TRUE(window);
+}
+
+}  // namespace
+
+// Poczatki skompilowanego planu to poczatki wyznaczone z deps od zrodel w gore, a rekord n jest
+// okreslony dokladnie od poczatku (plan_defined_iff_origin, *_originRule).
+TEST(ProofOracle, plan_defined_iff_origin) {
+  qTree instance;
+  compileDeepPlan(instance, "");
+  ASSERT_FALSE(HasFatalFailure());
+  const auto origin = modelOrigins(instance);
+  int shifted       = 0;
+  for (const auto &q : instance) {
+    if (q.isDeclaration()) continue;
+    ASSERT_EQ(origin.at(q.id), q.logicalOrigin) << q.id;
+    shifted += q.logicalOrigin > 0;
+    for (int n = 0; n < q.logicalOrigin + kPlanSpan; ++n)
+      ASSERT_EQ(q.logicalOrigin <= n, depsDefined(instance, q, origin, n)) << q.id << " n=" << n;
+  }
+  EXPECT_GE(shifted, 15);
+}
+
+// Ogony skompilowanego planu to najmniejsze dopuszczalne ogony zlozone od zrodel w gore: kazdy
+// odczyt okreslonego rekordu trafia w rekord okreslony i zapisany, a ogon krotszy o 1 nie wystarcza
+// w zadnym wezle (plan_rules_least, plan_rules_unique, *_leastTail).
+TEST(ProofOracle, plan_rules_least) {
+  qTree instance;
+  compileDeepPlan(instance, "");
+  ASSERT_FALSE(HasFatalFailure());
+  const auto origin = modelOrigins(instance);
+  const auto tail   = modelTails(instance, origin);
+  int inherited     = 0;
+  for (const auto &q : instance) {
+    if (q.isDeclaration()) continue;
+    ASSERT_EQ(tail.at(q.id), q.startupLatency) << q.id;
+    bool tailedInput = false;
+    for (int n = q.logicalOrigin; n < q.logicalOrigin + kPlanSpan; ++n)
+      for (const auto &read : planReads(instance, q, n, false)) {
+        ASSERT_GE(read.index, instance.getQuery(read.input).logicalOrigin) << q.id << " n=" << n;
+        tailedInput = tailedInput || instance.getQuery(read.input).startupLatency > 0;
+      }
+    inherited += tailedInput;
+  }
+  // Zlozenie jest sprawdzane na wezlach, ktorych wejscia same maja ogon.
+  EXPECT_GE(inherited, 12);
+}
+
+// Silnik wydaje rekord n wezla dokladnie w chwili (n+1+W)*Delta, kolejno od poczatku, i zaden
+// odczyt nie chybia: to model wykonania z PlanComposition.lean (emitTime, plan_rules_feasible).
+TEST(ProofOracle, plan_emission_schedule) {
+  std::filesystem::remove_all(kExecDir);
+  std::filesystem::create_directories(kExecDir);
+  for (const char *name : {"a.txt", "b.txt"}) {
+    std::ofstream data(std::filesystem::path(kExecDir) / name);
+    for (int n = 0; n < 400; ++n)
+      data << 1000 + n << '\n';
+  }
+  {
+    std::ofstream data(std::filesystem::path(kExecDir) / "c.txt");
+    for (int n = 0; n < 400; ++n)
+      data << n << ' ' << n + 1 << ' ' << n + 2 << '\n';
+  }
+  qTree instance;
+  compileDeepPlan(instance, std::string(kExecDir) + "/");
+  ASSERT_FALSE(HasFatalFailure());
+
+  // Horyzont, w ktorym kazdy wezel wydaje co najmniej cztery rekordy.
+  rational<int> horizon(0);
+  for (const auto &q : instance)
+    horizon = std::max(horizon, rational<int>(q.logicalOrigin + q.startupLatency + 4) * q.rInterval);
+  const auto trace = runPlan(instance, horizon);
+  ASSERT_FALSE(HasFatalFailure());
+  std::filesystem::remove_all(kExecDir);
+
+  for (const auto &q : instance) {
+    if (q.isDeclaration()) continue;
+    ASSERT_TRUE(trace.contains(q.id)) << q.id;
+    const auto &records = trace.at(q.id);
+    int expected        = q.logicalOrigin;
+    for (const auto &[n, record] : records) {
+      ASSERT_EQ(n, expected++) << q.id;
+      ASSERT_EQ(record.time, rational<int>(n + 1 + q.startupLatency) * q.rInterval) << q.id << " n=" << n;
+    }
+    const auto last = rational_cast<int>(horizon / q.rInterval) - 1 - q.startupLatency;
+    ASSERT_EQ(expected - 1, last) << q.id;
+    ASSERT_GE(records.size(), 4U) << q.id;
+  }
+}
+
+// Przepisanie R1 nie wydluza ogona zadnego wezla dalej w planie (plan_tail_mono). Strony
+// (ma>2)#(mb>1) i (ma#mb)>3 maja ten sam interwal i poczatek, prawa krotszy ogon (2 i 0, jak
+// w tail_can_be_strict), a za kazda stoi ten sam lancuch operatorow.
+TEST(ProofOracle, plan_tail_mono) {
+  std::string text               = R"(DECLARE v INTEGER STREAM ma, 1/10 TEXTFILE 'a.txt'
+DECLARE v INTEGER STREAM mb, 2/10 TEXTFILE 'b.txt'
+DECLARE v INTEGER STREAM mx, 3/10 TEXTFILE 'c.txt'
+SELECT * STREAM sa FROM ma>2
+SELECT * STREAM sb FROM mb>1
+SELECT * STREAM lhs FROM sa#sb
+SELECT * STREAM ab FROM ma#mb
+SELECT * STREAM rhs FROM ab>3
+)";
+  constexpr const char *kChain[] = {"", "_p", "_s", "_q", "_h", "_t", "_g", "_w", "_d", "_m"};
+  for (const char *side : {"lhs", "rhs"})
+    text += std::format(
+        "SELECT {0}[0]*2 STREAM {0}_p FROM {0}\n"
+        "SELECT * STREAM {0}_s FROM {0}_p+mx\n"
+        "SELECT {0}_s[0]+{0}_s[1] STREAM {0}_q FROM {0}_s\n"
+        "SELECT * STREAM {0}_h FROM {0}_q#mx\n"
+        "SELECT * STREAM {0}_t FROM {0}_h&3/10\n"
+        "SELECT * STREAM {0}_g FROM {0}_h@(1,3)\n"
+        "SELECT SUMC({0}_g[0] : 4) STREAM {0}_w FROM {0}_g\n"
+        "SELECT * STREAM {0}_d FROM {0}_w-1/2\n"
+        "SELECT * STREAM {0}_m FROM {0}_t>1\n",
+        side);
+  qTree instance;
+  compilePlan(instance, text);
+  ASSERT_FALSE(HasFatalFailure());
+
+  ASSERT_LT(instance.getQuery("rhs").startupLatency, instance.getQuery("lhs").startupLatency);
+  for (const char *suffix : kChain) {
+    const auto &lhs = instance.getQuery(std::string("lhs") + suffix);
+    const auto &rhs = instance.getQuery(std::string("rhs") + suffix);
+    ASSERT_EQ(rhs.rInterval, lhs.rInterval) << suffix;
+    ASSERT_EQ(rhs.logicalOrigin, lhs.logicalOrigin) << suffix;
+    ASSERT_LE(rhs.startupLatency, lhs.startupLatency) << suffix;
+  }
+}

@@ -19,7 +19,7 @@ dopuszczalne ogony dla całego planu (`Profs/PlanComposition.lean`).
 # Model wykonania
 
 Model opiera się na trzech własnościach silnika, które nie są tu dowodzone. Ich
-zgodność z kodem sprawdza test harmonogramu w `test/UnitTest/test_proofOracle.cpp`:
+zgodność z kodem sprawdza test `ProofOracle.plan_emission_schedule`:
 
 - węzeł o interwale `Δ` liczy się w chwilach `k*Δ`, `k ≥ 1` (`TimeLine` w `CRSMath.cpp`);
 - węzeł planu startowego milczy przez `O + W` swoich slotów, a potem zapisuje jeden
@@ -222,6 +222,22 @@ theorem interleave_originRule (P : ℕ → PlanNode) (v iA iB a b : ℕ) (ha : 0
   rw [hO, interleaveOrigin_le_iff, hd n]
   simp [interleaveDeps, originReady]
 ```
+
+# Związek z silnikiem
+
+Testy `ProofOracle` w `test/UnitTest/test_proofOracle.cpp` sprawdzają model na planie
+silnika, który zawiera każdy wiersz Tabeli 1 i ma do ośmiu poziomów, z niezerowymi
+początkami i ogonami. Mapy `reads` i `deps` test bierze z map silnika
+(`dataModel::queryInputsAvailable`):
+
+- `plan_defined_iff_origin`: początki wyznaczone z `deps` od źródeł w górę są równe
+  początkom z kompilatora, a rekord jest określony dokładnie od początku;
+- `plan_rules_least`: najmniejsze wystarczające ogony złożone od źródeł w górę są równe
+  ogonom z kompilatora, a każdy odczyt określonego rekordu trafia w rekord określony;
+- `plan_emission_schedule`: wykonanie slot po slocie wydaje rekord `n` każdego węzła
+  dokładnie w chwili `(n+1+W)*Δ`, kolejno od początku, bez chybionego odczytu;
+- `plan_tail_mono`: za stronami R1 `(A>2)#(B>1)` i `(A#B)>3` ten sam łańcuch operatorów
+  ma te same interwały i początki, a ogony po prawej nie są dłuższe.
 
 # Zakres
 
