@@ -423,4 +423,27 @@ theorem agseOrigin_eq_ceil (F h w Os : ℕ) (hh : 0 < h) :
   unfold agseOrigin
   rw [natCeil_div _ _ hh]
 
+/- ===== Okno rekordowe w liscie SELECT ===== -/
+
+/- MIN/MAX/AVG/SUMC(e : N): rekord n obejmuje rekordy zrodla n-(N-1) ... n, czyli to AGSE
+   z F = h = 1 i w = N (pozycje n*h-(w-1) ... n*h, rekord floor(j/F) = j). Przy kilku
+   szerokosciach w jednej liscie rozstrzyga najwieksza N (windowWidthOf w compiler.cpp).
+   Prog zapisany dodawaniem: O_S <= n-(N-1) na liczbach naturalnych zachodziloby takze
+   dla n < N-1, gdy okno siega przed indeks 0. -/
+-- ANCHOR: record_window_origin
+theorem recordWindowOrigin_le_iff (N Os n : ℕ) :
+    agseOrigin 1 1 N Os ≤ n ↔ Os + (N - 1) ≤ n := by
+  simpa using agseOrigin_le_iff 1 1 N Os n one_pos
+-- ANCHOR_END: record_window_origin
+
+/- Ogon okna rekordowego to ogon AGSE przy F = h = 1: ceil((1 + W_S)*1) - 1 = W_S. -/
+-- ANCHOR: record_window_tail_exact
+theorem recordWindowTail_exact (Ws W N0 : ℕ) (tick : ℚ) (htick : 0 < tick) :
+    Ws ≤ W ↔ ∀ n, N0 ≤ n → affineReady 1 1 0 Ws W tick n := by
+  have h : ⌈((1 + Ws : ℕ) : ℚ) * ((1 : ℕ) / (1 : ℕ) : ℚ)⌉₊ - 1 = Ws := by
+    rw [Nat.cast_one, div_one, mul_one, Nat.ceil_natCast]; omega
+  have := agseTail_exact 1 1 Ws W N0 one_pos one_pos tick htick
+  rwa [h] at this
+-- ANCHOR_END: record_window_tail_exact
+
 end Profs

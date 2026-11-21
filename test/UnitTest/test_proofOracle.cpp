@@ -1196,3 +1196,84 @@ TEST(ProofOracle, projectionTail_exact) {
     ASSERT_TRUE(tailIsExact(1, 1, ws, node.startupLatency, [](int n) { return n; })) << id;
   }
 }
+
+namespace {
+
+// Zrodla okien rekordowych: okno win (poczatek 4, ogon 2), przesuniety przeplot mix_sh1 oraz
+// src przesuniety o 0..3 rekordow (poczatek 0..3, ogon 0), ktory trafia w kAgseOriginRows.
+constexpr const char *kRecordWindowSources[] = {"win", "mix_sh1", "src", "src_sh1", "src_sh2", "src_sh3"};
+
+// Najszersze okno wezla; obok niego w tej samej liscie SELECT stoja okna 1 i (N+1)/2.
+constexpr int kRecordWindowWidths[] = {1, 2, 3, 5, 8};
+
+std::string recordWindowId(const char *source, int width) { return std::format("rw_{}_{}", source, width); }
+
+void compileRecordWindows(qTree &instance) {
+  std::string text = R"(
+        DECLARE x INTEGER, y INTEGER, z INTEGER STREAM wide, 1/10 TEXTFILE 'a.txt'
+        DECLARE value INTEGER STREAM pa, 3/100 TEXTFILE 'a.txt'
+        DECLARE value INTEGER STREAM pb, 1/20 TEXTFILE 'b.txt'
+        DECLARE value INTEGER STREAM src, 1/10 TEXTFILE 'c.txt'
+        SELECT * STREAM wide_sh1 FROM wide>1
+        SELECT * STREAM win FROM wide_sh1@(1,2)
+        SELECT * STREAM mix FROM pa#pb
+        SELECT * STREAM mix_sh1 FROM mix>1
+        SELECT * STREAM src_sh1 FROM src>1
+        SELECT * STREAM src_sh2 FROM src>2
+        SELECT * STREAM src_sh3 FROM src>3
+)";
+  for (const auto *source : kRecordWindowSources)
+    for (int width : kRecordWindowWidths)
+      text += std::format(
+          "SELECT MIN({0}[0] : 1), SUMC({0}[0] * 2 : {1}), AVG({0}[0] : {2}), MAX({0}[0] + 1 : {1}) STREAM {3} FROM {0}\n",
+          source, width, (width + 1) / 2, recordWindowId(source, width));
+  compilePlan(instance, text);
+}
+
+}  // namespace
+
+// Okno rekordowe MIN/MAX/AVG/SUMC(e : N) to AGSE z F = h = 1, w = N: O <= n dokladnie wtedy,
+// gdy O_S + N - 1 <= n przy najszerszym N z listy SELECT (recordWindowOrigin_le_iff), i O jest
+// wartoscia agseOrigin z tablicy Lean, gdy wiersz istnieje.
+TEST(ProofOracle, recordWindowOrigin_le_iff) {
+  qTree instance;
+  compileRecordWindows(instance);
+  ASSERT_FALSE(HasFatalFailure());
+  for (const auto *source : kRecordWindowSources) {
+    const int sourceO = instance.getQuery(source).logicalOrigin;
+    for (int width : kRecordWindowWidths) {
+      const auto id    = recordWindowId(source, width);
+      const auto &node = instance.getQuery(id);
+      for (int n = 0; n < node.logicalOrigin + 8; ++n)
+        ASSERT_EQ(node.logicalOrigin <= n, sourceO + width - 1 <= n) << id << " n=" << n;
+      const auto row = std::ranges::find_if(
+          kAgseOriginRows, [&](const AgseOriginRow &r) { return r.f == 1 && r.h == 1 && r.w == width && r.os == sourceO; });
+      if (row != std::end(kAgseOriginRows))
+        ASSERT_EQ(node.logicalOrigin, row->origin) << id;
+      else
+        ASSERT_TRUE(width > 5 || sourceO > 3) << id << ": brak wiersza kAgseOriginRows w jego zakresie";
+    }
+  }
+  ASSERT_GT(instance.getQuery("win").logicalOrigin, 0);
+  ASSERT_GT(instance.getQuery("mix_sh1").logicalOrigin, 0);
+}
+
+// Ogon okna rekordowego to ogon zrodla, dokladna granica dostepnosci przy p = q = 1
+// (recordWindowTail_exact); interwal zostaje interwalem zrodla.
+TEST(ProofOracle, recordWindowTail_exact) {
+  qTree instance;
+  compileRecordWindows(instance);
+  ASSERT_FALSE(HasFatalFailure());
+  ASSERT_GT(instance.getQuery("win").startupLatency, 0);
+  ASSERT_GT(instance.getQuery("mix_sh1").startupLatency, 0);
+  for (const auto *source : kRecordWindowSources) {
+    const auto &src = instance.getQuery(source);
+    for (int width : kRecordWindowWidths) {
+      const auto id    = recordWindowId(source, width);
+      const auto &node = instance.getQuery(id);
+      ASSERT_EQ(node.rInterval, src.rInterval) << id;
+      ASSERT_EQ(node.startupLatency, src.startupLatency) << id;
+      ASSERT_TRUE(tailIsExact(1, 1, src.startupLatency, node.startupLatency, [](int n) { return n; })) << id;
+    }
+  }
+}

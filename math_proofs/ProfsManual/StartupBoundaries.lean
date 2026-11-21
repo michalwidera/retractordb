@@ -173,8 +173,7 @@ theorem agseTail_exact (F h Ws W N0 : ℕ) (hF : 0 < F) (hh : 0 < h)
 
 Projekcja i redukcje krotek czytają rekord `n` (`p = q = 1`, `c = 0`), więc ich
 ogon to ogon źródła (`projectionTail_exact`), a początek przechodzi bez zmian
-(`projectionOrigin_eq`). Okno rekordowe w liście SELECT (`MIN(e : N)`) to AGSE z
-`F = h = 1` i `w = N`, co daje początek `O_S + N - 1` i ogon `W_S`.
+(`projectionOrigin_eq`).
 
 ```anchor projection_tail_exact -showProofStates (module := Profs.StartupBoundaries)
 theorem projectionTail_exact (Ws W N0 : ℕ) (tick : ℚ) (htick : 0 < tick) :
@@ -225,12 +224,39 @@ theorem agseOrigin_le_iff (F h w Os n : ℕ) (hh : 0 < h) :
   omega
 ```
 
+# Okno rekordowe w liście SELECT
+
+Agregat `MIN`, `MAX`, `AVG` lub `SUMC(e : N)` w liście SELECT daje rekord `n`
+obejmujący rekordy źródła `n-(N-1)` ... `n`. To okno AGSE z `F = h = 1` i
+`w = N`, bo pozycja `j` leży wtedy w rekordzie `j`. Przy kilku szerokościach w
+jednej liście rozstrzyga największa (`windowWidthOf` w `compiler.cpp`). Początek
+to `O_S + N - 1`. Próg jest zapisany dodawaniem, bo `O_S ≤ n-(N-1)` na liczbach
+naturalnych zachodziłoby także dla `n < N-1`:
+
+```anchor record_window_origin -showProofStates (module := Profs.StartupBoundaries)
+theorem recordWindowOrigin_le_iff (N Os n : ℕ) :
+    agseOrigin 1 1 N Os ≤ n ↔ Os + (N - 1) ≤ n := by
+  simpa using agseOrigin_le_iff 1 1 N Os n one_pos
+```
+
+Ogon to ogon źródła: wzór AGSE `ceil((1 + W_S)*F/h) - 1` przy `F = h = 1` daje
+`W_S`, a gotowość okna zależy od jego najnowszego rekordu (`agse_window_ready`):
+
+```anchor record_window_tail_exact -showProofStates (module := Profs.StartupBoundaries)
+theorem recordWindowTail_exact (Ws W N0 : ℕ) (tick : ℚ) (htick : 0 < tick) :
+    Ws ≤ W ↔ ∀ n, N0 ≤ n → affineReady 1 1 0 Ws W tick n := by
+  have h : ⌈((1 + Ws : ℕ) : ℚ) * ((1 : ℕ) / (1 : ℕ) : ℚ)⌉₊ - 1 = Ws := by
+    rw [Nat.cast_one, div_one, mul_one, Nat.ceil_natCast]; omega
+  have := agseTail_exact 1 1 Ws W N0 one_pos one_pos tick htick
+  rwa [h] at this
+```
+
 # Związek z silnikiem
 
 Testy `ProofOracle` w `test/UnitTest/test_proofOracle.cpp` porównują funkcje
 silnika z tablicami liczonymi przez `affineRead`, `affineTail` i `agseOrigin`
 (`math_proofs/gen-oracle.sh`). Sprawdzają też warunek dostępności poza zakresem
-tablic. Początki i ogony sumy i projekcji testy odczytują z planów skompilowanych
-z RQL. Mapa odczytu AGSE `floor(n*h/F)` jest liczona w `dataModel`, a nie w
+tablic. Początki i ogony sumy, projekcji i okna rekordowego testy odczytują z planów
+skompilowanych z RQL. Mapa odczytu AGSE `floor(n*h/F)` jest liczona w `dataModel`, a nie w
 `SOperations.hpp`, więc test porównuje z modelem tylko ogon i początek okna.
 Dowód nie obejmuje bajtów, deskryptorów ani harmonogramu działającego silnika.
