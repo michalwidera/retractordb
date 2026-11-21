@@ -83,6 +83,27 @@ PlanComposition	plan_rules_least	NIEPOKRYTE:test planu wielopoziomowego w etapie
 PlanComposition	plan_rules_unique	NIEPOKRYTE:test planu wielopoziomowego w etapie C
 PlanComposition	plan_tail_mono	NIEPOKRYTE:test planu wielopoziomowego w etapie C
 PlanComposition	leastTail_of_exact	POZA_ZAKRESEM:pomost do twierdzen operatorow Tabeli 1
+PlanInstances	single_localOK_iff	POZA_ZAKRESEM:lemat pomocniczy affine_localOK_iff
+PlanInstances	affine_localOK_iff	POZA_ZAKRESEM:lemat pomocniczy instancji afinicznych
+PlanInstances	affine_leastTail_of	POZA_ZAKRESEM:lemat pomocniczy instancji afinicznych
+PlanInstances	newest_localOK_iff	POZA_ZAKRESEM:lemat pomocniczy window_localOK_iff
+PlanInstances	projection_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	sum_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	subtract_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	theta_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	ntheta_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	window_localOK_iff	POZA_ZAKRESEM:lemat pomocniczy agse_leastTail i recordWindow_leastTail
+PlanInstances	agse_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	recordWindow_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	shift_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	interleave_readsInDeps	POZA_ZAKRESEM:wlasnosc modelu przeplotu (reads w deps)
+PlanInstances	interleave_leastTail	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	affine_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	projection_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	sum_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	window_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	shift_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanInstances	interleave_originRule	NIEPOKRYTE:test planu wielopoziomowego w etapie C
 ShiftMatching	interleave_starts_with_right	TEST:ProofOracle.interleaveAt_table
 ShiftMatching	progress_shift	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
 ShiftMatching	progress_le_slot	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
