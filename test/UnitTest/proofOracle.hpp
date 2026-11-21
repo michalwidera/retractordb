@@ -17,6 +17,7 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/ExactInvertibility.lean", "80c320bd5c23419c94340783e88bba48ebeeed2bbd289e7a4f16fd951d450bfa"},
     {"Profs/InterleaveCovering.lean", "2d29413acc3f4bceb40aa94870a4d49c3075adcfa123f22aabfaf87691a2979d"},
     {"Profs/InterleaveTailExact.lean", "5bf10daa265544a782a53a77adc8aa2d2e30c48484f81b00582565acfbafa4d1"},
+    {"Profs/PlanComposition.lean", "20dfabb6d288838c55c86dc802abb9027544e3cf4d949d313f934ed9eee00cac"},
     {"Profs/ShiftMatching.lean", "d74a5a242e5d5dc879ee2708ed607c6ee0ae74eb03bd01f8b47782b74457ba7a"},
     {"Profs/StartupBoundaries.lean", "4b3e2c38a678b4926ee1394613c72075264a293108cf0a708dd09657521f7594"},
     {"Profs/SumCommutativity.lean", "502c21dc6b6413b1c707c51de9bff8341e1f1c03879b91130f0d0376401c29ed"},

@@ -75,6 +75,14 @@ InterleaveTailExact	natCast_le_phaseRequirement	POZA_ZAKRESEM:lemat pomocniczy e
 InterleaveTailExact	progress_succ_le	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_closed
 InterleaveTailExact	progress_mono_succ	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_closed
 InterleaveTailExact	exactInterleaveTail_closed	TEST:ProofOracle.exactInterleaveTail_closed
+PlanComposition	plan_defined_iff_origin	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanComposition	plan_rules_feasible	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanComposition	localOK_mono	POZA_ZAKRESEM:lemat pomocniczy plan_rules_least
+PlanComposition	TailRules.feasible	POZA_ZAKRESEM:lemat pomocniczy plan_rules_least
+PlanComposition	plan_rules_least	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanComposition	plan_rules_unique	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanComposition	plan_tail_mono	NIEPOKRYTE:test planu wielopoziomowego w etapie C
+PlanComposition	leastTail_of_exact	POZA_ZAKRESEM:pomost do twierdzen operatorow Tabeli 1
 ShiftMatching	interleave_starts_with_right	TEST:ProofOracle.interleaveAt_table
 ShiftMatching	progress_shift	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
 ShiftMatching	progress_le_slot	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
