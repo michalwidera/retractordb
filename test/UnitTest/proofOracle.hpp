@@ -19,6 +19,7 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/InterleaveTailExact.lean", "5bf10daa265544a782a53a77adc8aa2d2e30c48484f81b00582565acfbafa4d1"},
     {"Profs/PlanComposition.lean", "d52a331ad422c80a0ff3fb0dd7c7a79e2c2340b049e7cae5d9e262ccc8c62162"},
     {"Profs/PlanInstances.lean", "65d8ee58fa41ac6481b4016a98af60b31f377d414e8f434d7cd398d6506e3fe6"},
+    {"Profs/PlanValues.lean", "802e89566b157667ecaebec435b145a8b5b65bfd8235f722102477be8f3c6e43"},
     {"Profs/ShiftMatching.lean", "d74a5a242e5d5dc879ee2708ed607c6ee0ae74eb03bd01f8b47782b74457ba7a"},
     {"Profs/StartupBoundaries.lean", "4b3e2c38a678b4926ee1394613c72075264a293108cf0a708dd09657521f7594"},
     {"Profs/SumCommutativity.lean", "502c21dc6b6413b1c707c51de9bff8341e1f1c03879b91130f0d0376401c29ed"},

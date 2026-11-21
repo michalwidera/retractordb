@@ -102,10 +102,13 @@ bool originReady(std::int64_t a, std::int64_t b, std::int64_t oa, std::int64_t o
   return oa <= indexA(a, b, n) && ob <= indexB(a, b, n);
 }
 
-// Wyemitowany rekord: wartosc pierwszego pola (-1 dla null) i chwila slotu, w ktorym powstal.
+// Wyemitowany rekord: wartosc pierwszego pola typu INTEGER (-1 dla pola innego typu), chwila slotu,
+// w ktorym powstal, i samo pierwsze pole dowolnego typu. NULL nie ma tu wlasnego znacznika: getRow
+// zastepuje go wartoscia zastepcza typu pola (nullFallbackValue).
 struct Emission {
   int value;
   rational<int> time;
+  rdb::descFldVT field;
 };
 
 // strumien -> indeks logiczny -> rekord.
@@ -142,7 +145,7 @@ Trace runPlan(qTree &instance, const rational<int> &horizon) {
       if (count == before[q.id]) continue;
       const auto row  = rdbtest::ok(proc.getRow(q.id, 0));
       const int value = std::holds_alternative<int>(row.at(0)) ? std::get<int>(row.at(0)) : -1;
-      trace[q.id][q.logicalOrigin + static_cast<int>(count) - 1] = {value, now};
+      trace[q.id][q.logicalOrigin + static_cast<int>(count) - 1] = {value, now, row.at(0)};
     }
   }
   pProc = nullptr;
@@ -1533,20 +1536,24 @@ TEST(ProofOracle, plan_emission_schedule) {
   }
 }
 
-// Przepisanie R1 nie wydluza ogona zadnego wezla dalej w planie (plan_tail_mono). Strony
-// (ma>2)#(mb>1) i (ma#mb)>3 maja ten sam interwal i poczatek, prawa krotszy ogon (2 i 0, jak
-// w tail_can_be_strict), a za kazda stoi ten sam lancuch operatorow.
-TEST(ProofOracle, plan_tail_mono) {
-  std::string text               = R"(DECLARE v INTEGER STREAM ma, 1/10 TEXTFILE 'a.txt'
-DECLARE v INTEGER STREAM mb, 2/10 TEXTFILE 'b.txt'
-DECLARE v INTEGER STREAM mx, 3/10 TEXTFILE 'c.txt'
+namespace {
+
+// Strony R1 (ma>2)#(mb>1) i (ma#mb)>3 maja ten sam interwal i poczatek, prawa krotszy ogon (2 i 0,
+// jak w tail_can_be_strict), a za kazda stoi ten sam lancuch operatorow lhs<x> i rhs<x>.
+constexpr const char *kR1Chain[] = {"", "_p", "_s", "_q", "_h", "_t", "_g", "_w", "_d", "_m"};
+
+std::string r1ChainText(const std::string &dir) {
+  std::string text = (dir.empty() ? std::string() : std::format("STORAGE '{}'\n", dir)) +
+                     std::format(R"(DECLARE v INTEGER STREAM ma, 1/10 TEXTFILE '{0}a.txt'
+DECLARE v INTEGER STREAM mb, 2/10 TEXTFILE '{0}b.txt'
+DECLARE v INTEGER STREAM mx, 3/10 TEXTFILE '{0}c.txt'
 SELECT * STREAM sa FROM ma>2
 SELECT * STREAM sb FROM mb>1
 SELECT * STREAM lhs FROM sa#sb
 SELECT * STREAM ab FROM ma#mb
 SELECT * STREAM rhs FROM ab>3
-)";
-  constexpr const char *kChain[] = {"", "_p", "_s", "_q", "_h", "_t", "_g", "_w", "_d", "_m"};
+)",
+                                 dir);
   for (const char *side : {"lhs", "rhs"})
     text += std::format(
         "SELECT {0}[0]*2 STREAM {0}_p FROM {0}\n"
@@ -1559,16 +1566,75 @@ SELECT * STREAM rhs FROM ab>3
         "SELECT * STREAM {0}_d FROM {0}_w-1/2\n"
         "SELECT * STREAM {0}_m FROM {0}_t>1\n",
         side);
+  return text;
+}
+
+}  // namespace
+
+// Przepisanie R1 nie wydluza ogona zadnego wezla dalej w planie (plan_tail_mono).
+TEST(ProofOracle, plan_tail_mono) {
   qTree instance;
-  compilePlan(instance, text);
+  compilePlan(instance, r1ChainText(""));
   ASSERT_FALSE(HasFatalFailure());
 
   ASSERT_LT(instance.getQuery("rhs").startupLatency, instance.getQuery("lhs").startupLatency);
-  for (const char *suffix : kChain) {
+  for (const char *suffix : kR1Chain) {
     const auto &lhs = instance.getQuery(std::string("lhs") + suffix);
     const auto &rhs = instance.getQuery(std::string("rhs") + suffix);
     ASSERT_EQ(rhs.rInterval, lhs.rInterval) << suffix;
     ASSERT_EQ(rhs.logicalOrigin, lhs.logicalOrigin) << suffix;
     ASSERT_LE(rhs.startupLatency, lhs.startupLatency) << suffix;
+  }
+}
+
+// R1 jest dopuszczalne na kazdym wezle dalej w planie (r1_plan_admissible, plan_substitution).
+// Ten sam plan wykonany slot po slocie: kazda para lhs<x> i rhs<x> ma te same rekordy pod tymi
+// samymi indeksami logicznymi od poczatku, a prawa wydaje kazdy z nich nie pozniej.
+TEST(ProofOracle, r1_plan_admissible) {
+  std::filesystem::remove_all(kExecDir);
+  std::filesystem::create_directories(kExecDir);
+  for (const auto [name, base] : {std::pair{"a.txt", 1000}, std::pair{"b.txt", 2000}, std::pair{"c.txt", 3000}}) {
+    std::ofstream data(std::filesystem::path(kExecDir) / name);
+    for (int n = 0; n < 900; ++n)
+      data << base + n << '\n';
+  }
+  qTree instance;
+  compilePlan(instance, r1ChainText(std::string(kExecDir) + "/"));
+  ASSERT_FALSE(HasFatalFailure());
+
+  // Horyzont, w ktorym kazdy wezel wydaje co najmniej dziesiec rekordow.
+  rational<int> horizon(0);
+  for (const auto &q : instance)
+    horizon = std::max(horizon, rational<int>(q.logicalOrigin + q.startupLatency + 10) * q.rInterval);
+  const auto trace = runPlan(instance, horizon);
+  ASSERT_FALSE(HasFatalFailure());
+  std::filesystem::remove_all(kExecDir);
+
+  for (const char *suffix : kR1Chain) {
+    const std::string lhsId = std::string("lhs") + suffix;
+    const std::string rhsId = std::string("rhs") + suffix;
+    const auto &lhsQry      = instance.getQuery(lhsId);
+    const auto &rhsQry      = instance.getQuery(rhsId);
+    ASSERT_EQ(rhsQry.rInterval, lhsQry.rInterval) << suffix;
+    ASSERT_EQ(rhsQry.logicalOrigin, lhsQry.logicalOrigin) << suffix;
+    ASSERT_LE(rhsQry.startupLatency, lhsQry.startupLatency) << suffix;
+
+    ASSERT_TRUE(trace.contains(lhsId)) << suffix;
+    ASSERT_TRUE(trace.contains(rhsId)) << suffix;
+    const auto &lhs = trace.at(lhsId);
+    const auto &rhs = trace.at(rhsId);
+    ASSERT_GE(lhs.size(), 10U) << suffix;
+    ASSERT_EQ(lhs.begin()->first, lhsQry.logicalOrigin) << suffix;
+    ASSERT_EQ(rhs.begin()->first, rhsQry.logicalOrigin) << suffix;
+    // Rozne wartosci w sladzie wykluczaja porownanie samych wartosci zastepczych NULL.
+    std::set<rdb::descFldVT> distinct;
+    for (const auto &[n, record] : lhs) {
+      ASSERT_TRUE(rhs.contains(n)) << suffix << " n=" << n;
+      ASSERT_FALSE(std::holds_alternative<std::monostate>(record.field)) << suffix << " n=" << n;
+      ASSERT_TRUE(record.field == rhs.at(n).field) << suffix << " n=" << n;
+      ASSERT_LE(rhs.at(n).time, record.time) << suffix << " n=" << n;
+      distinct.insert(record.field);
+    }
+    ASSERT_GE(distinct.size(), 2U) << suffix;
   }
 }
