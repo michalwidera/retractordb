@@ -182,6 +182,36 @@ TEST(xcompiler, refuses_deinterleave_with_equal_intervals) {
   }
 }
 
+TEST(xcompiler, refuses_deinterleave_with_shorter_argument) {
+  // Argument '&' i '%' to interwal drugiej skladowej przeplotu, a przeplot jest szybszy od obu
+  // skladowych, wiec argument krotszy od interwalu zrodla nie opisuje zadnego przeplotu. Przy 3/4
+  // nad zrodlem 1 kompilator dawal dotad wynik o interwale 3, ktory czytal rekordy zrodla przed ich
+  // powstaniem; przy 1/4 odmawial komunikatem o "szybszym" wyniku.
+  for (const char op : {'&', '%'}) {
+    for (const char *source : {"src", "(src-1)"})
+      for (const char *argument : {"3/4", "1/4"}) {
+        SCOPED_TRACE(std::format("{}{}{}", source, op, argument));
+        qTree instance;
+        const auto loaded = parsePlanText(instance, std::format("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'input.txt'\n"
+                                                                "SELECT * STREAM dst FROM {}{}{}\n",
+                                                                source, op, argument));
+        ASSERT_EQ(loaded.status, "OK");
+        const auto status = compiler(instance).compile();
+        EXPECT_NE(status.find("shorter than the source interval"), std::string::npos) << status;
+        EXPECT_FALSE(isInternalCompilerError(status)) << status;
+      }
+
+    qTree valid;
+    ASSERT_EQ(parsePlanText(valid, std::format("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'input.txt'\n"
+                                               "SELECT * STREAM dst FROM src{}5/4\n",
+                                               op))
+                  .status,
+              "OK");
+    ASSERT_EQ(compiler(valid).compile(), "OK");
+    EXPECT_EQ(valid.getQuery("dst").rInterval, boost::rational<int>(5));
+  }
+}
+
 TEST(xparser, check_multiline_backslash) {
   qTree instance;
   auto result = parserRQLFile_4Test(instance, "ut_multiline.rql");
@@ -5489,9 +5519,9 @@ TEST(xparser, let_constants_in_rational_and_scalar_contexts_compile_to_the_liter
        "DECLARE a INTEGER STREAM u, 1/40 TEXTFILE 'u.txt'",
        "LET I = 2\nLET D = 0.25\nLET F = 1/40\nDECLARE a INTEGER STREAM s, ?I TEXTFILE 's.txt'\n"
        "DECLARE a INTEGER STREAM t, ?D TEXTFILE 't.txt'\nDECLARE a INTEGER STREAM u, ?F TEXTFILE 'u.txt'"},
-      {header + "\nSELECT * STREAM o FROM s & 2\nSELECT * STREAM p FROM s % 1/2\nSELECT * STREAM q FROM s - 3/2\n"
+      {header + "\nSELECT * STREAM o FROM s & 2\nSELECT * STREAM p FROM s % 5/4\nSELECT * STREAM q FROM s - 3/2\n"
                 "SELECT * STREAM r FROM s - 2.5",
-       "LET DIV = 2\nLET MOD = 1/2\nLET RATE = 3/2\nLET SLOW = 2.5\n" + header +
+       "LET DIV = 2\nLET MOD = 5/4\nLET RATE = 3/2\nLET SLOW = 2.5\n" + header +
            "\nSELECT * STREAM o FROM s & ?DIV\nSELECT * STREAM p FROM s % ?MOD\nSELECT * STREAM q FROM s - ?RATE\n"
            "SELECT * STREAM r FROM s - ?SLOW"},
       {device + "0.5", "LET T = 0.5\n" + device + "?T"},

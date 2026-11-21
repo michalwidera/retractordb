@@ -78,11 +78,11 @@ namespace {
 /// Wyliczanie interwałów w szerszym typie, z kontrolą zakresu.
 ///
 /// Wzory operatorów mnożą licznik przez licznik i mianownik przez mianownik
-/// ((D_a*D_b)/(D_a+D_b) dla przeplotu, (D_a*D_b)/|D_a-D_b| dla rozplotu), więc
+/// ((D_a*D_b)/(D_a+D_b) dla przeplotu, (D_c*D_b)/(D_b-D_c) dla rozplotu), więc
 /// dla interwałów o licznikach rzędu 10^4 iloczyn wychodzi poza int.
 /// boost::rational<int> nie wykrywa przepełnienia - wynik jest wtedy cichym
-/// śmieciem, który ujawnia się dopiero jako niezwiązany błąd walidacji planu
-/// ("You cannot make faster div from slower source"). Liczymy więc w 64 bitach
+/// śmieciem, który ujawniał się dopiero jako niezwiązany błąd walidacji planu
+/// (dawny komunikat "You cannot make faster div from slower source"). Liczymy więc w 64 bitach
 /// i sprawdzamy, czy wynik daje się w ogóle zapisać w typie interwału.
 using wideRational = boost::rational<std::int64_t>;
 
@@ -272,19 +272,22 @@ std::string compiler::resolveStreamIntervals() {
             continue;
           }  //           D_c * D_b
           //   D_a = --------------
-          //         abs(D_c - D_b)
+          //           D_b - D_c
           if (delta1 == delta2)
             return fmt::format("Stream '{}' has an '&' argument equal to the source interval; the result interval is undefined",
                                q.id);
-          const auto narrowed = narrowInterval((widen(delta1) * widen(delta2)) / abs(widen(delta1) - widen(delta2)), q.id,
-                                               "(D_c*D_b)/|D_c-D_b|");  // deltaDivMod(delta1, delta2);
+          // Źródło C = A#B ma interwał D_a*D_b/(D_a+D_b) < D_b, więc argument nie dłuższy od D_c
+          // wyklucza przeplot z taką składową. Dotąd przechodził przedział D_c/2 <= D_b < D_c, w którym
+          // wynik czytał rekordy źródła, zanim powstały. Przy D_b > D_c wynik jest zawsze wolniejszy od źródła.
+          if (delta2 < delta1)
+            return fmt::format(
+                "Stream '{}' has an '&' argument shorter than the source interval; the source cannot be an interleave with that "
+                "component",
+                q.id);
+          const auto narrowed = narrowInterval((widen(delta1) * widen(delta2)) / (widen(delta2) - widen(delta1)), q.id,
+                                               "(D_c*D_b)/(D_b-D_c)");  // deltaDivMod(delta1, delta2);
           if (!narrowed) return kIntervalOutOfRange;
           delta = *narrowed;
-
-          if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            return {"You cannot make faster div from slower source"};
-          }
         } break;
         case STREAM_DEHASH_MOD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -298,19 +301,21 @@ std::string compiler::resolveStreamIntervals() {
             continue;
           }  //           D_c * D_a
           //   D_b = --------------
-          //         abs(D_c - D_a)
+          //           D_a - D_c
           if (delta1 == delta2)
             return fmt::format("Stream '{}' has a '%' argument equal to the source interval; the result interval is undefined",
                                q.id);
-          const auto narrowed = narrowInterval((widen(delta2) * widen(delta1)) / abs(widen(delta2) - widen(delta1)), q.id,
-                                               "(D_c*D_a)/|D_c-D_a|");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+          // Ta sama zasada co dla '&': argument to interwał drugiej składowej przeplotu, więc musi
+          // być dłuższy od interwału źródła.
+          if (delta2 < delta1)
+            return fmt::format(
+                "Stream '{}' has a '%' argument shorter than the source interval; the source cannot be an interleave with that "
+                "component",
+                q.id);
+          const auto narrowed = narrowInterval((widen(delta2) * widen(delta1)) / (widen(delta2) - widen(delta1)), q.id,
+                                               "(D_c*D_a)/(D_a-D_c)");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
           if (!narrowed) return kIntervalOutOfRange;
           delta = *narrowed;
-
-          if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            return {"You cannot make faster mod from slower source"};
-          }
         } break;
         case STREAM_SUBTRACT: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
