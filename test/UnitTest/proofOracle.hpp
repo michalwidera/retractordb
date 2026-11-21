@@ -18,6 +18,7 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/InterleaveCovering.lean", "2d29413acc3f4bceb40aa94870a4d49c3075adcfa123f22aabfaf87691a2979d"},
     {"Profs/InterleaveTailExact.lean", "5bf10daa265544a782a53a77adc8aa2d2e30c48484f81b00582565acfbafa4d1"},
     {"Profs/ShiftMatching.lean", "d74a5a242e5d5dc879ee2708ed607c6ee0ae74eb03bd01f8b47782b74457ba7a"},
+    {"Profs/StartupBoundaries.lean", "31eb8d48ab4af86d1dd71268f91f7c63fbeb13a5e246034cc212faee12489e4e"},
     {"Profs/SumCommutativity.lean", "502c21dc6b6413b1c707c51de9bff8341e1f1c03879b91130f0d0376401c29ed"},
     {"OracleMain.lean", "4165f610ca923a07b11357d458b964d92ab8dcb123303b6fe4fda529c97afd66"},
     {"lakefile.lean", "36132fc8f52d7622f00145b2baae75edda31f8eab5cc2561f7dd84c6d7a1ab5c"},

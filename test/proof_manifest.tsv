@@ -86,6 +86,36 @@ ShiftMatching	ratioB_match	POZA_ZAKRESEM:lemat pomocniczy shift_matching_tail
 ShiftMatching	shift_matching_tail	TEST:ProofOracle.exact_tail_rewrite
 ShiftMatching	exact_tail_rewrite	TEST:ProofOracle.exact_tail_rewrite
 ShiftMatching	tail_can_be_strict	TEST:ProofOracle.tail_can_be_strict
+StartupBoundaries	affineReady_iff_nat	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	affineReady_iff_residue	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	residue_ge	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	residue_attained	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	residue_attained_from	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	ceil_pred_le_iff	POZA_ZAKRESEM:lemat pomocniczy affineTail_exact
+StartupBoundaries	affineTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy PhaseStartupLatency i AddStartupLatency
+StartupBoundaries	natCeil_div	POZA_ZAKRESEM:lemat pomocniczy affineTail_eq_phase
+StartupBoundaries	phaseStartupLatency_eq_engine	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy PhaseStartupLatency
+StartupBoundaries	affineTail_eq_phase	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy PhaseStartupLatency
+StartupBoundaries	addRead_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy Add
+StartupBoundaries	addTail_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy AddStartupLatency
+StartupBoundaries	sumTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy AddStartupLatency i maksimum po skladowych w computeStartupLatency
+StartupBoundaries	subtractRead_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy Subtract
+StartupBoundaries	subtractTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy SubtractStartupLatency
+StartupBoundaries	thetaRead_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy Div
+StartupBoundaries	theta_ratio	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy ThetaStartupLatency (iloraz deltaTarget/deltaSource)
+StartupBoundaries	thetaTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy ThetaStartupLatency
+StartupBoundaries	nthetaRead_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy Mod
+StartupBoundaries	nthetaTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy NThetaStartupLatency
+StartupBoundaries	agse_window_ready	POZA_ZAKRESEM:lemat modelu okna AGSE dla agseTail_exact
+StartupBoundaries	agseTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy AgseStartupLatency
+StartupBoundaries	projectionTail_exact	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy ogona projekcji i redukcji krotek w computeStartupLatency
+StartupBoundaries	affineRead_mono	POZA_ZAKRESEM:lemat pomocniczy affineOrigin_le_iff
+StartupBoundaries	affineRead_reaches	POZA_ZAKRESEM:lemat pomocniczy affineOrigin_le_iff
+StartupBoundaries	affineOrigin_le_iff	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy firstIndexReaching dla Subtract, Div i Mod w computeLogicalOrigin
+StartupBoundaries	sumOrigin_le_iff	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy firstIndexReaching dla Add w computeLogicalOrigin
+StartupBoundaries	projectionOrigin_eq	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy poczatku projekcji i redukcji krotek w computeLogicalOrigin
+StartupBoundaries	agseOrigin_le_iff	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy AgseLogicalOrigin
+StartupBoundaries	agseOrigin_eq_ceil	NIEPOKRYTE:brak tablicy w OracleMain.lean i testu w test_proofOracle.cpp; dotyczy AgseLogicalOrigin
 SumCommutativity	sample_self	TEST:ProofOracle.sample_self
 SumCommutativity	sum_commutativity	TEST:ProofOracle.sum_commutativity
 SumCommutativity	sum_fast_left	TEST:ProofOracle.sum_fast_left

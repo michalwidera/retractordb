@@ -10,6 +10,9 @@ Ten katalog jest samodzielnym projektem Lean 4. Zawiera formalizacje twierdzeń 
 | Stwierdzenie: zaburzenie kolejności zdarzeń | `Profs/EventOrder.lean` | `ProfsManual/EventOrder.lean` |
 | Stwierdzenie: przemienność sumy strumieni | `Profs/SumCommutativity.lean` | `ProfsManual/SumCommutativity.lean` |
 | Twierdzenie R1: przesunięcie dopasowane do tempa | `Profs/ShiftMatching.lean`, `Profs/CausalShift.lean`, `Profs/InterleaveTailExact.lean` | `ProfsManual/ShiftMatching.lean` |
+| Granice rozruchowe Tabeli 1: suma, różnica, rozploty, AGSE, projekcja | `Profs/StartupBoundaries.lean` | brak (jeszcze bez dokumentu Verso) |
+
+`StartupBoundaries.lean` dowodzi dokładności obu granic rozruchowych dla operatorów o afinicznej mapie odczytu `⌊(n·p + c)/q⌋`: `Add`, `Subtract`, `Div` (Θ), `Mod` (~Θ), okna AGSE i projekcji. Ogon (`affineTail_exact`) jest najmniejszym ogonem spełniającym zdarzeniowy warunek dostępności od dowolnego progu, w tym samym modelu co `exactInterleaveTail_exact`, a jego postać zamknięta to `PhaseStartupLatency` z `κ = (c - c mod gcd(p, q))/q` (`affineTail_eq_phase`, `phaseStartupLatency_eq_engine`). Twierdzenia dla poszczególnych operatorów (`sumTail_exact`, `subtractTail_exact`, `thetaTail_exact`, `nthetaTail_exact`, `agseTail_exact`, `projectionTail_exact`) podają regułę w postaci z `SOperations.hpp`, a lematy `*Read_eq` wiążą mapę modelu z funkcjami `Add`, `Subtract`, `Div` i `Mod`. Początki (`affineOrigin_le_iff`, `sumOrigin_le_iff`, `agseOrigin_le_iff`, `projectionOrigin_eq`) opisują to, co liczy `firstIndexReaching` i `AgseLogicalOrigin` w `compiler::computeLogicalOrigin`. Dla Θ model zakłada, że wejście jest przeplotem, czyli `Δ_s = Δ·Δ_b/(Δ + Δ_b)` (`theta_ratio`). Testów porównujących te reguły silnika z modelem jeszcze nie ma; w `test/proof_manifest.tsv` mają status `NIEPOKRYTE`.
 
 Twierdzenie Fraenkela (1969) publikacja cytuje bez dowodu, więc nie ma osobnego dokumentu.
 

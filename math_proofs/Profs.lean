@@ -8,3 +8,4 @@ import Profs.SumCommutativity
 import Profs.ShiftMatching
 import Profs.CausalShift
 import Profs.InterleaveTailExact
+import Profs.StartupBoundaries
