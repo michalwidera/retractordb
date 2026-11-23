@@ -32,7 +32,7 @@
 #include "rdb/rationalFormat.hpp"
 #include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
-#include "SOperations.hpp"   // ceilR
+#include "SOperations.hpp"   // floorR, saturatedTail, reguly ogona
 
 using boost::lexical_cast;
 
@@ -173,6 +173,24 @@ std::optional<int> parseIndex(const std::string &text) {
   const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
   if (ec != std::errc{} || end != text.data() + text.size()) return std::nullopt;
   return value;
+}
+
+/// Podloga i sufit iloczynu w * deltaOut/deltaSrc dla nieujemnego w, dokladnie w __int128 (#637).
+///
+/// Przy deltaOut = t1/t2 i deltaSrc = s1/s2 iloczyn to (w*t1*s2) / (t2*s1): dla w < 2^32 licznik
+/// < 2^94, mianownik < 2^62. Wzory pojemnosci historii w computeRequiredCapacities liczyly go do
+/// 2026-11-23 w boost::rational<int>, ktory nie wykrywa przepelnienia - przeplot 1/48000 # 60
+/// dawal zrodlu a pojemnosc 287 zamiast 2880002, czyli odczyt spoza historii.
+__int128 floorScaled(const std::int64_t w, const boost::rational<int> &deltaOut, const boost::rational<int> &deltaSrc) {
+  const __int128 numerator   = __int128{w} * deltaOut.numerator() * deltaSrc.denominator();
+  const __int128 denominator = __int128{deltaOut.denominator()} * deltaSrc.numerator();
+  return numerator / denominator;
+}
+
+__int128 ceilScaled(const std::int64_t w, const boost::rational<int> &deltaOut, const boost::rational<int> &deltaSrc) {
+  const __int128 numerator   = __int128{w} * deltaOut.numerator() * deltaSrc.denominator();
+  const __int128 denominator = __int128{deltaOut.denominator()} * deltaSrc.numerator();
+  return (numerator + denominator - 1) / denominator;
 }
 }  // namespace
 
@@ -1802,6 +1820,22 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
 
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
+  // Pojemność spoza int to błąd planu (#637), jak ogon spoza int (#635). Wzory `#`, `&`, `%`, `+`
+  // i `-` liczą w __int128 (floorScaled, ceilScaled), więc wartość dochodzi tu dokładna, nie zawinięta.
+  std::string rangeError;
+  const auto raiseCapacity = [&capMap, &rangeError](const std::string &source, const std::string &consumer,
+                                                    const __int128 required, const int lowerBound) {
+    if (required > std::numeric_limits<int>::max()) {
+      constexpr __int128 printable = std::numeric_limits<std::int64_t>::max();
+      rangeError =
+          std::format("Stream '{}' needs a history of {} records for stream '{}'; the limit is {}", source,
+                      static_cast<std::int64_t>(std::min(required, printable)), consumer, std::numeric_limits<int>::max());
+      return false;
+    }
+    capMap[source] = std::max({capMap[source], lowerBound, static_cast<int>(required)});
+    return true;
+  };
+
   for (auto &q : coreInstance) {       // for each declaration
     if (!q.isDeclaration()) continue;  // that is declaration
     capMap[q.id] = 1;
@@ -1931,10 +1965,9 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
         // o jeden okres źródła (<=1) + prefetch źródła deklarowanego (+1);
         // kJunctionHistory = bound 2 + margines 2.
         for (const auto &nameSrc : {arg1, arg2}) {
-          const auto &source = coreInstance[nameSrc];
-          const int delayed =
-              ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
-          capMap[nameSrc] = std::max({capMap[nameSrc], kJunctionHistory, delayed});
+          const auto &source     = coreInstance[nameSrc];
+          const __int128 delayed = ceilScaled(q.startupLatency, q.rInterval, source.rInterval) - source.startupLatency + 2;
+          if (!raiseCapacity(nameSrc, q.id, delayed, kJunctionHistory)) return std::unexpected(rangeError);
         }
         break;
       case STREAM_DEHASH_DIV:
@@ -1942,10 +1975,9 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
         // Rozplot: jak wyżej, historia tylko dla strumienia rozplatanego
         // (arg2 to argument wymierny, nie strumień).
         {
-          const auto &source = coreInstance[arg1];
-          const int delayed =
-              ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
-          capMap[arg1] = std::max({capMap[arg1], kJunctionHistory, delayed});
+          const auto &source     = coreInstance[arg1];
+          const __int128 delayed = ceilScaled(q.startupLatency, q.rInterval, source.rInterval) - source.startupLatency + 2;
+          if (!raiseCapacity(arg1, q.id, delayed, kJunctionHistory)) return std::unexpected(rangeError);
         }
         break;
       case STREAM_ADD: {
@@ -1960,10 +1992,10 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
         // prefetch) - ten sam człon co w STREAM_SUBTRACT i STREAM_AGSE.
         for (const auto &nameSrc : {arg1, arg2}) {
           const auto &source = coreInstance[nameSrc];
-          const auto ratio   = q.rInterval / source.rInterval;
-          int required       = ceilR(boost::rational<int>(1 + q.startupLatency) * ratio) - source.startupLatency;
+          __int128 required =
+              ceilScaled(std::int64_t{1} + q.startupLatency, q.rInterval, source.rInterval) - source.startupLatency;
           if (source.isDeclaration()) required += kDeclarationPrefetch;
-          capMap[nameSrc] = std::max({capMap[nameSrc], required, 1});
+          if (!raiseCapacity(nameSrc, q.id, required, 1)) return std::unexpected(rangeError);
         }
       } break;
       case STREAM_AVG:
@@ -1974,12 +2006,14 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
         break;
       case STREAM_SUBTRACT: {
         const auto &source = coreInstance[arg1];
-        const auto ratio   = q.rInterval / source.rInterval;
-        // Dla deklaracji maksimum odległości od c_{ceil(n*ratio)}
+        // ratio = Delta_out/Delta_src. Dla deklaracji maksimum odległości od c_{ceil(n*ratio)}
         // występuje w fazie całkowitej. Dwa rekordy startowe mają tę samą
         // genezę co w AGSE (uzbrojenie storage i zerowy prefetch).
-        int required = source.isDeclaration() ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
-                                              : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
+        // Dla strumienia pośredniego ceil(Wout*ratio) - Wsrc różni się od dawnego
+        // ceilR(Wout*ratio - Wsrc) tylko dla wartości ujemnych, a te podnosi maksimum z 1.
+        __int128 required = source.isDeclaration()
+                                ? floorScaled(q.startupLatency, q.rInterval, source.rInterval) + 2
+                                : ceilScaled(q.startupLatency, q.rInterval, source.rInterval) - source.startupLatency;
         // K24/P1: formuła dla deklaracji zaniżała pojemność dla 39,1% par
         // (konsument, deklaracja) w korpusie 10 010 planów. Przy ilorazie
         // całkowitym >= 3 odczyt wypadał poza historią i dawał CICHY rekord
@@ -1990,9 +2024,10 @@ std::expected<std::map<std::string, int>, std::string> compiler::computeRequired
         // co potwierdzono wyczerpująco na 2070 parach (ratio, Wout).
         // Maksimum obu wartości - patrz komentarz przy STREAM_AGSE.
         if (source.isDeclaration()) {
-          required = std::max(required, floorR(boost::rational<int>(1 + q.startupLatency) * ratio) + kDeclarationPrefetch);
+          required = std::max(
+              required, floorScaled(std::int64_t{1} + q.startupLatency, q.rInterval, source.rInterval) + kDeclarationPrefetch);
         }
-        capMap[arg1] = std::max({capMap[arg1], required, 1});
+        if (!raiseCapacity(arg1, q.id, required, 1)) return std::unexpected(rangeError);
       } break;
       default:
         return std::unexpected(
