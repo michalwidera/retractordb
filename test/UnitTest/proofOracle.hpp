@@ -12,6 +12,7 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/BeattyModel.lean", "0d74ff6c645eb5aa987c1551a85bc4ac608ee9dd517d39d8fa2ee1d228182523"},
     {"Profs/BeattyPartition.lean", "b63382f5be495bf597e4caeb026e1d7479fd6b8e154b711ec684e81f734438cf"},
     {"Profs/CausalShift.lean", "e25e91c91c8a9712104d3172cc037be0357369b22a6318d70e6896935133a7c0"},
+    {"Profs/CppArith.lean", "12ff3d3e212248d551b85855cbd7c134286b961089d697c31cfaf0b635951b58"},
     {"Profs/Deinterleave.lean", "ce1d5be0a96e2e31e0799243daa66dfc9f85937e0c8d1467dd2c61949faff9be"},
     {"Profs/EventOrder.lean", "16ded3dba9b137e89fa0829596180465ac982aa0545542518e1fc7c2a74bfd31"},
     {"Profs/ExactInvertibility.lean", "80c320bd5c23419c94340783e88bba48ebeeed2bbd289e7a4f16fd951d450bfa"},

@@ -470,7 +470,7 @@ TEST(xSOperations, hash_startup_latency_handles_the_int_range_edge) {
   EXPECT_GT(HashStartupLatency(boost::rational<int>(1), boost::rational<int>(big), 0, 1), std::int64_t{big});
 }
 
-// Interwał przeplotu w int nie ogranicza p i q do int (#NNN). Dla 2/3 # 2000000002/5 interwał
+// Interwał przeplotu w int nie ogranicza p i q do int (#644). Dla 2/3 # 2000000002/5 interwał
 // C to 1000000001/1500000004, a p/q = 5/3000000003, L = 3000000008. Wartości policzone na
 // ułamkach dokładnych (Python fractions):
 //   kres A = ceil(W_A*L/q): 0 dla W_A = 0, 4 dla W_A = 3 (3*L/q = 3,000000015);
