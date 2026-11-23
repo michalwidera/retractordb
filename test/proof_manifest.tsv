@@ -70,6 +70,24 @@ EngineRules	modCpp_eq	NIEPOKRYTE:test w A4 (D5)
 EngineRules	affineRead_self	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	subtractCpp_eq	NIEPOKRYTE:test w A4 (D5)
 EngineRules	addCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	affineTail_zero	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	natTail_cast	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	min_int64Max_le_iff	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	ceilDiv_le	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	agseStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	agseStartupLatency_lt	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	agseStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	agseLogicalOriginCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	agseLogicalOrigin_lt	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	cross_pos	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	saturatedTailCpp_natCast	NIEPOKRYTE:test w A4 (D5)
+EngineRules	addStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	addStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	phaseStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaTail_phase	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	nthetaStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
 Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
 Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
 Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original

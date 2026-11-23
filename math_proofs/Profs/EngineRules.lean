@@ -729,6 +729,429 @@ theorem addCpp_eq {o src : RatInt} (ho : o.Valid) (ho0 : 0 < o.val) (hs : src.Va
     rw [show n * (o.num * src.den) + 0 = n * o.num * src.den by ring,
       show src.num * o.den = o.den * src.num by ring]
 
+/- ===== Reguly rozruchowe (krok A3a) =====
+
+   Hipotezy jak w A2: interwaly dodatnie i znormalizowane, ogon zrodla W z [0, INT_MAX],
+   step > 0 i sourceWidth > 0 (wymusza kompilator planu). Reguly konczace sie na saturatedTail
+   maja wynik min(v, INT64_MAX), z ktorego oba przypadki nasycenia wynikaja wprost; wnioski
+   *_exact lacza regule z granica gotowosci modelu dla kazdego ogona W' z zakresu int, czyli
+   kazdego, ktorego kompilator nie odrzuca - przy nich nasycenie nie ma znaczenia.
+
+   Dowody przy argumentach rzutowanych z N skladaja wynik przez rw krok po kroku: simp only
+   z Option.bind_some dawal tu term, ktorego jadro nie sprawdza (deep recursion, 2026-11-23). -/
+
+/- affineTail bez czlonu fazowego (c = 0). -/
+theorem affineTail_zero (p q Ws : ℕ) : affineTail p q 0 Ws = (q * (1 + Ws) + p - 1) / p - 1 := by
+  unfold affineTail; simp
+
+/- max(0, ceil(X/p) - 1) z saturatedTailCpp_eq jako ogon w liczbach naturalnych. -/
+theorem natTail_cast (X p : ℕ) (hp : 0 < p) :
+    max 0 (⌈(X : ℚ) / p⌉ - 1) = (((X + p - 1) / p - 1 : ℕ) : ℤ) := by
+  rw [← natCeil_div X p hp, ← Int.natCast_ceil_eq_ceil (by positivity)]
+  omega
+
+/- Nasycenie nie zmienia porownania z ogonem z zakresu int (2^31 - 1 < INT64_MAX). -/
+theorem min_int64Max_le_iff {v W : ℤ} (hW : W < 2 ^ 31) : min v int64Max ≤ W ↔ v ≤ W := by
+  have h : (2 : ℤ) ^ 31 < int64Max := by unfold int64Max; norm_num
+  constructor
+  · intro h1
+    rcases le_total v int64Max with h2 | h2
+    · rwa [min_eq_left h2] at h1
+    · rw [min_eq_right h2] at h1; linarith
+  · intro h1; exact (min_le_left _ _).trans h1
+
+/- Sufit ilorazu przez h >= 1 nie przekracza dzielnej. -/
+theorem ceilDiv_le (x h : ℕ) (hh : 0 < h) : (x + h - 1) / h ≤ x := by
+  rcases Nat.eq_zero_or_pos x with h0 | h0
+  · rw [h0, Nat.zero_add, Nat.div_eq_of_lt (by omega)]
+  · apply Nat.div_le_of_le_mul
+    have : h - 1 ≤ (h - 1) * x := Nat.le_mul_of_pos_right _ h0
+    have e : h * x = (h - 1) * x + x := by
+      rw [← Nat.succ_mul, Nat.succ_eq_add_one, Nat.sub_add_cancel hh]
+    omega
+
+/- ===== AgseStartupLatency ===== -/
+
+-- ANCHOR: agse_startup_latency_cpp
+def agseStartupLatencyCpp (sourceWidth step sourceLatency : ℤ) : Option ℤ := do
+  -- std::int64_t{1} + sourceLatency
+  let a ← addC wInt64 1 sourceLatency
+  -- (...) * sourceWidth
+  let m ← mulC wInt64 a sourceWidth
+  -- roundedAwayFromZero(..., step)
+  let r ← roundedAwayFromZeroCpp m step
+  -- return ... - 1;
+  subC wInt64 r 1
+-- ANCHOR_END: agse_startup_latency_cpp
+
+/- Bez nasycenia: (1+W)*F < 2^62, a wynik ceil((1+W)*F/step) - 1 jest od niego mniejszy
+   (agseStartupLatency_lt). Postac ceil((1+W)*F/step) - 1 z agseTail_exact daje addTail_eq. -/
+theorem agseStartupLatencyCpp_eq {F h W : ℕ} (hF : 0 < F) (hFl : F < 2 ^ 31) (hh : 0 < h)
+    (hW : W < 2 ^ 31) :
+    agseStartupLatencyCpp F h W = some (affineTail h F 0 W : ℤ) := by
+  have hm : F * (1 + W) < 2 ^ 62 := by
+    calc F * (1 + W) < 2 ^ 31 * 2 ^ 31 := Nat.mul_lt_mul_of_lt_of_le hFl (by omega) (by omega)
+      _ = 2 ^ 62 := by norm_num
+  have hm1 : 1 ≤ F * (1 + W) := Nat.one_le_iff_ne_zero.mpr (by positivity)
+  have hd1 : 1 ≤ (F * (1 + W) + h - 1) / h := (Nat.le_div_iff_mul_le hh).mpr (by omega)
+  have hdl := ceilDiv_le (F * (1 + W)) h hh
+  have e : (1 + (W : ℤ)) * F = ((F * (1 + W) : ℕ) : ℤ) := by push_cast; ring
+  have hmR : inRange wInt64 ((F * (1 + W) : ℕ) : ℤ) := by
+    generalize F * (1 + W) = M at *
+    constructor <;> norm_num [wInt64]
+    omega
+  have s1 : addC wInt64 1 (W : ℤ) = some (1 + (W : ℤ)) :=
+    addC_of_inRange (by constructor <;> norm_num [wInt64] <;> omega)
+  have s2 : mulC wInt64 (1 + (W : ℤ)) F = some ((F * (1 + W) : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (by rw [e]; exact hmR), e]
+  have s3 := roundedAwayFromZeroCpp_natCast _ _ hh hmR
+  have s4 : subC wInt64 (((F * (1 + W) + h - 1) / h : ℕ) : ℤ) 1 = some (affineTail h F 0 W : ℤ) := by
+    rw [subC_of_inRange (by
+      generalize (F * (1 + W) + h - 1) / h = D at *
+      generalize F * (1 + W) = M at *
+      constructor <;> norm_num [wInt64] <;> omega), affineTail_zero, Nat.cast_sub hd1, Nat.cast_one]
+  unfold agseStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4]
+
+theorem agseStartupLatency_lt {F h W : ℕ} (hFl : F < 2 ^ 31) (hh : 0 < h) (hW : W < 2 ^ 31) :
+    affineTail h F 0 W < 2 ^ 62 := by
+  have hm : F * (1 + W) < 2 ^ 62 := by
+    calc F * (1 + W) < 2 ^ 31 * 2 ^ 31 := Nat.mul_lt_mul_of_lt_of_le hFl (by omega) (by omega)
+      _ = 2 ^ 62 := by norm_num
+  rw [affineTail_zero]
+  have := ceilDiv_le (F * (1 + W)) h hh
+  omega
+
+/- Wniosek: wynik kodu nie przekracza W' z zakresu int dokladnie wtedy, gdy od kazdego progu N0
+   kazdy rekord okna jest gotowy (agseTail_exact; gotowosc najnowszego pola to gotowosc okna,
+   agse_window_ready). -/
+theorem agseStartupLatencyCpp_exact {F h W W' N0 : ℕ} (hF : 0 < F) (hFl : F < 2 ^ 31) (hh : 0 < h)
+    (hW : W < 2 ^ 31) (tick : ℚ) (htick : 0 < tick) {v : ℤ}
+    (hv : agseStartupLatencyCpp F h W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady h F 0 W W' tick n := by
+  rw [agseStartupLatencyCpp_eq hF hFl hh hW, Option.some.injEq] at hv
+  rw [← hv, Nat.cast_le]
+  exact affineTail_exact h F 0 W W' N0 hh hF tick htick
+
+/- ===== AgseLogicalOrigin ===== -/
+
+-- ANCHOR: agse_logical_origin_cpp
+def agseLogicalOriginCpp (sourceWidth step length sourceOrigin : ℤ) : Option ℤ := do
+  -- const std::int64_t lengthAbs = length < 0 ? -std::int64_t{length} : length;
+  let lengthAbs ← (if length < 0 then subC wInt64 0 length else some length)
+  -- std::int64_t{sourceOrigin} * sourceWidth
+  let m ← mulC wInt64 sourceOrigin sourceWidth
+  -- (...) + lengthAbs
+  let s ← addC wInt64 m lengthAbs
+  -- ... - 1
+  let s1 ← subC wInt64 s 1
+  -- return roundedAwayFromZero(..., step);
+  roundedAwayFromZeroCpp s1 step
+-- ANCHOR_END: agse_logical_origin_cpp
+
+/- Granice hipotez:
+   - length != 0: okno @(k,0) odrzuca parser (RQLParser.cpp, exitSExpAgse: boundedSigned z min = 1,
+     takze dla -0 i stalej LET; sprawdzone xretractor -c 2026-11-23). Przy length = 0 i Os = 0
+     kod daje -1, a agseOrigin 0 (odejmowanie w N).
+   - 0 <= Os: compiler::computeLogicalOrigin zaczyna od 0 dla deklaracji, a kazda galaz daje
+     wynik >= origin zrodla - z wyjatkiem przepelnienia int przy >N i oknie rekordowym (#647),
+     po ktorym ujemny origin dochodzi tu jako sourceOrigin. Do poprawki #647 to jawna granica.
+   Bez nasycenia: Os*F + |length| - 1 < 2^62 + 2^31 (agseLogicalOrigin_lt). -/
+theorem agseLogicalOriginCpp_eq {F h Os : ℕ} {length : ℤ} (hFl : F < 2 ^ 31) (hh : 0 < h) (hOs : Os < 2 ^ 31) (hl : inRange wInt length) (hl0 : length ≠ 0) :
+    agseLogicalOriginCpp F h length Os = some (agseOrigin F h length.natAbs Os : ℤ) := by
+  obtain ⟨hl1, hl2⟩ := hl
+  norm_num [wInt] at hl1 hl2
+  have hm : Os * F < 2 ^ 62 := by
+    calc Os * F < 2 ^ 31 * 2 ^ 31 := Nat.mul_lt_mul'' hOs hFl
+      _ = 2 ^ 62 := by norm_num
+  have hL : (length.natAbs : ℤ) = if length < 0 then 0 - length else length := by
+    split_ifs <;> omega
+  have hLb : length.natAbs ≤ 2 ^ 31 := by omega
+  have hL0 : 1 ≤ length.natAbs := by omega
+  have s0 : (if length < 0 then subC wInt64 0 length else some length) =
+      some (length.natAbs : ℤ) := by
+    rw [hL]
+    split_ifs
+    · exact subC_of_inRange (by constructor <;> norm_num [wInt64] <;> omega)
+    · rfl
+  clear hL
+  generalize length.natAbs = L at *
+  have hmZ : ((Os * F : ℕ) : ℤ) < 2 ^ 62 := by exact_mod_cast hm
+  have hLZ : (L : ℤ) ≤ 2 ^ 31 := by exact_mod_cast hLb
+  have hL1 : (1 : ℤ) ≤ L := by exact_mod_cast hL0
+  have em : (Os : ℤ) * F = ((Os * F : ℕ) : ℤ) := by push_cast; ring
+  have eL : ((Os * F + (L - 1) : ℕ) : ℤ) = ((Os * F : ℕ) : ℤ) + L - 1 := by
+    rw [Nat.cast_add, Nat.cast_sub hL0, Nat.cast_one]; ring
+  have hsR : inRange wInt64 ((Os * F + (L - 1) : ℕ) : ℤ) := by
+    rw [eL]; generalize ((Os * F : ℕ) : ℤ) = M at *
+    constructor <;> norm_num [wInt64] <;> omega
+  have s1 : mulC wInt64 (Os : ℤ) F = some ((Os * F : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (by
+      rw [em]; generalize ((Os * F : ℕ) : ℤ) = M at *; constructor <;> norm_num [wInt64] <;> omega), em]
+  have s2 : addC wInt64 ((Os * F : ℕ) : ℤ) (L : ℤ) = some (((Os * F : ℕ) : ℤ) + L) :=
+    addC_of_inRange (by
+      generalize ((Os * F : ℕ) : ℤ) = M at *; constructor <;> norm_num [wInt64] <;> omega)
+  have s3 : subC wInt64 (((Os * F : ℕ) : ℤ) + L) 1 = some ((Os * F + (L - 1) : ℕ) : ℤ) := by
+    rw [subC_of_inRange (by
+      generalize ((Os * F : ℕ) : ℤ) = M at *; constructor <;> norm_num [wInt64] <;> omega), eL]
+  have s4 := roundedAwayFromZeroCpp_natCast _ _ hh hsR
+  unfold agseLogicalOriginCpp
+  simp only [Option.bind_eq_bind]
+  rw [s0, Option.bind_some, s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4]
+  rfl
+
+theorem agseLogicalOrigin_lt {F h Os w : ℕ} (hFl : F < 2 ^ 31) (hh : 0 < h) (hOs : Os < 2 ^ 31)
+    (hw : w ≤ 2 ^ 31) : agseOrigin F h w Os < 2 ^ 62 + 2 ^ 31 := by
+  have hm : Os * F < 2 ^ 62 := by
+    calc Os * F < 2 ^ 31 * 2 ^ 31 := Nat.mul_lt_mul'' hOs hFl
+      _ = 2 ^ 62 := by norm_num
+  unfold agseOrigin
+  have := ceilDiv_le (Os * F + (w - 1)) h hh
+  omega
+
+/- ===== Lematy pomocnicze regul z rational<int> ===== -/
+
+theorem cross_pos {r s : RatInt} (hr : r.Valid) (hr0 : 0 < r.val) (hs : s.Valid) : 0 < cross r s := by
+  obtain ⟨h1, h2⟩ := cross_spec hr hr0 hs
+  have : (0 : ℤ) < cross r s := by rw [h1]; exact h2
+  exact_mod_cast this
+
+/- saturatedTail na nieujemnym liczniku X i dodatnim mianowniku p jako ogon w N. -/
+theorem saturatedTailCpp_natCast {X p : ℕ} (hp : 0 < p) (hX : (X : ℤ) + p ≤ 2 ^ 126) :
+    saturatedTailCpp X p = some (min (((X + p - 1) / p - 1 : ℕ) : ℤ) int64Max) := by
+  have hX0 : (0 : ℤ) ≤ X := by positivity
+  rw [saturatedTailCpp_eq (N := (X : ℤ)) (D := (p : ℤ)) hX0 (by exact_mod_cast hp)
+    (inRange128_of_nonneg (by linarith) hX), Int.cast_natCast, Int.cast_natCast, natTail_cast X p hp]
+
+/- ===== AddStartupLatency ===== -/
+
+-- ANCHOR: add_startup_latency_cpp
+def addStartupLatencyCpp (s t : RatInt) (W : ℤ) : Option ℤ := do
+  -- (__int128{1} + sourceLatency)
+  let a ← addC wInt128 1 W
+  -- (...) * deltaSource.numerator()
+  let b ← mulC wInt128 a s.num
+  -- const __int128 numerator = (...) * deltaTarget.denominator();
+  let numerator ← mulC wInt128 b t.den
+  -- const __int128 denominator = __int128{deltaSource.denominator()} * deltaTarget.numerator();
+  let denominator ← mulC wInt128 s.den t.num
+  -- return saturatedTail(numerator, denominator);
+  saturatedTailCpp numerator denominator
+-- ANCHOR_END: add_startup_latency_cpp
+
+/- s = deltaSource, t = deltaTarget, p = t1*s2, q = s1*t2: ogon wzgledem skladowej to
+   affineTail p q 0 W = ceil((1+W)*s/t) - 1 (addTail_eq). Licznik < 2^93, mianownik < 2^62.
+   assert(sourceLatency >= 0) to typ W : N. -/
+theorem addStartupLatencyCpp_eq {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    addStartupLatencyCpp s t W = some (min (affineTail (cross t s) (cross s t) 0 W : ℤ) int64Max) := by
+  obtain ⟨s1p, s1l, s2p, s2l⟩ := ratInt_pos_bounds hs hs0
+  obtain ⟨t1p, t1l, t2p, t2l⟩ := ratInt_pos_bounds ht ht0
+  obtain ⟨hq, -⟩ := cross_spec hs hs0 ht
+  obtain ⟨hp, -⟩ := cross_spec ht ht0 hs
+  have hW1 : (0 : ℤ) ≤ 1 + W := by positivity
+  have hW2 : (1 + (W : ℤ)) ≤ 2 ^ 31 := by
+    have : (W : ℤ) < 2 ^ 31 := by exact_mod_cast hW
+    linarith
+  have l1 : (1 + (W : ℤ)) * s.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul hW2 s1l.le s1p.le (by norm_num)
+  have l2 : (1 + (W : ℤ)) * s.num * t.den ≤ 2 ^ 31 * 2 ^ 31 * 2 ^ 31 :=
+    mul_le_mul l1 t2l.le t2p.le (by norm_num)
+  have l3 : s.den * t.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul s2l.le t1l.le t1p.le (by norm_num)
+  have p1 : 0 ≤ (1 + (W : ℤ)) * s.num := mul_nonneg hW1 s1p.le
+  have p2 : 0 ≤ (1 + (W : ℤ)) * s.num * t.den := mul_nonneg p1 t2p.le
+  have eN : (1 + (W : ℤ)) * s.num * t.den = ((cross s t * (1 + W) : ℕ) : ℤ) := by
+    push_cast; rw [hq]; ring
+  have eD : s.den * t.num = ((cross t s : ℕ) : ℤ) := by rw [hp]; ring
+  have s1 : addC wInt128 1 (W : ℤ) = some (1 + (W : ℤ)) :=
+    addC_of_inRange (inRange128_of_le (by linarith) hW2 (by norm_num))
+  have s2 : mulC wInt128 (1 + (W : ℤ)) s.num = some ((1 + (W : ℤ)) * s.num) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) l1 (by norm_num))
+  have s3 : mulC wInt128 ((1 + (W : ℤ)) * s.num) t.den = some ((cross s t * (1 + W) : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (inRange128_of_le (by linarith) l2 (by norm_num)), eN]
+  have s4 : mulC wInt128 s.den t.num = some ((cross t s : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (inRange128_of_le (by linarith [mul_pos s2p t1p]) l3 (by norm_num)), eD]
+  have s5 := saturatedTailCpp_natCast (X := cross s t * (1 + W)) (cross_pos ht ht0 hs)
+    (by rw [← eN, ← eD]; linarith)
+  unfold addStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some, s5,
+    affineTail_zero]
+
+/- Wniosek: ogon kodu nie przekracza W' z zakresu int dokladnie wtedy, gdy od kazdego progu N0
+   rekord skladowej czytany przez Add jest gotowy. Przy tick = 1/(s2*t2) jest p*tick = t
+   i q*tick = s, czyli Delta_out i Delta_src; maksimum po skladowych daje sumTail_exact. -/
+theorem addStartupLatencyCpp_exact {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) {W W' N0 : ℕ} (hW : W < 2 ^ 31) (hW' : W' < 2 ^ 31) (tick : ℚ)
+    (htick : 0 < tick) {v : ℤ} (hv : addStartupLatencyCpp s t W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady (cross t s) (cross s t) 0 W W' tick n := by
+  rw [addStartupLatencyCpp_eq hs hs0 ht ht0 hW, Option.some.injEq] at hv
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
+  exact affineTail_exact _ _ 0 W W' N0 (cross_pos ht ht0 hs) (cross_pos hs hs0 ht) tick htick
+
+/- ===== PhaseStartupLatency ===== -/
+
+-- ANCHOR: phase_startup_latency_cpp
+def phaseStartupLatencyCpp (phaseBound ratio : RatInt) (W : ℤ) : Option ℤ := do
+  -- (__int128{sourceLatency} + 1)
+  let a ← addC wInt128 W 1
+  -- (...) * phaseBound.denominator()
+  let b ← mulC wInt128 a phaseBound.den
+  -- phaseBound.numerator() + (...)
+  let c ← addC wInt128 phaseBound.num b
+  -- const __int128 numerator = (...) * ratio.denominator();
+  let numerator ← mulC wInt128 c ratio.den
+  -- if (numerator <= 0) return 0;
+  if numerator ≤ 0 then some 0
+  else do
+    -- const __int128 denominator = __int128{phaseBound.denominator()} * ratio.numerator();
+    let denominator ← mulC wInt128 phaseBound.den ratio.num
+    -- return saturatedTail(numerator, denominator);
+    saturatedTailCpp numerator denominator
+-- ANCHOR_END: phase_startup_latency_cpp
+
+/- phaseBound = u/v dowolnego znaku (Valid), ratio = R/S > 0 (assert). Licznik
+   (u + (W+1)*v)*S lezy w [-2^62, 2^94), mianownik v*R w (0, 2^62). Licznik <= 0 daje 0,
+   tak jak obciecie N w phaseStartupLatency (phaseStartupLatency_eq_engine). -/
+theorem phaseStartupLatencyCpp_eq {k r : RatInt} (hk : k.Valid) (hr : r.Valid) (hr0 : 0 < r.val)
+    {W : ℕ} (hW : W < 2 ^ 31) :
+    phaseStartupLatencyCpp k r W = some (min (phaseStartupLatency k.val r.val W : ℤ) int64Max) := by
+  obtain ⟨r1p, r1l, r2p, r2l⟩ := ratInt_pos_bounds hr hr0
+  have k2p := hk.1
+  obtain ⟨k1a, k1b⟩ := hk.2.2.1
+  have k2l := hk.2.2.2.2
+  norm_num [wInt] at k1a k1b k2l
+  have hWZ : (W : ℤ) < 2 ^ 31 := by exact_mod_cast hW
+  have hW1 : (0 : ℤ) ≤ W + 1 := by positivity
+  have l1 : ((W : ℤ) + 1) * k.den ≤ 2 ^ 31 * 2 ^ 31 :=
+    mul_le_mul (by linarith) (by linarith) k2p.le (by norm_num)
+  have p1 : 0 ≤ ((W : ℤ) + 1) * k.den := mul_nonneg hW1 k2p.le
+  have c1 : -2 ^ 31 ≤ k.num + ((W : ℤ) + 1) * k.den := by linarith
+  have c2 : k.num + ((W : ℤ) + 1) * k.den ≤ 2 ^ 31 + 2 ^ 62 := by linarith
+  have n1 : -(2 ^ 62) ≤ (k.num + ((W : ℤ) + 1) * k.den) * r.den := by nlinarith
+  have n2 : (k.num + ((W : ℤ) + 1) * k.den) * r.den ≤ (2 ^ 31 + 2 ^ 62) * 2 ^ 31 := by nlinarith
+  have d1 : 0 < k.den * r.num := mul_pos k2p r1p
+  have d2 : k.den * r.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul (by linarith) r1l.le r1p.le (by norm_num)
+  have inR : ∀ x : ℤ, -(2 ^ 62) ≤ x → x ≤ (2 ^ 31 + 2 ^ 62) * 2 ^ 31 → inRange wInt128 x := by
+    intro x h1 h2
+    constructor <;> norm_num [wInt128] at h1 h2 ⊢ <;> omega
+  have s1 : addC wInt128 (W : ℤ) 1 = some ((W : ℤ) + 1) := addC_of_inRange (inR _ (by linarith) (by linarith))
+  have s2 : mulC wInt128 ((W : ℤ) + 1) k.den = some (((W : ℤ) + 1) * k.den) :=
+    mulC_of_inRange (inR _ (by linarith) (by linarith))
+  have s3 : addC wInt128 k.num (((W : ℤ) + 1) * k.den) = some (k.num + ((W : ℤ) + 1) * k.den) :=
+    addC_of_inRange (inR _ (by linarith) (by linarith))
+  have s4 : mulC wInt128 (k.num + ((W : ℤ) + 1) * k.den) r.den =
+      some ((k.num + ((W : ℤ) + 1) * k.den) * r.den) := mulC_of_inRange (inR _ n1 n2)
+  have s5 : mulC wInt128 k.den r.num = some (k.den * r.num) :=
+    mulC_of_inRange (inR _ (by linarith) (by linarith))
+  have hq : (k.val + (W : ℚ) + 1) / r.val =
+      (((k.num + ((W : ℤ) + 1) * k.den) * r.den : ℤ) : ℚ) / ((k.den * r.num : ℤ) : ℚ) := by
+    unfold RatInt.val
+    have h1 : (k.den : ℚ) ≠ 0 := by exact_mod_cast k2p.ne'
+    have h2 : (r.den : ℚ) ≠ 0 := by exact_mod_cast r2p.ne'
+    have h3 : (r.num : ℚ) ≠ 0 := by exact_mod_cast r1p.ne'
+    push_cast
+    field_simp
+    ring
+  rw [phaseStartupLatency_eq_engine, hq]
+  unfold phaseStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some]
+  split_ifs with hN
+  · have hd : (0 : ℚ) < ((k.den * r.num : ℤ) : ℚ) := by exact_mod_cast d1
+    have hn : (((k.num + ((W : ℤ) + 1) * k.den) * r.den : ℤ) : ℚ) ≤ 0 := by exact_mod_cast hN
+    have hc : ⌈(((k.num + ((W : ℤ) + 1) * k.den) * r.den : ℤ) : ℚ) / ((k.den * r.num : ℤ) : ℚ)⌉ ≤ 0 :=
+      Int.ceil_le.mpr (by rw [Int.cast_zero]; exact div_nonpos_of_nonpos_of_nonneg hn hd.le)
+    rw [max_eq_left (by omega), min_eq_left (by unfold int64Max; norm_num)]
+  · have hN0 : 0 ≤ (k.num + ((W : ℤ) + 1) * k.den) * r.den := by linarith [not_le.mp hN]
+    rw [s5, Option.bind_some, saturatedTailCpp_eq (N := (k.num + ((W : ℤ) + 1) * k.den) * r.den)
+      (D := k.den * r.num) hN0 d1
+      (inRange128_of_le (B := (2 ^ 31 + 2 ^ 62) * 2 ^ 31 + 2 ^ 31 * 2 ^ 31) (by linarith)
+        (by linarith) (by norm_num))]
+
+/- ===== NThetaStartupLatency ===== -/
+
+-- ANCHOR: ntheta_startup_latency_cpp
+def nthetaStartupLatencyCpp (s t : RatInt) (W : ℤ) : Option ℤ := do
+  -- (__int128{sourceLatency} + 1)
+  let a ← addC wInt128 W 1
+  -- (...) * deltaTarget.denominator()
+  let b ← mulC wInt128 a t.den
+  -- const __int128 numerator = (...) * deltaSource.numerator();
+  let numerator ← mulC wInt128 b s.num
+  -- const __int128 denominator = __int128{deltaTarget.numerator()} * deltaSource.denominator();
+  let denominator ← mulC wInt128 t.num s.den
+  -- return saturatedTail(numerator, denominator);
+  saturatedTailCpp numerator denominator
+-- ANCHOR_END: ntheta_startup_latency_cpp
+
+/- Ten sam ogon co AddStartupLatency(s, t, W): p = t1*s2, q = s1*t2, licznik (W+1)*t2*s1 < 2^93,
+   mianownik t1*s2 < 2^62. -/
+theorem nthetaStartupLatencyCpp_eq {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    nthetaStartupLatencyCpp s t W = some (min (affineTail (cross t s) (cross s t) 0 W : ℤ) int64Max) := by
+  obtain ⟨s1p, s1l, s2p, s2l⟩ := ratInt_pos_bounds hs hs0
+  obtain ⟨t1p, t1l, t2p, t2l⟩ := ratInt_pos_bounds ht ht0
+  obtain ⟨hq, -⟩ := cross_spec hs hs0 ht
+  obtain ⟨hp, -⟩ := cross_spec ht ht0 hs
+  have hW1 : (0 : ℤ) ≤ W + 1 := by positivity
+  have hW2 : ((W : ℤ) + 1) ≤ 2 ^ 31 := by
+    have : (W : ℤ) < 2 ^ 31 := by exact_mod_cast hW
+    linarith
+  have l1 : ((W : ℤ) + 1) * t.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul hW2 t2l.le t2p.le (by norm_num)
+  have l2 : ((W : ℤ) + 1) * t.den * s.num ≤ 2 ^ 31 * 2 ^ 31 * 2 ^ 31 :=
+    mul_le_mul l1 s1l.le s1p.le (by norm_num)
+  have l3 : t.num * s.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul t1l.le s2l.le s2p.le (by norm_num)
+  have p1 : 0 ≤ ((W : ℤ) + 1) * t.den := mul_nonneg hW1 t2p.le
+  have eN : ((W : ℤ) + 1) * t.den * s.num = ((cross s t * (1 + W) : ℕ) : ℤ) := by
+    push_cast; rw [hq]; ring
+  have eD : t.num * s.den = ((cross t s : ℕ) : ℤ) := by rw [hp]
+  have s1 : addC wInt128 (W : ℤ) 1 = some ((W : ℤ) + 1) :=
+    addC_of_inRange (inRange128_of_le (by linarith) hW2 (by norm_num))
+  have s2 : mulC wInt128 ((W : ℤ) + 1) t.den = some (((W : ℤ) + 1) * t.den) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) l1 (by norm_num))
+  have s3 : mulC wInt128 (((W : ℤ) + 1) * t.den) s.num = some ((cross s t * (1 + W) : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (inRange128_of_le (by linarith [mul_nonneg p1 s1p.le]) l2 (by norm_num)), eN]
+  have s4 : mulC wInt128 t.num s.den = some ((cross t s : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (inRange128_of_le (by linarith [mul_pos t1p s2p]) l3 (by norm_num)), eD]
+  have s5 := saturatedTailCpp_natCast (X := cross s t * (1 + W)) (cross_pos ht ht0 hs)
+    (by rw [← eN, ← eD]; linarith)
+  unfold nthetaStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some, s5,
+    affineTail_zero]
+
+/- Postac z wymagania [soperations.n-theta-startup-latency.1]: PhaseStartupLatency(0, t/s, W). -/
+theorem nthetaTail_phase {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) (W : ℕ) :
+    phaseStartupLatency 0 (t.val / s.val) W = affineTail (cross t s) (cross s t) 0 W := by
+  have h := affineTail_eq_phase (cross t s) (cross s t) 0 W (cross_pos ht ht0 hs) (cross_pos hs hs0 ht)
+  simp only [Nat.zero_mod, Nat.sub_zero, Nat.cast_zero, zero_div] at h
+  rw [h, ratInt_val_div ht hs hs0]
+  obtain ⟨hq, -⟩ := cross_spec hs hs0 ht
+  obtain ⟨hp, -⟩ := cross_spec ht ht0 hs
+  have hp' : ((cross t s : ℕ) : ℚ) = ((t.num * s.den : ℤ) : ℚ) := by rw [← hp, Int.cast_natCast]
+  have hq' : ((cross s t : ℕ) : ℚ) = ((t.den * s.num : ℤ) : ℚ) := by
+    rw [mul_comm t.den, ← hq, Int.cast_natCast]
+  rw [hp', hq']
+
+theorem nthetaStartupLatencyCpp_eq_phase {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    nthetaStartupLatencyCpp s t W = some (min (phaseStartupLatency 0 (t.val / s.val) W : ℤ) int64Max) := by
+  rw [nthetaTail_phase hs hs0 ht ht0, nthetaStartupLatencyCpp_eq hs hs0 ht ht0 hW]
+
+/- Wniosek jak addStartupLatencyCpp_exact: mapa odczytu affineRead p q 0 n = floor(n*t/s)
+   (addRead_eq). Ze to mapa Mod(), czyli i + floor(i*u/v) z nthetaRead_eq, wynika dopiero przy
+   s = t*o/(t+o) dla parametru o rozplotu (theta_ratio) - kod tego nie sprawdza; ten krok
+   nalezy do A3b razem z Theta. -/
+theorem nthetaStartupLatencyCpp_exact {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) {W W' N0 : ℕ} (hW : W < 2 ^ 31) (hW' : W' < 2 ^ 31) (tick : ℚ)
+    (htick : 0 < tick) {v : ℤ} (hv : nthetaStartupLatencyCpp s t W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady (cross t s) (cross s t) 0 W W' tick n := by
+  rw [nthetaStartupLatencyCpp_eq hs hs0 ht ht0 hW, Option.some.injEq] at hv
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
+  exact affineTail_exact _ _ 0 W W' N0 (cross_pos ht ht0 hs) (cross_pos hs hs0 ht) tick htick
+
 end Cpp
 
 end Profs
