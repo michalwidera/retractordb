@@ -9,6 +9,11 @@ if ! lake build Profs profs_manual --wfail; then
   printf '\nDOWODY: BLAD - kod Lean lub dokumenty Verso maja bledy albo ostrzezenia (w tym sorry); szczegoly powyzej.\n' >&2
   exit 1
 fi
+# Aksjomaty twierdzen Profs.* (#634): tylko propext, Classical.choice i Quot.sound.
+if ! lake env lean AxiomCheck.lean; then
+  printf '\nDOWODY: BLAD - twierdzenie zalezy od aksjomatu spoza propext, Classical.choice, Quot.sound; szczegoly powyzej.\n' >&2
+  exit 1
+fi
 trap 'printf "\nRENDEROWANIE: BLAD - dowody sa poprawne, ale nie udalo sie wygenerowac wynikow; szczegoly powyzej.\n" >&2' ERR
 
 lake exe profs_manual --with-tex
@@ -24,7 +29,7 @@ mkdir -p build/verso/text
 python3 render_text.py build/verso/html-single/index.html \
   build/verso/text/all-proofs.txt
 
-for chapter in interleave-covering deinterleave exact-invertibility event-order sum-commutativity shift-matching startup-boundaries plan-composition plan-values; do
+for chapter in interleave-covering deinterleave exact-invertibility event-order sum-commutativity shift-matching startup-boundaries plan-composition plan-values engine-rules; do
   python3 render_text.py "build/verso/html-multi/$chapter/index.html" \
     "build/verso/text/$chapter.txt"
 done

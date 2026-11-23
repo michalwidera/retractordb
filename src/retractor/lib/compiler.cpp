@@ -1200,14 +1200,12 @@ std::string compiler::expandIndexWildcards(query &q) {
       return internalCompilerError(fmt::format("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id));
     }
     if (minSizeFlat <= 0) {
-      // minSizeFlat == 0 znaczy, ze zrodlo ma PUSTY deskryptor, a jedyna droga do tego jest
-      // okno AGSE o dlugosci zero: query::descriptorFrom iteruje `for (i=0; i<abs(length); i++)`,
-      // wiec @(k,0) nie wytwarza ani jednego pola. Komunikat mowi o oknie, a nie o "flat size",
-      // bo to okno uzytkownik napisal.
-      return fmt::format(
-          "Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
-          "produces nothing to expand",
-          q.id);
+      // Zrodlo bez pol to zlamany niezmiennik, a nie blad planu: deklaracja ma co najmniej jedno
+      // pole, lista SELECT nie jest pusta, a okno `@(k,0)` - dawniej jedyna droga do pustego
+      // deskryptora - parser odrzuca od #308/#440 (`|window| >= 1`, takze `-0` i stala LET).
+      // Straz zostaje, bo bez niej petla nizej rozwinelaby `[_]` po cichu do zera pol (#647).
+      return internalCompilerError(
+          fmt::format("compiler::expandIndexWildcards: '[_]' source of query '{}' has no fields", q.id));
     }
 
     for (int i = 0; i < minSizeFlat; i++) {
@@ -2175,6 +2173,13 @@ std::string originSearchTooExtreme(const std::string &nodeId, const int threshol
       nodeId, kOriginSearchLimit, threshold);
 }
 
+// Origin poza int to blad planu, a nie przypadek brzegowy (A2 M11, #647) - wspolny komunikat
+// wszystkich galezi, ktore origin zwiekszaja.
+std::string originBeyondInt(const std::string &nodeId, const std::int64_t origin) {
+  return fmt::format("Stream '{}' has a logical origin of {} slots; the limit is {}", nodeId, origin,
+                     std::numeric_limits<int>::max());
+}
+
 }  // namespace
 
 std::string compiler::computeLogicalOrigin() {
@@ -2222,8 +2227,14 @@ std::string compiler::computeLogicalOrigin() {
         // n-(width-1) ... n, więc pierwszy definiowalny rekord wypada tam, gdzie całe okno
         // mieści się w istniejącej części źródła:
         //   n - (width-1) >= O_src  =>  O = O_src + width - 1.
+        //
+        // Suma liczona w int64: o1 bliskie INT_MAX plus szerokość do 65536 przepełniała int (#647).
         std::string windowError;
-        if (const auto width = windowWidthOf(q, windowError); width.has_value()) result = o1 + *width - 1;
+        if (const auto width = windowWidthOf(q, windowError); width.has_value()) {
+          const std::int64_t widened = std::int64_t{o1} + *width - 1;
+          if (widened > std::numeric_limits<int>::max()) return originBeyondInt(q.id, widened);
+          result = static_cast<int>(widened);
+        }
       } else if (op == STREAM_TIMEMOVE) {
         // tau_N jest OPÓŹNIENIEM: rekord n ma treść rekordu n-N producenta. Rekordy o indeksie
         // mniejszym od N nie mają definicji - sięgałyby przed początek producenta - więc
@@ -2235,7 +2246,11 @@ std::string compiler::computeLogicalOrigin() {
         //
         // Suma slotów milczenia (origin + ogon) zostaje bez zmian, więc ciąg wydanych rekordów
         // jest identyczny - przesuwa się wyłącznie ich adres w czasie.
-        result = o1 + std::get<int>(q.lProgram.back().getVT());
+        //
+        // Suma liczona w int64, jak w gałęzi AGSE: o1 bliskie INT_MAX plus N do 65536 przepełniało int (#647).
+        const std::int64_t shifted = std::int64_t{o1} + std::get<int>(q.lProgram.back().getVT());
+        if (shifted > std::numeric_limits<int>::max()) return originBeyondInt(q.id, shifted);
+        result = static_cast<int>(shifted);
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają na bieżącej krotce producenta.
       } else if (op == STREAM_AGSE) {
@@ -2244,9 +2259,7 @@ std::string compiler::computeLogicalOrigin() {
         // Dwa okna `@(1,65536)` w lancuchu daja origin ok. 2^32, czyli pierwszy rekord po czterech
         // miliardach slotow - blad planu, a nie przypadek brzegowy (A2 M11). Do tej pory int sie przepelnial.
         const std::int64_t origin = AgseLogicalOrigin(sourceWidth, step, length, o1);
-        if (origin > std::numeric_limits<int>::max())
-          return std::format("Stream '{}' has a logical origin of {} slots; the limit is {}", q.id, origin,
-                             std::numeric_limits<int>::max());
+        if (origin > std::numeric_limits<int>::max()) return originBeyondInt(q.id, origin);
         result = static_cast<int>(origin);
       } else if (op == STREAM_SUBTRACT) {
         const auto delta   = q.rInterval;

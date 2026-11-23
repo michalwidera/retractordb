@@ -3094,6 +3094,30 @@ TEST(xcompiler, agse_logical_origin_beyond_int_is_a_plan_error) {
   EXPECT_EQ(compileRql(source + "SELECT * STREAM w2 FROM w1@(65536,1)\n"), "OK");
 }
 
+// Przesuniecie `>N` i okno rekordowe w liscie SELECT tylko DODAJA do origin producenta, ale w int bez
+// strazy: do #647 origin bliski INT_MAX przepelnial sie, a plan przechodzil `-c` z ujemnym origin.
+// Lancuch z #647 daje w5 origin 2147450886 = INT_MAX - 32761 przy budzecie elementow w normie, wiec
+// dodatek 32761 trafia dokladnie w granice, a 32762 lub wiecej jest bledem planu.
+TEST(xcompiler, shift_and_record_window_origin_beyond_int_is_a_plan_error) {
+  // covers: compiler.compiler.7~1
+  const std::string chain =
+      "DECLARE a INTEGER STREAM core, 1 TEXTFILE 'd.txt'\n"
+      "SELECT * STREAM w1 FROM core@(2,65533)\n"
+      "SELECT * STREAM w2 FROM w1@(1,1)\n"
+      "SELECT * STREAM w3 FROM w2>65536\n"
+      "SELECT * STREAM w4 FROM w3>65536\n"
+      "SELECT * STREAM w5 FROM w4>65536\n";
+
+  std::string verdict = compileRql(chain + "SELECT * STREAM w6 FROM w5>65536\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w6' has a logical origin of 2147516422 slots; the limit is 2147483647")) << verdict;
+  EXPECT_EQ(compileRql(chain + "SELECT * STREAM w6 FROM w5>32761\n"), "OK");
+
+  // Okno rekordowe szerokosci W dodaje W-1.
+  verdict = compileRql(chain + "SELECT SUMC(w5[0]:65536) STREAM w6 FROM w5\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w6' has a logical origin of 2147516421 slots; the limit is 2147483647")) << verdict;
+  EXPECT_EQ(compileRql(chain + "SELECT SUMC(w5[0]:32762) STREAM w6 FROM w5\n"), "OK");
+}
+
 // Ogon przeplotu spoza int to blad planu (#616). Do 2026-11-10 HashStartupLatency() rzutowal wynik
 // na int bez kontroli. Ogon razy interwal (glebokosc czasowa) rosnie tylko przez prawy argument `#`,
 // wiec swiadek sklada najpierw lancuch x_k = s#x_(k-1) nad zrodlem o interwale 1: x10 ma interwal 1/11
