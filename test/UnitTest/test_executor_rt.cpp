@@ -250,12 +250,12 @@ TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
 // przy 100 Hz w slocie 214748365 (~24,9 dnia) termin wychodzil ujemny, przy 360 Hz juz po ~2,8 dnia,
 // a sen absolutny do terminu z przeszlosci nie spi wcale.
 TEST(ExecutorRtSleepTest, SlotDeadlineMsSurvivesLongAxis) {
-  // covers: executorrt.rt-slot-deadline-ms.1~1
-  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(1, 3)), 333);
-  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2, 3)), 666);
-  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(214748365, 100)), 2147483650L);
-  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(85899346, 360)), 238609294L);
-  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2147483647, 1)), 2147483647000L);
+  // covers: executorrt.rt-slot-deadline-ms.2~1
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<std::int64_t>(1, 3)), 333);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<std::int64_t>(2, 3)), 666);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<std::int64_t>(214748365, 100)), 2147483650L);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<std::int64_t>(85899346, 360)), 238609294L);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<std::int64_t>(2147483647, 1)), 2147483647000L);
 }
 
 // --- rtCheckAndPrint ---

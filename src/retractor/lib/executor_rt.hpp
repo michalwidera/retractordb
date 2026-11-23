@@ -10,6 +10,7 @@
 
 #include <pthread.h>
 
+#include <cstdint>
 #include <ctime>
 
 #include <boost/rational.hpp>
@@ -46,12 +47,14 @@ bool rtCheckAndPrint();
 bool rtActivate(int priority = appcfg::kDefaultSchedulingRtPriority);
 
 /// Funkcja rtSlotDeadlineMs powinna:
-/// - [executorrt.rt-slot-deadline-ms.1~1] zwracać termin slotu w milisekundach od kotwicy: licznik slotSeconds razy 1000 podzielony całkowicie przez mianownik, w typie long, z obciętym ułamkiem ms.
+/// - [executorrt.rt-slot-deadline-ms.2~1] zwracać termin slotu w milisekundach od kotwicy: licznik slotSeconds razy 1000 podzielony całkowicie przez mianownik, liczony w __int128 i oddany w typie long, z obciętym ułamkiem ms.
 ///
 /// @note `rational<int> * 1000` po cichu przepelnia licznik, gdy os przekroczy 2^31 ms (~24,9 dnia), a przy
 ///       mianowniku niepodzielnym przez 1000 duzo wczesniej (1/360 s: po ~2,8 dnia). Sen wzgledny znosil to,
-///       bo liczyl tylko roznice terminow; sen absolutny potrzebuje calej wartosci.
-long rtSlotDeadlineMs(const boost::rational<int> &slotSeconds);
+///       bo liczyl tylko roznice terminow; sen absolutny potrzebuje calej wartosci. Chwila slotu ma licznik
+///       w int64 (#640), wiec iloczyn z 1000 idzie w __int128; horyzont TimeLine gwarantuje, ze wynik
+///       miesci sie w long.
+long rtSlotDeadlineMs(const boost::rational<std::int64_t> &slotSeconds);
 
 /// Funkcja rtAbsoluteSleep powinna:
 /// - [executorrt.rt-absolute-sleep.1~1] spać do terminu anchor + interval_ms na zegarze CLOCK_MONOTONIC, a przy terminie, który już minął, wracać od razu.

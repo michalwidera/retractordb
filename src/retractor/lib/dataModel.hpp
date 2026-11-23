@@ -175,8 +175,8 @@ class dataModel {
   /// Jeden slot planu. Blad odczytu, zapisu albo ewaluacji konczy slot w miejscu, w ktorym
   /// wystapil, i wraca do wolajacego - demon zatrzymuje sie na nim (executorsm::run), silnik
   /// osadzony oddaje go z step().
-  [[nodiscard]] rdb::Result<> processRows(std::span<const char> dueMask,
-                                          const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
+  [[nodiscard]] rdb::Result<> processRows(
+      std::span<const char> dueMask, const boost::rational<std::int64_t> &currentTimeSlot = boost::rational<std::int64_t>(0));
   [[nodiscard]] rdb::Result<> processZeroStep();
 
   [[nodiscard]] rdb::Result<std::vector<rdb::descFldVT>> getRow(const std::string &instance, int timeOffset);

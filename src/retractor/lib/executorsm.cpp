@@ -665,7 +665,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             }
             auto availableTimeIntervals = std::move(*importedIntervals);
             if (availableTimeIntervals != timeIntervals) {
-              tl.updateTimeIntervals(availableTimeIntervals);
+              if (auto updated = tl.updateTimeIntervals(availableTimeIntervals); !updated) {
+                engineError = std::move(updated).error();
+                break;
+              }
               timeIntervals = std::move(availableTimeIntervals);
             }
             planDevices = countDevices(*coreInstancePtr);
@@ -678,8 +681,21 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           // Inner time is counted in miliseconds
           // probably can be increased in faster machines
           //
-          const boost::rational<int> currentTimeSlot = tl.getNextTimeSlot();
-          const long deadlineMs                      = rtSlotDeadlineMs(currentTimeSlot);
+          auto nextSlot = tl.getNextTimeSlot();
+          if (!nextSlot) [[unlikely]] {
+            // Horyzont osi (#640): blad silnika zamiast slotu, ktorego indeks rekordu wyszedlby poza int.
+            // Komunikat dostaje nazwe strumienia najszybszego interwalu - to on wyznacza horyzont.
+            engineError = std::move(nextSlot).error();
+            std::scoped_lock lock(core_mutex);
+            const auto fastest =
+                std::ranges::find_if(*coreInstancePtr, [&tl](const query &q) { return q.rInterval == tl.fastestInterval(); });
+            if (fastest != coreInstancePtr->end())
+              engineError =
+                  rdb::Error(engineError->code(), std::format("{} - stream '{}'", engineError->message(), fastest->id));
+            break;
+          }
+          const boost::rational<std::int64_t> currentTimeSlot = *nextSlot;
+          const long deadlineMs                               = rtSlotDeadlineMs(currentTimeSlot);
 
           // Termin slotu = kotwica epoki + czas logiczny slotu, w kazdym trybie taktowanym. Czas
           // pracy slotu (obliczenia, faza DEVICE) nie przesuwa wiec nastepnych terminow. Po

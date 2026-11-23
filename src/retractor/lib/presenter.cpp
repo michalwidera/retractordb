@@ -515,7 +515,7 @@ rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
   };
 
   std::vector<proc_t> proc;
-  boost::rational<int> prev_interval(0);
+  boost::rational<std::int64_t> prev_interval(0);
 
   int stepCounter = 0;
   int stepLimit   = cycleCount * cycleStepInt;
@@ -524,7 +524,8 @@ rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSetVar.insert(it.id);
 
-    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec);
+    RDB_TRY_ASSIGN(const auto slot, tl.getNextTimeSlot());
+    boost::rational<std::int64_t> interval(slot * msInSec);
     int period(boost::rational_cast<int>(interval - prev_interval));
     prev_interval = interval;
 
