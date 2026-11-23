@@ -2281,9 +2281,15 @@ std::string compiler::computeStartupLatency() {
 
   // Ogon źródła przeliczony na sloty konsumenta: w slotów źródła to w*dSrc sekund, czyli ceil(w*dSrc/dDst)
   // slotów konsumenta. Zaokrąglamy w górę - pół slotu opóźnienia to wciąż slot, w którym nie ma czego wydać.
-  auto toSlots = [](int w, const boost::rational<int> &dSrc, const boost::rational<int> &dDst) -> int {
+  // Rachunek w __int128 jak w regułach ogona (#635): przy dSrc = s1/s2 i dDst = t1/t2 licznik w*s1*t2 < 2^93.
+  // Do 2026-11-23 liczył go rational<int>, który przepełniał się po cichu także przy dSrc == dDst - redukcja
+  // MIN nad strumieniem o interwale 42000/288000007 i ogonie 41142858 dostawała ogon 33886.
+  // ceil(n/d) = max(0, ceil((n+d)/d) - 1), więc wystarcza saturatedTail z SOperations.hpp.
+  auto toSlots = [](int w, const boost::rational<int> &dSrc, const boost::rational<int> &dDst) -> std::int64_t {
     if (w <= 0) return 0;
-    return ceilR(boost::rational<int>(w) * dSrc / dDst);
+    const __int128 numerator   = __int128{w} * dSrc.numerator() * dDst.denominator();
+    const __int128 denominator = __int128{dSrc.denominator()} * dDst.numerator();
+    return saturatedTail(numerator + denominator, denominator);
   };
 
   std::map<std::string, int> latency;
@@ -2311,9 +2317,9 @@ std::string compiler::computeStartupLatency() {
       int w1                 = 0;
       if (!latencyOf(src1, w1)) continue;  // producent jeszcze nierozwiązany
 
-      const auto op     = q.lProgram.back().getCommandID();
-      const auto delta1 = deltaOf(src1);
-      int result        = toSlots(w1, delta1, q.rInterval);
+      const auto op       = q.lProgram.back().getCommandID();
+      const auto delta1   = deltaOf(src1);
+      std::int64_t result = toSlots(w1, delta1, q.rInterval);
 
       if (q.lProgram.size() == 1) {
         // Czysty PUSH_STREAM - ten sam interwał, ten sam ogon. Okno rekordowe niczego tu nie
@@ -2341,12 +2347,7 @@ std::string compiler::computeStartupLatency() {
         // patrz HashStartupLatency() w SOperations.hpp. Do 2026-08-07 stała tu postać O(1)
         // max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)); kampania K24 zmierzyła jej zgodność
         // z granicą zdarzeniową na 92,1% węzłów `#`, z zawyżeniem o slot w pozostałych.
-        // Ta sama straż zakresu co przy AGSE: ogon spoza int to błąd planu (#616).
-        const std::int64_t tail = HashStartupLatency(delta1, delta2, w1, w2);
-        if (tail > std::numeric_limits<int>::max())
-          return std::format("Stream '{}' has a startup latency of {} slots; the limit is {}", q.id, tail,
-                             std::numeric_limits<int>::max());
-        result = static_cast<int>(tail);
+        result = HashStartupLatency(delta1, delta2, w1, w2);
       } else if (op == STREAM_ADD) {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;
@@ -2376,17 +2377,18 @@ std::string compiler::computeStartupLatency() {
       } else if (op == STREAM_AGSE) {
         const auto step       = std::get<std::pair<int, int>>(q.lProgram.back().getVT()).first;
         const int sourceWidth = coreInstance[src1].descriptorStorage().flatElementCount();
-        // Ta sama straz co przy origin (A2 M11).
-        const std::int64_t tail = AgseStartupLatency(sourceWidth, step, w1);
-        if (tail > std::numeric_limits<int>::max())
-          return std::format("Stream '{}' has a startup latency of {} slots; the limit is {}", q.id, tail,
-                             std::numeric_limits<int>::max());
-        result = static_cast<int>(tail);
+        result                = AgseStartupLatency(sourceWidth, step, w1);
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają wyłącznie na bieżącej krotce producenta.
       }
 
-      latency[q.id] = result;
+      // Ogon spoza int to błąd planu, jedna straż dla wszystkich reguł: `#` (#616), AGSE (ta sama
+      // co przy origin, A2 M11) oraz `+`, `-`, `Θ` i `~Θ` (#635). Reguły liczą dokładnie i zwracają
+      // int64; do 2026-11-23 cztery ostatnie liczyły w rational<int> i zaniżały ogon po cichu.
+      if (result > std::numeric_limits<int>::max())
+        return std::format("Stream '{}' has a startup latency of {} slots; the limit is {}", q.id, result,
+                           std::numeric_limits<int>::max());
+      latency[q.id] = static_cast<int>(result);
       changed       = true;
     }
   }

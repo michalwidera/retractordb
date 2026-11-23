@@ -3110,6 +3110,71 @@ TEST(xcompiler, hash_startup_latency_beyond_int_is_a_plan_error) {
   EXPECT_EQ(compileRql(plan("1/100000000")), "OK");
 }
 
+// Plan z #635: rozplot przeplotu 1/48000 # 60. Do 2026-11-23 ThetaStartupLatency() liczyl
+// w rational<int> i dawal da tail=286. Ogony policzono niezaleznie, dokladnie, w Pythonie,
+// przegladem okresu z map odczytu (Hash, Div, Mod) i warunku dostepnosci.
+TEST(xcompiler, dehash_startup_latency_over_48khz_interleave_is_exact) {
+  // covers: compiler.compiler.7~1, soperations.theta-startup-latency.2~1
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance,
+                                                                 "DECLARE v INTEGER STREAM a, 1/48000 TEXTFILE 'a.txt'\n"
+                                                                 "DECLARE v INTEGER STREAM b, 60 TEXTFILE 'b.txt'\n"
+                                                                 "SELECT * STREAM c FROM a # b\n"
+                                                                 "SELECT * STREAM da FROM c & 60\n"
+                                                                 "SELECT * STREAM db FROM c % 1/48000\n");
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_EQ(instance.getQuery("c").startupLatency, 2880000);
+  EXPECT_EQ(instance.getQuery("da").startupLatency, 2880000);
+  EXPECT_EQ(instance.getQuery("db").startupLatency, 0);
+}
+
+// Ogon sumy spoza int to blad planu (#635), jak dla `#` i AGSE. c = a#b ma interwal 60/2880001
+// i ogon 2880000, wiec ogon z = c+f wzgledem c wynosi 60/Delta_f - 1: przy f = 1/100000000 to
+// 5999999999 > INT_MAX, przy f = 1/100000 - 5999999 i plan przechodzi. Liczby policzono niezaleznie
+// w Pythonie z warunku dostepnosci. Do 2026-11-23 AddStartupLatency() liczyl w rational<int> i ogon
+// przepelnial sie po cichu.
+TEST(xcompiler, add_startup_latency_beyond_int_is_a_plan_error) {
+  // covers: compiler.compiler.7~1, soperations.add-startup-latency.2~1
+  const auto plan = [](const std::string &fastInterval) {
+    return "DECLARE v INTEGER STREAM a, 1/48000 TEXTFILE 'a.txt'\n"
+           "DECLARE v INTEGER STREAM b, 60 TEXTFILE 'b.txt'\n"
+           "DECLARE v INTEGER STREAM f, " +
+           fastInterval + " TEXTFILE 'f.txt'\nSELECT * STREAM c FROM a # b\nSELECT * STREAM z FROM c + f\n";
+  };
+  const std::string verdict = compileRql(plan("1/100000000"));
+  EXPECT_TRUE(verdict.contains("Stream 'z' has a startup latency of 5999999999 slots; the limit is 2147483647")) << verdict;
+
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, plan("1/100000"));
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_EQ(instance.getQuery("z").startupLatency, 5999999);
+}
+
+// Redukcja dziala na biezacej krotce producenta i zachowuje jego interwal, wiec dziedziczy jego ogon.
+// Do 2026-11-23 przeliczenie ogona przez takt (toSlots w computeStartupLatency) liczylo w rational<int>
+// W*Delta/Delta i przy W*42000 > INT_MAX zanizalo ogon po cichu: r dostawal 33886 zamiast 41142858.
+TEST(xcompiler, reduction_inherits_large_startup_latency) {
+  // covers: compiler.compiler.7~1
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance,
+                                                                 "DECLARE v INTEGER STREAM a, 7/48000 TEXTFILE 'a.txt'\n"
+                                                                 "DECLARE v INTEGER STREAM b, 6000 TEXTFILE 'b.txt'\n"
+                                                                 "SELECT * STREAM c FROM a # b\n"
+                                                                 "SELECT * STREAM r FROM MIN(c)\n");
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  ASSERT_EQ(instance.getQuery("c").rInterval, boost::rational<int>(42000, 288000007));
+  ASSERT_EQ(instance.getQuery("r").rInterval, instance.getQuery("c").rInterval);
+  // Swiadek lezy w obszarze przepelnienia dawnego rachunku: W*42000 > INT_MAX.
+  ASSERT_GT(std::int64_t{instance.getQuery("c").startupLatency} * 42000, std::numeric_limits<int>::max());
+  EXPECT_EQ(instance.getQuery("r").startupLatency, instance.getQuery("c").startupLatency);
+}
+
 // Petla okresu AGSE w computeRequiredCapacities liczyla (n+1+Wout)*step w int: przy F = 65536 i kroku
 // 65535 to ok. 2^32 (A2 M11). Wartosc oczekiwana policzona niezaleznie, liczbami calkowitymi Pythona.
 TEST(xcompiler, agse_capacity_period_is_computed_without_int_overflow) {

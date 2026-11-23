@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 
 #include <boost/rational.hpp>
@@ -117,6 +118,23 @@ constexpr std::int64_t roundedAwayFromZero(const std::int64_t numerator, const s
   return ((numerator < 0) == (denominator < 0)) ? quotient + 1 : quotient - 1;
 }
 
+/// Funkcja saturatedTail powinna:
+/// - [soperations.saturated-tail.1~1] dla nieujemnego numerator i dodatniego denominator zwracać max(0, ceil(numerator / denominator) - 1) w int64, a wynik większy niż INT64_MAX zastępować wartością INT64_MAX.
+///
+/// Wspólne zakończenie reguł ogona `+`, `-`, `Θ` i `~Θ` (#635): każda ma postać
+/// max(0, ceil(licznik / mianownik) - 1). Wyrazy pośrednie tych reguł liczone w __int128 sięgają
+/// 2^125 (patrz ThetaStartupLatency()), więc wynik nie zawsze mieści się w int64. Nasycenie
+/// niczego nie ukrywa: każda wartość ponad INT_MAX jest dla wołającego odmową planu, a INT64_MAX
+/// też nią jest. Liczniki reguł są mniejsze niż 2^125, a mianowniki niż 2^93, więc
+/// numerator + denominator - 1 nie przepełnia __int128.
+constexpr std::int64_t saturatedTail(const __int128 numerator, const __int128 denominator) {
+  assert(numerator >= 0 && denominator > 0);
+  const __int128 tail          = ((numerator + denominator - 1) / denominator) - 1;
+  constexpr std::int64_t limit = std::numeric_limits<std::int64_t>::max();
+  if (tail < 0) return 0;
+  return tail > limit ? limit : static_cast<std::int64_t>(tail);
+}
+
 /// Funkcja AgseStartupLatency powinna:
 /// - [soperations.agse-startup-latency.1~1] zwracać ogon okna AGSE W = roundedAwayFromZero((1 + sourceLatency) * sourceWidth, step) - 1, liczony w int64.
 ///
@@ -167,6 +185,7 @@ constexpr std::int64_t AgseLogicalOrigin(const int sourceWidth, const int step, 
 
 /// Funkcja AddStartupLatency powinna:
 /// - [soperations.add-startup-latency.1~1] zwracać ogon sumy strumieni względem jednej składowej: ceilR((1 + sourceLatency) * deltaSource / deltaTarget) - 1; maksimum po składowych wyznacza wołający.
+/// - [soperations.add-startup-latency.2~1] dla dodatnich interwałów i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX; wynik spoza int odrzuca wołający.
 ///
 /// Suma strumieni czyta składową o interwale deltaSource po indeksie
 /// floor(n*Delta_out/Delta_src) (patrz Add()). Rekord o tym indeksie jest
@@ -179,12 +198,23 @@ constexpr std::int64_t AgseLogicalOrigin(const int sourceWidth, const int step, 
 /// z granicą zdarzeniową dla 42,3% węzłów `+` w korpusie i zaniżała ogon dla
 /// pozostałych - dla składowej o zerowym ogonie dawała zero niezależnie od
 /// tego, jak wolna jest składowa. Postać powyższa zgadza się dla 2527 z 2527.
-constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
-  return ceilR(rational<int>(1 + sourceLatency) * deltaSource / deltaTarget) - 1;
+///
+/// Rachunek (#635): przy deltaSource = s1/s2 i deltaTarget = t1/t2 ogon to
+///   ceil( (1+W_src)*s1*t2 / (s2*t1) ) - 1.
+/// Licznik < 2^31 * 2^62 = 2^93, mianownik < 2^62 - liczy się w __int128 bez przepełnienia.
+/// Do 2026-11-23 stał tu ten sam wzór w rational<int>, który nie wykrywa przepełnienia:
+/// (7/3, 1/1000, W_src = 307698) dawało -713691434 zamiast 717964333.
+constexpr std::int64_t AddStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
+                                         const int sourceLatency) {
+  assert(sourceLatency >= 0);
+  const __int128 numerator   = (__int128{1} + sourceLatency) * deltaSource.numerator() * deltaTarget.denominator();
+  const __int128 denominator = __int128{deltaSource.denominator()} * deltaTarget.numerator();
+  return saturatedTail(numerator, denominator);
 }
 
 /// Funkcja PhaseStartupLatency powinna:
 /// - [soperations.phase-startup-latency.1~1] zwracać ogon operatora o afinicznym odwzorowaniu indeksu: max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1), gdzie ratio = Delta_out/Delta_src, a phaseBound to kres części fazowej indeksu.
+/// - [soperations.phase-startup-latency.2~1] dla dodatniego ratio i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX.
 ///
 /// Ogon operatorów jednoargumentowych o afinicznym odwzorowaniu indeksu: `-`, `Θ` i `~Θ`.
 /// Jedna postać, trzy stałe fazowe.
@@ -207,45 +237,95 @@ constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational
 /// i weryfikacja: rdb-experiment/investigation_K24H10/DERIVATION.md §5. Zgodność
 /// z modelem zdarzeniowym na korpusie K24: 4329/4329, 2578/2578 i 2503/2503 węzłów
 /// (ziarno 20260804), tyleż na 20260807, zero zaniżeń w żadnej z klas.
-constexpr int PhaseStartupLatency(const rational<int> &phaseBound, const rational<int> &ratio, const int sourceLatency) {
-  return std::max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1);
+///
+/// Rachunek (#635): przy phaseBound = u/v i ratio = R/S ogon to
+///   max(0, ceil( (u + (W_src+1)*v) * S / (v*R) ) - 1).
+/// Licznik < (2^31 + 2^62) * 2^31 < 2^94, mianownik < 2^62 - __int128 bez przepełnienia.
+/// Niedodatni licznik daje ogon 0, tak jak max(0, ...) w postaci wymiernej. Reguły `-`, `Θ`
+/// i `~Θ` NIE wołają tej funkcji: ich phaseBound i ratio to ilorazy interwałów, które po
+/// skróceniu mają składowe do 2^62 i nie mieszczą się w rational<int>. Każda z nich liczy
+/// tę samą postać z licznikiem i mianownikiem wymnożonymi przez gcd, z którego powstało
+/// skrócenie - patrz niżej.
+constexpr std::int64_t PhaseStartupLatency(const rational<int> &phaseBound, const rational<int> &ratio,
+                                           const int sourceLatency) {
+  assert(ratio > 0 && sourceLatency >= 0);
+  const __int128 numerator =
+      (phaseBound.numerator() + (__int128{sourceLatency} + 1) * phaseBound.denominator()) * ratio.denominator();
+  if (numerator <= 0) return 0;
+  const __int128 denominator = __int128{phaseBound.denominator()} * ratio.numerator();
+  return saturatedTail(numerator, denominator);
 }
 
 /// Funkcja SubtractStartupLatency powinna:
 /// - [soperations.subtract-startup-latency.1~1] zwracać ogon różnicy C-Delta: PhaseStartupLatency((q-1)/q, deltaTarget/deltaSource, sourceLatency), gdzie q to mianownik skróconego deltaTarget/deltaSource.
+/// - [soperations.subtract-startup-latency.2~1] dla dodatnich interwałów i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX; wynik spoza int odrzuca wołający.
 ///
 /// C-Delta wybiera c_{ceil(n*Delta/Dc)}, czyli e(n) = (q - n*p mod q)/q przy p/q = Delta/Dc
 /// po skróceniu. Kres (q-1)/q jest osiągany dla n spełniającego n*p = 1 (mod q).
-constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
-                                     const int sourceLatency) {
-  const auto ratio = deltaTarget / deltaSource;
-  const int q      = ratio.denominator();
-  return PhaseStartupLatency(rational<int>(q - 1, q), ratio, sourceLatency);
+///
+/// Rachunek (#635): przy deltaSource = s1/s2, deltaTarget = t1/t2 i h = gcd(t1*s2, t2*s1)
+/// skrócony iloraz to p/q = (t1*s2/h) / (t2*s1/h). Postać fazowa upraszcza się do
+/// ceil( ((W_src+2)*q - 1) / p ) - 1, a po wymnożeniu licznika i mianownika przez h do
+///   ceil( ((W_src+2)*t2*s1 - h) / (t1*s2) ) - 1.
+/// Licznik < 2^31 * 2^62 < 2^94 i jest dodatni, bo h <= t2*s1. Do 2026-11-23 ten sam wzór
+/// w rational<int> zaniżał ogon po cichu, np. dla (1/48000, 1/44100) od W_src ok. 1,46 * 10^7.
+constexpr std::int64_t SubtractStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
+                                              const int sourceLatency) {
+  assert(sourceLatency >= 0);
+  const std::int64_t sourceScaled = std::int64_t{deltaTarget.denominator()} * deltaSource.numerator();  // t2*s1
+  const std::int64_t targetScaled = std::int64_t{deltaTarget.numerator()} * deltaSource.denominator();  // t1*s2
+  const std::int64_t h            = std::gcd(targetScaled, sourceScaled);
+  const __int128 numerator        = ((__int128{sourceLatency} + 2) * sourceScaled) - h;
+  return saturatedTail(numerator, targetScaled);
 }
 
 /// Funkcja ThetaStartupLatency powinna:
 /// - [soperations.theta-startup-latency.1~1] zwracać ogon rozplotu Θ: PhaseStartupLatency((a+b-1)/b, deltaTarget/deltaSource, sourceLatency), gdzie a/b to skrócone deltaTarget/other.
+/// - [soperations.theta-startup-latency.2~1] dla dodatnich interwałów i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX; wynik spoza int odrzuca wołający.
 ///
 /// Θ czyta pozycję i + ceil((i+1)*Da/Db) przeplotu (patrz Div()). Przy a/b = Delta_out/param
 /// po skróceniu faza wynosi (a-t)/b dla t = 0 i (a+b-t)/b dla t > 0, gdzie t = (n+1)*a mod b,
 /// więc kres to (a+b-1)/b - osiągany, bo gcd(a,b) = 1. Dla ilorazu całkowitego (b = 1) kres
 /// wynosi a i po podzieleniu przez r daje ogon własny ZERO, nie jeden.
-constexpr int ThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const rational<int> &other,
-                                  const int sourceLatency) {
-  const auto span = deltaTarget / other;
-  return PhaseStartupLatency(rational<int>(span.numerator() + span.denominator() - 1, span.denominator()),
-                             deltaTarget / deltaSource, sourceLatency);
+///
+/// Rachunek (#635): przy deltaSource = s1/s2, deltaTarget = t1/t2, other = o1/o2
+/// i g = gcd(t1*o2, t2*o1) jest a = t1*o2/g, b = t2*o1/g, a r = t1*s2/(t2*s1). Postać fazowa
+///   ceil( (a + (W_src+2)*b - 1) * t2*s1 / (b*t1*s2) ) - 1
+/// po wymnożeniu licznika i mianownika przez g (b*g = t2*o1, a*g = t1*o2) i skróceniu t2 daje
+///   ceil( (t1*o2 + (W_src+2)*t2*o1 - g) * s1 / (o1*t1*s2) ) - 1.
+/// Nawias < 2^62 + 2^31 * 2^62 < 2^94, licznik < 2^125, mianownik < 2^93 - __int128 bez
+/// przepełnienia; bez skrócenia t2 licznik sięgałby 2^155. Do 2026-11-23 postać fazowa
+/// w rational<int> zaniżała ogon po cichu: przeplot 1/48000 # 60 i Θ z parametrem 60 dawały
+/// 286 zamiast 2880000.
+constexpr std::int64_t ThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
+                                           const rational<int> &other, const int sourceLatency) {
+  assert(sourceLatency >= 0);
+  const std::int64_t spanNumerator   = std::int64_t{deltaTarget.numerator()} * other.denominator();  // t1*o2 = a*g
+  const std::int64_t spanDenominator = std::int64_t{deltaTarget.denominator()} * other.numerator();  // t2*o1 = b*g
+  const std::int64_t g               = std::gcd(spanNumerator, spanDenominator);
+  const __int128 numerator   = (spanNumerator + ((__int128{sourceLatency} + 2) * spanDenominator) - g) * deltaSource.numerator();
+  const __int128 denominator = __int128{other.numerator()} * deltaTarget.numerator() * deltaSource.denominator();  // o1*t1*s2
+  return saturatedTail(numerator, denominator);
 }
 
 /// Funkcja NThetaStartupLatency powinna:
 /// - [soperations.n-theta-startup-latency.1~1] zwracać ogon rozplotu ~Θ: PhaseStartupLatency(0, deltaTarget/deltaSource, sourceLatency).
+/// - [soperations.n-theta-startup-latency.2~1] dla dodatnich interwałów i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX; wynik spoza int odrzuca wołający.
 ///
 /// ~Θ czyta pozycję i + floor(i*Db/Da) (patrz Mod()), więc e(n) = -(n*a mod b)/b <= 0
 /// i kres wynosi 0, osiągany dla n = 0. Ogon jest zatem samym przeliczeniem dostępności
 /// pierwszego rekordu - bez zaokrąglenia ogona składowej w górę, które zawyżało wynik przy
 /// niezerowym W_src.
-constexpr int NThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
-  return PhaseStartupLatency(rational<int>(0), deltaTarget / deltaSource, sourceLatency);
+///
+/// Rachunek (#635): przy deltaSource = s1/s2 i deltaTarget = t1/t2 postać fazowa z kresem 0 to
+///   ceil( (W_src+1)*t2*s1 / (t1*s2) ) - 1;
+/// skrócenie ilorazu nie zmienia sufitu, więc gcd jest zbędne. Licznik < 2^93, mianownik < 2^62.
+constexpr std::int64_t NThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
+                                            const int sourceLatency) {
+  assert(sourceLatency >= 0);
+  const __int128 numerator   = (__int128{sourceLatency} + 1) * deltaTarget.denominator() * deltaSource.numerator();
+  const __int128 denominator = __int128{deltaTarget.numerator()} * deltaSource.denominator();
+  return saturatedTail(numerator, denominator);
 }
 
 /// Funkcja HashStartupLatency powinna:

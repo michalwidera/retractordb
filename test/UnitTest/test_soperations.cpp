@@ -500,3 +500,100 @@ TEST(xSOperations, hash_former_scan_limit_boundary_is_exact) {
     EXPECT_EQ(HashStartupLatency(boost::rational<int>(a), boost::rational<int>(b), 0, 1), expected);
   }
 }
+
+// =====================================================================================
+// Ogony `+`, `-`, `Θ` i `~Θ` poza zakresem rachunku w rational<int> (#635).
+//
+// Do 2026-11-23 cztery reguły liczyły w rational<int>, który nie wykrywa przepełnienia:
+// wyraz pośredni typu (1+W)*Delta_src/Delta_out przekraczał int, choć wynik dokładny się
+// w nim mieścił, i silnik po cichu ZANIŻAŁ ogon. Wartości oczekiwane liczy niżej przegląd
+// jednego okresu fazowego w __int128 wprost z definicji: indeks odczytu z mapy operatora
+// (Add, Subtract, Div, Mod) i warunek dostępności, bez postaci zamkniętej reguł.
+// =====================================================================================
+
+namespace {
+
+using wide = __int128;
+
+wide ceilDivWide(wide numerator, wide denominator) { return (numerator + denominator - 1) / denominator; }
+
+// Najmniejszy W >= 0, dla którego rekord idx(n) składowej, określony w chwili
+// (idx(n)+1+W_src)*D_src, jest gotowy przed końcem slotu n, czyli (n+1+W)*D_out, dla każdego
+// n z [0, period). Odczyty powtarzają się z okresem mianownika skróconego ilorazu, który
+// wyznacza fazę mapy, a wymaganie przesuwa się wtedy razem z n - jeden okres wystarcza.
+template <typename Read>
+std::int64_t affineTailByScan(Read read, wide period, const boost::rational<int> &source, const boost::rational<int> &out,
+                              int latency) {
+  const wide scaleNum = wide{source.numerator()} * out.denominator();
+  const wide scaleDen = wide{source.denominator()} * out.numerator();
+  wide result         = 0;
+  for (wide n = 0; n < period; ++n)
+    result = std::max(result, ceilDivWide((read(n) + 1 + latency) * scaleNum, scaleDen) - 1 - n);
+  return static_cast<std::int64_t>(result);
+}
+
+}  // namespace
+
+// Przeplot 1/48000 # 60 ma interwał 60/2880001. Θ z parametrem 60 (lewa składowa) czyta pozycję
+// n + ceil((n+1)*a/b), ~Θ z parametrem 60 (prawa składowa o interwale 1/48000 względem lewej 60)
+// pozycję n + floor(n*Dt/Da). Okres 2880000 = mianownik (1/48000)/60. Θ dawało 0 zamiast 745 przy
+// W_src = 744, a przy W_src = 2880000 z planu zgłoszenia 286 zamiast 2880000.
+TEST(xSOperations, dehash_startup_latency_is_exact_beyond_rational_int) {
+  // covers: soperations.theta-startup-latency.2~1, soperations.n-theta-startup-latency.2~1
+  const boost::rational<int> fast{1, 48000};
+  const boost::rational<int> slow{60};
+  const boost::rational<int> hashed = fast * slow / (fast + slow);
+  ASSERT_EQ(hashed, boost::rational<int>(60, 2880001));
+  const wide period = (fast / slow).denominator();
+  ASSERT_EQ(period, 2880000);
+  const auto thetaRead  = [](wide n) { return n + ceilDivWide(n + 1, 2880000); };  // Div(fast, slow, n)
+  const auto nthetaRead = [](wide n) { return n + (n / 2880000); };                // Mod(slow, fast, n)
+
+  EXPECT_EQ(ThetaStartupLatency(hashed, fast, slow, 744), 745);
+  EXPECT_EQ(ThetaStartupLatency(hashed, fast, slow, 744), affineTailByScan(thetaRead, period, hashed, fast, 744));
+  EXPECT_EQ(ThetaStartupLatency(hashed, fast, slow, 2880000), 2880000);
+  EXPECT_EQ(ThetaStartupLatency(hashed, fast, slow, 2880000), affineTailByScan(thetaRead, period, hashed, fast, 2880000));
+  EXPECT_EQ(NThetaStartupLatency(hashed, fast, 2880000), affineTailByScan(nthetaRead, period, hashed, fast, 2880000));
+}
+
+// `+`: (7/3, 1/1000, W_src = 307698) dawało -713691434 zamiast 717964333; okres 7000 = mianownik
+// (1/1000)/(7/3). `-`: (1/48000, 1/44100) myliło się od W_src ok. 1,46 * 10^7; okres 147 = mianownik
+// (1/44100)/(1/48000) = 160/147.
+TEST(xSOperations, add_and_subtract_startup_latency_are_exact_beyond_rational_int) {
+  // covers: soperations.add-startup-latency.2~1, soperations.subtract-startup-latency.2~1
+  const boost::rational<int> addSource{7, 3};
+  const boost::rational<int> addOut{1, 1000};
+  const auto addRead = [](wide n) { return n * 3 / 7000; };  // Add(addOut, addSource, n)
+  EXPECT_EQ(AddStartupLatency(addSource, addOut, 307698), 717964333);
+  EXPECT_EQ(AddStartupLatency(addSource, addOut, 307698), affineTailByScan(addRead, 7000, addSource, addOut, 307698));
+
+  const boost::rational<int> subSource{1, 48000};
+  const boost::rational<int> subOut{1, 44100};
+  const auto subRead = [](wide n) { return ceilDivWide(n * 160, 147); };  // Subtract(subSource, subOut, n)
+  for (const int latency : {14600000, 20000000, std::numeric_limits<int>::max()})
+    EXPECT_EQ(SubtractStartupLatency(subSource, subOut, latency), affineTailByScan(subRead, 147, subSource, subOut, latency))
+        << "W_src=" << latency;
+}
+
+// Wynik większy niż INT64_MAX nasyca się, a nie zawija; PhaseStartupLatency liczy dokładnie
+// także iloczyny bliskie 2^62, a niedodatni licznik daje zero jak max(0, ...).
+TEST(xSOperations, wide_startup_latency_saturates_instead_of_wrapping) {
+  // covers: soperations.saturated-tail.1~1, soperations.phase-startup-latency.2~1, soperations.theta-startup-latency.2~1
+  constexpr std::int64_t int64Max = std::numeric_limits<std::int64_t>::max();
+  constexpr int intMax            = std::numeric_limits<int>::max();
+  EXPECT_EQ(saturatedTail(0, 5), 0);
+  EXPECT_EQ(saturatedTail(6, 2), 2);
+  EXPECT_EQ(saturatedTail(7, 2), 3);
+  EXPECT_EQ(saturatedTail(wide{int64Max} + 1, 1), int64Max);
+  EXPECT_EQ(saturatedTail(wide{int64Max} + 2, 1), int64Max);
+  EXPECT_EQ(saturatedTail(wide{1} << 100, 1), int64Max);
+
+  // Kres 1, r = 1/INT_MAX, W_src = INT_MAX: (1 + INT_MAX + 1) * INT_MAX - 1, ok. 2^62.
+  EXPECT_EQ(PhaseStartupLatency(boost::rational<int>(1), boost::rational<int>(1, intMax), intMax),
+            ((std::int64_t{intMax} + 2) * intMax) - 1);
+  EXPECT_EQ(PhaseStartupLatency(boost::rational<int>(-5), boost::rational<int>(1), 3), 0);
+  // Licznik Θ ok. 2^93 przy mianowniku 1: wynik nasycony, a nie ujemny albo obcięty.
+  EXPECT_EQ(ThetaStartupLatency(boost::rational<int>(intMax), boost::rational<int>(1, intMax), boost::rational<int>(1, intMax),
+                                intMax),
+            int64Max);
+}
