@@ -27,6 +27,25 @@ CausalShift	delayed_interleave_values	TEST:ProofOracle.shift_matching_values
 CausalShift	causal_shift_matching_read	TEST:ProofOracle.causal_shift_matching_read
 CausalShift	causal_shift_matching_tail	TEST:ProofOracle.exact_tail_rewrite
 CausalShift	causal_shift_matching	TEST:ProofOracle.causal_shift_matching
+CppArith	checked_eq_none_iff	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	checked_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	addC_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	subC_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	mulC_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tdivC_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tmodC_of_inRange	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	inRange_mono	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	castC_widen	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tdiv_inRange_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tdivC_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tmodC_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tdivC_natCast	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	tmodC_natCast	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	gcd64_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	ratInt_beq_iff_val	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	ratInt_num_pos	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	crossProduct_bound	POZA_ZAKRESEM:lemat pomocniczy
+CppArith	ratInt_val_div	POZA_ZAKRESEM:lemat pomocniczy
 Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
 Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
 Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original
