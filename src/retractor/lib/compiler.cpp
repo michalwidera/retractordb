@@ -32,7 +32,7 @@
 #include "rdb/rationalFormat.hpp"
 #include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
-#include "SOperations.hpp"   // floorR, saturatedTail, reguly ogona
+#include "SOperations.hpp"   // hashLeftCount, saturatedTail, reguly ogona
 
 using boost::lexical_cast;
 
@@ -2282,10 +2282,10 @@ std::string compiler::computeLogicalOrigin() {
           // Przeplot czyta w slocie n tylko JEDNĄ składową, ale obie pozycje - floor(z*n) dla
           // pierwszej i n-floor(z*n) dla drugiej - są niemalejące. Najmniejsze n, od którego
           // KAŻDY dalszy slot trafia w istniejący rekord swojej składowej, to maksimum progów.
-          const auto zet   = delta2 / (delta1 + delta2);
-          const auto first = firstIndexReaching([&](int n) { return floorR(zet * n); }, o1);
+          // Rachunek dokladny jak w Hash() (#636): z*n w rational<int> przepelnial sie dla n do 2^25.
+          const auto first = firstIndexReaching([&](int n) { return hashLeftCount(delta1, delta2, n); }, o1);
           if (!first) return originSearchTooExtreme(q.id, o1);
-          const auto second = firstIndexReaching([&](int n) { return n - floorR(zet * n); }, o2);
+          const auto second = firstIndexReaching([&](int n) { return n - hashLeftCount(delta1, delta2, n); }, o2);
           if (!second) return originSearchTooExtreme(q.id, o2);
           result = std::max(*first, *second);
         }

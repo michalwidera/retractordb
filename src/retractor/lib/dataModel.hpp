@@ -56,7 +56,7 @@ class dataModel {
   /// klienta sprawdza wczesniej handler komendy (exists()) i odpowiada `error.response`.
   [[nodiscard]] streamInstance &streamRuntime(const std::string &instance);
 
-  [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
+  [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, std::int64_t forwardIndex) const;
   [[nodiscard]] bool queryInputsAvailable(const query &qry, int logicalIndex);
   [[nodiscard]] rdb::Result<> bootstrapDeclaration(const query &qry);
   /// Kolejny rekord uzbrojonej deklaracji: odczyt z akcesora i fire() do historii.
@@ -142,7 +142,7 @@ class dataModel {
    * (streamInstance::unavailableRecord) i jest ważna tylko do następnego odczytu tego
    * strumienia - kolejny revRead nadpisuje bieżący payload. Nie przechowywać jej.
    */
-  [[nodiscard]] rdb::Result<const rdb::payload *> fetchForward(const std::string &instance, int forwardIndex);
+  [[nodiscard]] rdb::Result<const rdb::payload *> fetchForward(const std::string &instance, std::int64_t forwardIndex);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source

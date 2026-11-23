@@ -163,7 +163,7 @@ rdb::Result<std::unique_ptr<rdb::payload>::pointer> dataModel::getPayload(const 
   return out.getPayload();
 }
 
-rdb::Result<const rdb::payload *> dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
+rdb::Result<const rdb::payload *> dataModel::fetchForward(const std::string &instance, const std::int64_t forwardIndex) {
   auto &runtime = streamRuntime(instance);
   auto &out     = *(runtime.outputPayload);
   out.releaseOnHold();
@@ -177,11 +177,14 @@ rdb::Result<const rdb::payload *> dataModel::fetchForward(const std::string &ins
   // więc rekord o indeksie równym bazie jest fizycznie rekordem 0 w buforze. To jedyne miejsce,
   // w którym ta różnica jest przeliczana - dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
   // poprawkę raz, a nie każdy z osobna.
-  const auto count        = static_cast<int>(out.getRecordsCount());
+  //
+  // Indeks w int64: mapy odczytu moga wskazac rekord za granica int (SOperations.hpp, #636), a taki
+  // rekord jest po prostu niedostepny.
+  const auto count        = static_cast<std::int64_t>(out.getRecordsCount());
   const auto &logicalBase = runtime.logicalIndexBase;
   RDB_ASSERT(logicalBase.has_value(), "dataModel::fetchForward: logical index base not initialized for '{}'", instance);
-  const int physical = forwardIndex - *logicalBase;
-  const int rev      = count - 1 - physical;
+  const std::int64_t physical = forwardIndex - *logicalBase;
+  const std::int64_t rev      = count - 1 - physical;
 
   const bool outOfRange = physical < 0 || rev < 0 ||  //
                           (out.isDeclared() && std::cmp_greater_equal(rev, out.historySize()));
@@ -219,7 +222,7 @@ rdb::Result<> dataModel::bootstrapDeclaration(const query &qry) {
   return {};
 }
 
-bool dataModel::forwardRecordAvailable(const std::string &instance, const int forwardIndex) const {
+bool dataModel::forwardRecordAvailable(const std::string &instance, const std::int64_t forwardIndex) const {
   // Jedyne wyszukanie w qSet omijajace streamRuntime(): predykat jest const, a streamRuntime()
   // nie. Galaz `false` dla nazwy spoza modelu jest przy tym nieosiagalna. Pytanie pada wylacznie
   // z processRows, ktory na wejsciu przepuszcza kazdy wezel planu przez refreshStreamHandles(),
@@ -230,13 +233,13 @@ bool dataModel::forwardRecordAvailable(const std::string &instance, const int fo
   const auto &logicalIndexBase = found->second->logicalIndexBase;
   if (!logicalIndexBase.has_value()) return false;
 
-  const auto &output = *found->second->outputPayload;
-  const int count    = static_cast<int>(output.getRecordsCount());
-  const int physical = forwardIndex - logicalIndexBase.value();
+  const auto &output          = *found->second->outputPayload;
+  const auto count            = static_cast<std::int64_t>(output.getRecordsCount());
+  const std::int64_t physical = forwardIndex - logicalIndexBase.value();
   if (physical < 0 || physical >= count) return false;
   if (!output.isDeclared()) return true;
 
-  const int reverseIndex = count - 1 - physical;
+  const std::int64_t reverseIndex = count - 1 - physical;
   return reverseIndex >= 0 && std::cmp_less(reverseIndex, output.historySize());
 }
 
@@ -283,11 +286,11 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
-      // Pozycja splaszczona w int64 - patrz floorDiv. Iloraz jest indeksem rekordu zrodla, a ten
-      // zyje na osi logicznej int, wiec wraca do int bez straty.
+      // Pozycja splaszczona w int64 - patrz floorDiv. Iloraz jest indeksem rekordu zrodla i zostaje
+      // w int64: dla step > F rosnie szybciej niz logicalIndex i moze wyjsc poza int (#636).
       const std::int64_t newestPosition = static_cast<std::int64_t>(logicalIndex) * step;
-      const int firstRecord             = static_cast<int>(floorDiv(newestPosition - (lengthAbs - 1), sourceWidth));
-      const int lastRecord              = static_cast<int>(floorDiv(newestPosition, sourceWidth));
+      const std::int64_t firstRecord    = floorDiv(newestPosition - (lengthAbs - 1), sourceWidth);
+      const std::int64_t lastRecord     = floorDiv(newestPosition, sourceWidth);
       available = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
     } break;
     case STREAM_HASH: {
@@ -619,7 +622,7 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
       const auto n = logicalIndex();
 
-      int fwdPos = -1;
+      std::int64_t fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
         // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} - element c o tym indeksie powstaje dopiero PO slocie n
         // strumienia wynikowego (definicja jest o jeden slot nieprzyczynowa). Przyczynowość
