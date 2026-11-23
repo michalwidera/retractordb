@@ -46,6 +46,30 @@ CppArith	ratInt_beq_iff_val	POZA_ZAKRESEM:lemat pomocniczy
 CppArith	ratInt_num_pos	POZA_ZAKRESEM:lemat pomocniczy
 CppArith	crossProduct_bound	POZA_ZAKRESEM:lemat pomocniczy
 CppArith	ratInt_val_div	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	inRange64_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	inRange128_of_nonneg	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	ratInt_pos_bounds	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	tdiv_inRange64	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	tdiv_small_of_tmod_ne_zero	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	intCeil_div	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	floorDivCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	awayFromZero_div	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	roundedAwayFromZeroCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	roundedAwayFromZeroCpp_natCast	NIEPOKRYTE:test w A4 (D5)
+EngineRules	saturatedIndexCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	saturatedTailCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	cross_spec	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	affineRead_cast	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	inRange128_of_le	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	index_lt	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	progress_le	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	hashLeftCountCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	hashCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	divCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	modCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	affineRead_self	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	subtractCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	addCpp_eq	NIEPOKRYTE:test w A4 (D5)
 Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
 Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
 Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original
