@@ -10,13 +10,6 @@
 
 using namespace boost;
 
-/// Funkcja floorR powinna:
-/// - [soperations.floor-r.1~1] zwracać część całkowitą num, licząc numerator / denominator w int.
-/// (!sr_problem:nazwa obiecuje podłogę, a dla ujemnego num wynik jest obcięciem w stronę zera, np. floorR(-1/2) == 0; wołający dziś podają wartości nieujemne.)
-///
-/// Wzorzec: https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
-constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
-
 /// Funkcja floorDiv powinna:
 /// - [soperations.floor-div.1~1] zwracać iloraz numerator / denominator zaokrąglony w dół (w stronę minus nieskończoności), także dla ujemnego licznika lub mianownika, w arytmetyce int64.
 ///
@@ -30,17 +23,42 @@ constexpr std::int64_t floorDiv(const std::int64_t numerator, const std::int64_t
   return (numerator % denominator != 0 && ((numerator < 0) != (denominator < 0))) ? quotient - 1 : quotient;
 }
 
-/// Funkcja ceilR powinna:
-/// - [soperations.ceil-r.1~1] zwracać num, gdy jest całkowite, a w przeciwnym razie zaokrąglać je od zera: część całkowitą obciętą w stronę zera powiększać o 1 dla dodatniego num i pomniejszać o 1 dla ujemnego.
-constexpr int ceilR(boost::rational<int> const &num) {
-  auto inum = static_cast<int>(num.numerator() / num.denominator());
-  if (num == inum) return inum;
-  return (num.numerator() > 0) ? ++inum : --inum;
+// Mapy odczytu (#636): Hash, Div, Mod, Subtract i Add. Wspólny kontrakt: indeks rekordu n jest
+// indeksem logicznym z [0, INT_MAX], a interwały mają dodatnie składowe int. Rachunek idzie
+// w __int128 na licznikach i mianownikach interwałów, bez rational<int>: iloraz interwałów
+// d = d1/d2 i e = e1/e2 to iloraz iloczynów krzyżowych d1*e2 / (d2*e1), każdy < 2^62, a razy
+// n < 2^31 daje < 2^93. Do 2026-11-23 mapy liczyły n*d/e w rational<int>, który nie wykrywa
+// przepełnienia: przeplot 1/360 # 1/250 czytał zły rekord od n = 59 652 324, ok. 27 h przy 610 Hz.
+//
+// Granicę INT_MAX wyznacza oś czasu: TimeLine (CRSMath.cpp) liczy sloty każdego interwału w int,
+// więc żaden istniejący rekord nie ma indeksu większego. Wynik mapy może ją przekroczyć, bo Θ, ~Θ
+// i `-` czytają strumień szybszy - dlatego jest int64. Wartość ponad INT64_MAX nasyca się: rekordu
+// o takim indeksie nie ma, więc dla wołającego jest po prostu niedostępny.
+
+/// Funkcja saturatedIndex powinna:
+/// - [soperations.saturated-index.1~1] zwracać nieujemne index w int64, a wartość większą niż INT64_MAX zastępować wartością INT64_MAX.
+constexpr std::int64_t saturatedIndex(const __int128 index) {
+  assert(index >= 0);
+  constexpr std::int64_t limit = std::numeric_limits<std::int64_t>::max();
+  return index > limit ? limit : static_cast<std::int64_t>(index);
+}
+
+/// Funkcja hashLeftCount powinna:
+/// - [soperations.hash-left-count.1~1] dla dodatnich deltaA i deltaB oraz n z [0, INT_MAX + 1] zwracać dokładnie ⌊n*z⌋, z = deltaB/(deltaA+deltaB), czyli liczbę rekordów lewej składowej przed rekordem n przeplotu C = A#B.
+///
+/// Przy deltaA = a1/a2 i deltaB = b1/b2 jest z = b1*a2 / (a1*b2 + b1*a2): licznik < 2^62,
+/// mianownik < 2^63, a n razy licznik < 2^94. Skrócenie z nie zmienia podłogi, więc gcd jest zbędne.
+constexpr std::int64_t hashLeftCount(const rational<int> &deltaA, const rational<int> &deltaB, const std::int64_t n) {
+  assert(n >= 0);
+  const std::int64_t right = std::int64_t{deltaB.numerator()} * deltaA.denominator();  // b1*a2
+  const std::int64_t left  = std::int64_t{deltaA.numerator()} * deltaB.denominator();  // a1*b2
+  return static_cast<std::int64_t>((__int128{n} * right) / (__int128{left} + right));
 }
 
 /// Funkcja Hash powinna:
 /// - [soperations.hash.1~1] dla rekordu i (od 0) przeplotu C = A#B przy z = deltaB/(deltaA+deltaB) zwracać true i ustawiać retPos = i - ⌊iz⌋ (indeks w B), gdy ⌊iz⌋ == ⌊(i+1)z⌋, a w przeciwnym razie zwracać false i ustawiać retPos = ⌊iz⌋ (indeks w A).
 /// - [soperations.hash.2~1] zakładać dodatnie deltaA i deltaB, sprawdzane asercją wyłącznie w buildzie Debug.
+/// - [soperations.hash.3~1] liczyć wynik dokładnie dla każdego i z [0, INT_MAX]; retPos mieści się w int, bo nie przekracza i.
 ///
 /// Przeplot (definicja formalna): dla i-tego rekordu strumienia C = A#B (i od 0)
 ///   c_i = b_{i-⌊iz⌋}  gdy ⌊iz⌋ == ⌊(i+1)z⌋   (zwraca true,  retPos = indeks w B)
@@ -52,14 +70,9 @@ inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const
   // Parametry sa stale w planie, wiec w Release nie sprawdzamy ich dla kazdego rekordu.
   assert(deltaA > 0);
   assert(deltaB > 0);
-  const rational<int> zet = deltaB / (deltaA + deltaB);
-  bool ret                = floorR(zet * i) == floorR(zet * (i + 1));
-
-  if (ret) {
-    retPos = i - floorR(zet * i);  // B
-  } else {
-    retPos = floorR(zet * i);  // A
-  }
+  const std::int64_t leftCount = hashLeftCount(deltaA, deltaB, i);
+  const bool ret               = leftCount == hashLeftCount(deltaA, deltaB, std::int64_t{i} + 1);
+  retPos                       = static_cast<int>(ret ? i - leftCount : leftCount);  // B : A
   return ret;
 }
 
@@ -69,31 +82,44 @@ inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const
 // Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu C.
 
 /// Funkcja Div powinna:
-/// - [soperations.div.1~1] zwracać indeks postępujący w przeplocie C elementu a_i lewej składowej (Θ): i + ceilR((i+1)*deltaA/deltaB).
-constexpr int Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
-  return i + ceilR((i + 1) * deltaA / deltaB);
+/// - [soperations.div.1~1] zwracać indeks postępujący w przeplocie C elementu a_i lewej składowej (Θ): i + ⌈(i+1)*deltaA/deltaB⌉.
+/// - [soperations.div.2~1] liczyć wynik dokładnie dla dodatnich deltaA, deltaB i każdego i z [0, INT_MAX], zwracać go w int64 i nasycać na INT64_MAX.
+constexpr std::int64_t Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
+  assert(i >= 0);
+  const __int128 numerator   = (__int128{i} + 1) * deltaA.numerator() * deltaB.denominator();
+  const __int128 denominator = __int128{deltaA.denominator()} * deltaB.numerator();
+  return saturatedIndex(i + ((numerator + denominator - 1) / denominator));
 }
 
 /// Funkcja Mod powinna:
-/// - [soperations.mod.1~1] zwracać indeks postępujący w przeplocie C elementu b_i prawej składowej (~Θ): i + floorR(i*deltaB/deltaA).
-constexpr int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
-  return i + floorR(i * deltaB / deltaA);
+/// - [soperations.mod.1~1] zwracać indeks postępujący w przeplocie C elementu b_i prawej składowej (~Θ): i + ⌊i*deltaB/deltaA⌋.
+/// - [soperations.mod.2~1] liczyć wynik dokładnie dla dodatnich deltaA, deltaB i każdego i z [0, INT_MAX], zwracać go w int64 i nasycać na INT64_MAX.
+constexpr std::int64_t Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
+  assert(i >= 0);
+  const __int128 numerator   = __int128{i} * deltaB.numerator() * deltaA.denominator();
+  const __int128 denominator = __int128{deltaB.denominator()} * deltaA.numerator();
+  return saturatedIndex(i + (numerator / denominator));
 }
 
 /// Funkcja Subtract powinna:
-/// - [soperations.subtract.1~1] zwracać indeks rekordu C wybranego dla rekordu i różnicy C-Delta: i dla równych interwałów, a w przeciwnym razie ceilR(i*deltaTarget/deltaSource).
+/// - [soperations.subtract.1~1] zwracać indeks rekordu C wybranego dla rekordu i różnicy C-Delta: i dla równych interwałów, a w przeciwnym razie ⌈i*deltaTarget/deltaSource⌉.
+/// - [soperations.subtract.2~1] liczyć wynik dokładnie dla dodatnich interwałów i każdego i z [0, INT_MAX], zwracać go w int64 i nasycać na INT64_MAX.
 ///
 /// Różnica C-Delta wybiera z C składową o docelowym interwale Delta.
 /// Delta nie może być mniejsza od interwału C (wynik nie może wymagać
 /// rekordów szybszych niż źródło). Dla równych interwałów wybór jest
 /// tożsamością, a dla wolniejszego wyniku wybieramy indeks ceil(i*Delta/Dc).
-constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int i) {
+constexpr std::int64_t Subtract(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int i) {
+  assert(i >= 0);
   if (deltaSource == deltaTarget) return i;
-  return ceilR(i * deltaTarget / deltaSource);
+  const __int128 numerator   = __int128{i} * deltaTarget.numerator() * deltaSource.denominator();
+  const __int128 denominator = __int128{deltaTarget.denominator()} * deltaSource.numerator();
+  return saturatedIndex((numerator + denominator - 1) / denominator);
 }
 
 /// Funkcja Add powinna:
-/// - [soperations.add.1~1] zwracać indeks postępujący rekordu składowej o interwale deltaSrc czytanego przez rekord n sumy: n, gdy deltaOut == deltaSrc, a w przeciwnym razie floorR(n*deltaOut/deltaSrc).
+/// - [soperations.add.1~1] zwracać indeks postępujący rekordu składowej o interwale deltaSrc czytanego przez rekord n sumy: n, gdy deltaOut == deltaSrc, a w przeciwnym razie ⌊n*deltaOut/deltaSrc⌋.
+/// - [soperations.add.2~1] liczyć wynik dokładnie dla dodatnich interwałów i każdego n z [0, INT_MAX], zwracać go w int64 i nasycać na INT64_MAX.
 ///
 /// Suma strumieni (definicja formalna): dla C = A+B, gdzie Delta_c = min(Delta_a, Delta_b):
 ///   c_n = (a_n, b_{⌊n·Delta_a/Delta_b⌋})   gdy Delta_a <= Delta_b
@@ -101,17 +127,20 @@ constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &de
 /// Oba przypadki mają jedną postać: indeks składowej o interwale deltaSrc to
 /// ⌊n·Delta_c/deltaSrc⌋ - dla składowej szybszej (deltaSrc == Delta_c) daje n.
 /// Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu składowej.
-constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, const int n) {
+constexpr std::int64_t Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, const int n) {
+  assert(n >= 0);
   if (deltaOut == deltaSrc) return n;
-  return floorR(n * deltaOut / deltaSrc);
+  const __int128 numerator   = __int128{n} * deltaOut.numerator() * deltaSrc.denominator();
+  const __int128 denominator = __int128{deltaOut.denominator()} * deltaSrc.numerator();
+  return saturatedIndex(numerator / denominator);
 }
 
 /// Funkcja roundedAwayFromZero powinna:
-/// - [soperations.rounded-away-from-zero.1~1] zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera (jak ceilR).
+/// - [soperations.rounded-away-from-zero.1~1] zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera.
 ///
 /// Rachunek w int64, bo (1+W_src)*F przekracza int juz dla trzech okien `@(1,65536)` w lancuchu
-/// (A2 M11). Zaokraglenie jest to samo co w ceilR() - od zera - wiec w zakresie int wynik sie nie
-/// zmienia; wynik spoza int odrzuca kompilator jako blad planu.
+/// (A2 M11). Zaokraglenie jest to samo co w dawnym ceilR() na rational<int> - od zera - wiec
+/// w zakresie int wynik sie nie zmienia; wynik spoza int odrzuca kompilator jako blad planu.
 constexpr std::int64_t roundedAwayFromZero(const std::int64_t numerator, const std::int64_t denominator) {
   const std::int64_t quotient = numerator / denominator;
   if (numerator % denominator == 0) return quotient;
@@ -184,7 +213,7 @@ constexpr std::int64_t AgseLogicalOrigin(const int sourceWidth, const int step, 
 }
 
 /// Funkcja AddStartupLatency powinna:
-/// - [soperations.add-startup-latency.1~1] zwracać ogon sumy strumieni względem jednej składowej: ceilR((1 + sourceLatency) * deltaSource / deltaTarget) - 1; maksimum po składowych wyznacza wołający.
+/// - [soperations.add-startup-latency.1~1] zwracać ogon sumy strumieni względem jednej składowej: ⌈(1 + sourceLatency) * deltaSource / deltaTarget⌉ - 1; maksimum po składowych wyznacza wołający.
 /// - [soperations.add-startup-latency.2~1] dla dodatnich interwałów i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX; wynik spoza int odrzuca wołający.
 ///
 /// Suma strumieni czyta składową o interwale deltaSource po indeksie
@@ -213,7 +242,7 @@ constexpr std::int64_t AddStartupLatency(const rational<int> &deltaSource, const
 }
 
 /// Funkcja PhaseStartupLatency powinna:
-/// - [soperations.phase-startup-latency.1~1] zwracać ogon operatora o afinicznym odwzorowaniu indeksu: max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1), gdzie ratio = Delta_out/Delta_src, a phaseBound to kres części fazowej indeksu.
+/// - [soperations.phase-startup-latency.1~1] zwracać ogon operatora o afinicznym odwzorowaniu indeksu: max(0, ⌈(phaseBound + sourceLatency + 1) / ratio⌉ - 1), gdzie ratio = Delta_out/Delta_src, a phaseBound to kres części fazowej indeksu.
 /// - [soperations.phase-startup-latency.2~1] dla dodatniego ratio i nieujemnego sourceLatency z zakresu int liczyć wynik dokładnie, bez przepełnienia, i zwracać go w int64 nasyconym na INT64_MAX.
 ///
 /// Ogon operatorów jednoargumentowych o afinicznym odwzorowaniu indeksu: `-`, `Θ` i `~Θ`.

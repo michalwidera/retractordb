@@ -13,13 +13,7 @@
 // ctest -R '^ut-soperations' -V
 
 TEST(xSOperations, rounding_helpers_obey_signed_and_64_bit_contracts) {
-  // covers: soperations.floor-r.1~1, soperations.floor-div.1~1, soperations.ceil-r.1~1, soperations.rounded-away-from-zero.1~1
-  EXPECT_EQ(floorR(boost::rational<int>(-3, 2)), -1);
-  EXPECT_EQ(floorR(boost::rational<int>(3, 2)), 1);
-  EXPECT_EQ(ceilR(boost::rational<int>(-3, 2)), -2);
-  EXPECT_EQ(ceilR(boost::rational<int>(3, 2)), 2);
-  EXPECT_EQ(ceilR(boost::rational<int>(-2)), -2);
-  EXPECT_EQ(ceilR(boost::rational<int>(0)), 0);
+  // covers: soperations.floor-div.1~1, soperations.rounded-away-from-zero.1~1
   EXPECT_EQ(floorDiv(-3, 2), -2);
   EXPECT_EQ(floorDiv(3, -2), -2);
   EXPECT_EQ(floorDiv(-3, -2), 1);
@@ -596,4 +590,62 @@ TEST(xSOperations, wide_startup_latency_saturates_instead_of_wrapping) {
   EXPECT_EQ(ThetaStartupLatency(boost::rational<int>(intMax), boost::rational<int>(1, intMax), boost::rational<int>(1, intMax),
                                 intMax),
             int64Max);
+}
+
+// #636: mapy odczytu liczyly n * Delta w rational<int>, ktory nie wykrywa przepelnienia, wiec od
+// pewnego n czytaly zly rekord albo podawaly indeks ujemny. Wartosci oczekiwane policzone
+// niezaleznie od silnika ulamkami Pythona (fractions.Fraction) wprost z definicji formalnych.
+// Przeplot 1/360 # 1/250 ma interwal 1/610; Hash mylil sie od n = 59 652 324 (ok. 27,2 h przy 610 Hz).
+TEST(xSOperations, read_maps_are_exact_up_to_int_max) {
+  // covers: soperations.hash.3~1, soperations.hash-left-count.1~1, soperations.div.2~1, soperations.mod.2~1, soperations.subtract.2~1, soperations.add.2~1
+  constexpr int intMax = std::numeric_limits<int>::max();
+  const boost::rational<int> left{1, 360};
+  const boost::rational<int> right{1, 250};
+  const boost::rational<int> hashed{1, 610};
+
+  const std::vector<std::tuple<int, bool, int>> hashCases = {
+      {59652323, false, 35204649}, {59652324, true, 24447674}, {59652325, false, 35204650}, {intMax, true, 880116249}};
+  for (const auto &[n, expectedTakeB, expectedPos] : hashCases) {
+    int pos = -1;
+    EXPECT_EQ(Hash(left, right, n, pos), expectedTakeB) << "n=" << n;
+    EXPECT_EQ(pos, expectedPos) << "n=" << n;
+  }
+  // Hash(INT_MAX) siega po n = INT_MAX + 1.
+  EXPECT_EQ(hashLeftCount(left, right, std::int64_t{intMax} + 1), INT64_C(1267367398));
+
+  EXPECT_EQ(Div(left, right, 100000000), INT64_C(169444446));
+  EXPECT_EQ(Div(left, right, intMax), INT64_C(3638791736));
+  EXPECT_EQ(Mod(left, right, 100000000), INT64_C(244000000));
+  EXPECT_EQ(Mod(left, right, intMax), INT64_C(5239860098));
+  EXPECT_EQ(Subtract(hashed, right, 100000000), INT64_C(244000000));
+  EXPECT_EQ(Subtract(hashed, right, intMax), INT64_C(5239860099));
+  EXPECT_EQ(Add(left, right, 100000000), INT64_C(69444444));
+  EXPECT_EQ(Add(left, right, intMax), INT64_C(1491308088));
+
+  // Para 2 s i 99 997 s (przeplot 199994/99999): Hash, Mod i Subtract mylily sie juz od n ok. 21 641.
+  const boost::rational<int> slowLeft{2};
+  const boost::rational<int> slowRight{99997};
+  const boost::rational<int> slowHashed{199994, 99999};
+  for (const auto &[n, expectedPos, expectedMod, expectedSubtract] :
+       std::vector<std::tuple<int, int, std::int64_t, std::int64_t>>{{21641, 21640, 1082039179, 1082039180},
+                                                                     {30000, 29999, 1499985000, 1499985000}}) {
+    int pos = -1;
+    EXPECT_FALSE(Hash(slowLeft, slowRight, n, pos)) << "n=" << n;
+    EXPECT_EQ(pos, expectedPos) << "n=" << n;
+    EXPECT_EQ(Mod(slowLeft, slowRight, n), expectedMod) << "n=" << n;
+    EXPECT_EQ(Subtract(slowHashed, slowRight, n), expectedSubtract) << "n=" << n;
+  }
+}
+
+// Indeks w strumieniu szybszym moze wyjsc poza int64, choc n miesci sie w int: (n+1) * INT_MAX^2
+// to ok. 2^93. Wynik nasyca sie na INT64_MAX - rekordu o takim indeksie nie ma - zamiast sie zawinac.
+TEST(xSOperations, read_maps_saturate_instead_of_wrapping) {
+  // covers: soperations.saturated-index.1~1, soperations.div.2~1, soperations.mod.2~1, soperations.subtract.2~1
+  constexpr int intMax            = std::numeric_limits<int>::max();
+  constexpr std::int64_t int64Max = std::numeric_limits<std::int64_t>::max();
+  const boost::rational<int> huge{intMax};
+  const boost::rational<int> tiny{1, intMax};
+  EXPECT_EQ(Div(huge, tiny, intMax), int64Max);
+  EXPECT_EQ(Mod(tiny, huge, intMax), int64Max);
+  EXPECT_EQ(Subtract(tiny, huge, intMax), int64Max);
 }
