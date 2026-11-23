@@ -52,63 +52,63 @@ EngineRules	ratInt_pos_bounds	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	tdiv_inRange64	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	tdiv_small_of_tmod_ne_zero	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	intCeil_div	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	floorDivCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	floorDivCpp_eq	TEST:ProofOracle.floorDivCpp_table
 EngineRules	awayFromZero_div	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	roundedAwayFromZeroCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	roundedAwayFromZeroCpp_natCast	NIEPOKRYTE:test w A4 (D5)
-EngineRules	saturatedIndexCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	saturatedTailCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	roundedAwayFromZeroCpp_eq	TEST:ProofOracle.roundedAwayFromZeroCpp_table
+EngineRules	roundedAwayFromZeroCpp_natCast	TEST:ProofOracle.roundedAwayFromZeroCpp_table
+EngineRules	saturatedIndexCpp_eq	TEST:ProofOracle.saturatedIndexCpp_table
+EngineRules	saturatedTailCpp_eq	TEST:ProofOracle.saturatedTailCpp_table
 EngineRules	cross_spec	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	affineRead_cast	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	inRange128_of_le	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	index_lt	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	progress_le	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	hashLeftCountCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	hashCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	divCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	modCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	hashLeftCountCpp_eq	TEST:ProofOracle.hashLeftCountCpp_table
+EngineRules	hashCpp_eq	TEST:ProofOracle.hashCpp_table
+EngineRules	divCpp_eq	TEST:ProofOracle.divCpp_table
+EngineRules	modCpp_eq	TEST:ProofOracle.modCpp_table
 EngineRules	affineRead_self	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	subtractCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	addCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	subtractCpp_eq	TEST:ProofOracle.subtractCpp_table
+EngineRules	addCpp_eq	TEST:ProofOracle.addCpp_table
 EngineRules	affineTail_zero	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	natTail_cast	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	min_int64Max_le_iff	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	ceilDiv_le	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	agseStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	agseStartupLatencyCpp_eq	TEST:ProofOracle.agseStartupLatencyCpp_table
 EngineRules	agseStartupLatency_lt	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	agseStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
-EngineRules	agseLogicalOriginCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	agseStartupLatencyCpp_exact	TEST:ProofOracle.agseStartupLatencyCpp_table
+EngineRules	agseLogicalOriginCpp_eq	TEST:ProofOracle.agseLogicalOriginCpp_table
 EngineRules	agseLogicalOrigin_lt	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	cross_pos	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	saturatedTailCpp_natCast	NIEPOKRYTE:test w A4 (D5)
-EngineRules	addStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	addStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
-EngineRules	phaseStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	nthetaStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	saturatedTailCpp_natCast	TEST:ProofOracle.saturatedTailCpp_table
+EngineRules	addStartupLatencyCpp_eq	TEST:ProofOracle.addStartupLatencyCpp_table
+EngineRules	addStartupLatencyCpp_exact	TEST:ProofOracle.addStartupLatencyCpp_table
+EngineRules	phaseStartupLatencyCpp_eq	TEST:ProofOracle.phaseStartupLatencyCpp_table
+EngineRules	nthetaStartupLatencyCpp_eq	TEST:ProofOracle.nthetaStartupLatencyCpp_table
 EngineRules	nthetaTail_phase	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	nthetaStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
-EngineRules	nthetaStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaStartupLatencyCpp_eq_phase	TEST:ProofOracle.nthetaStartupLatencyCpp_table
+EngineRules	nthetaStartupLatencyCpp_exact	TEST:ProofOracle.nthetaStartupLatencyCpp_table
 EngineRules	pred_sub_mod_of_dvd	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	phaseBound_reduce	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	ratInt_ratio_cross	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	subtractStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	subtractStartupLatencyCpp_eq	TEST:ProofOracle.subtractStartupLatencyCpp_table
 EngineRules	subtractTail_phase	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	subtractStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
-EngineRules	subtractStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
-EngineRules	thetaStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	subtractStartupLatencyCpp_eq_phase	TEST:ProofOracle.subtractStartupLatencyCpp_table
+EngineRules	subtractStartupLatencyCpp_exact	TEST:ProofOracle.subtractStartupLatencyCpp_table
+EngineRules	thetaStartupLatencyCpp_eq	TEST:ProofOracle.thetaStartupLatencyCpp_table
 EngineRules	thetaPhaseBound_reduce	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	thetaStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaStartupLatencyCpp_eq_phase	TEST:ProofOracle.thetaStartupLatencyCpp_table
 EngineRules	thetaRatio_cross	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	thetaTail_affine	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	thetaStartupLatencyCpp_eq_affine	NIEPOKRYTE:test w A4 (D5)
-EngineRules	thetaStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaStartupLatencyCpp_eq_affine	TEST:ProofOracle.thetaStartupLatencyCpp_table
+EngineRules	thetaStartupLatencyCpp_exact	TEST:ProofOracle.thetaStartupLatencyCpp_table
 EngineRules	nthetaTail_affine	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	nthetaStartupLatencyCpp_exact_mod	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaStartupLatencyCpp_exact_mod	TEST:ProofOracle.nthetaStartupLatencyCpp_table
 EngineRules	reduced_pos	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	hashStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
-EngineRules	hashStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	hashStartupLatencyCpp_eq	TEST:ProofOracle.hashStartupLatencyCpp_table
+EngineRules	hashStartupLatencyCpp_exact	TEST:ProofOracle.hashStartupLatencyCpp_table
 EngineRules	progress_mul_left	POZA_ZAKRESEM:lemat pomocniczy
-EngineRules	hashCpp_eq_reduced	NIEPOKRYTE:test w A4 (D5)
+EngineRules	hashCpp_eq_reduced	TEST:ProofOracle.hashCpp_table
 Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
 Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
 Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original

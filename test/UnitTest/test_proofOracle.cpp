@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <set>
@@ -1640,4 +1641,196 @@ TEST(ProofOracle, r1_plan_admissible) {
     }
     ASSERT_GE(distinct.size(), 2U) << suffix;
   }
+}
+
+// ===== Przepisania funkcji SOperations.hpp (Profs/EngineRules.lean, #634, krok A4) =====
+//
+// Twierdzenia <nazwa>Cpp_* mowia o przepisaniu funkcji C++ do Lean w arytmetyce sprawdzanej.
+// Tablice kCpp* sa liczone tymi przepisaniami (OracleMain.lean), a testy ponizej porownuja je
+// z funkcjami C++ na siatce malych wartosci i punktow przy INT_MAX, INT64_MAX i granicy __int128.
+// Zgodnosc na siatce przenosi twierdzenia z przepisania na kod; wiernosc poza siatka sprawdza
+// czlowiek. Wiersz z defined = false to punkt, w ktorym przepisanie daje none (UB w C++):
+// funkcji C++ sie tam nie wola, a test sprawdza, ze punkt lezy dokladnie poza kontraktem.
+
+namespace {
+
+constexpr std::int64_t kInt64Min = std::numeric_limits<std::int64_t>::min();
+constexpr __int128 kInt128Max    = (((__int128{1} << 126) - 1) << 1) + 1;
+
+std::string text128(__int128 x) {
+  if (x == 0) return "0";
+  const bool negative = x < 0;
+  std::string digits;
+  while (x != 0) {
+    const int digit = static_cast<int>(x % 10);
+    digits.insert(digits.begin(), static_cast<char>('0' + (negative ? -digit : digit)));
+    x /= 10;
+  }
+  return negative ? "-" + digits : digits;
+}
+
+// Interwal z siatki: boost::rational<int> po normalizacji musi miec te same skladowe co para
+// (num, den) w Lean, inaczej porownanie dotyczyloby innego wejscia.
+rational<int> gridRational(int num, int den) {
+  const rational<int> r(num, den);
+  EXPECT_EQ(r.numerator(), num) << num << "/" << den;
+  EXPECT_EQ(r.denominator(), den) << num << "/" << den;
+  return r;
+}
+
+std::string readRow(const CppReadRow &row) { return std::format("a={}/{} b={}/{} i={}", row.a1, row.a2, row.b1, row.b2, row.i); }
+
+std::string pairTailRow(const CppPairTailRow &row) {
+  return std::format("s={}/{} t={}/{} W={}", row.s1, row.s2, row.t1, row.t2, row.w);
+}
+
+}  // namespace
+
+TEST(ProofOracle, floorDivCpp_table) {
+  // covers: soperations.floor-div.1~1
+  int undefined = 0;
+  for (const auto &row : kCppDivisionRows) {
+    const bool ub = row.b == 0 || (row.a == kInt64Min && row.b == -1);
+    ASSERT_EQ(row.floorDefined, !ub) << "a=" << row.a << " b=" << row.b;
+    if (ub) {
+      ++undefined;
+      continue;
+    }
+    ASSERT_EQ(floorDiv(row.a, row.b), row.floorDiv) << "a=" << row.a << " b=" << row.b;
+  }
+  ASSERT_GT(undefined, 0);
+}
+
+TEST(ProofOracle, roundedAwayFromZeroCpp_table) {
+  // covers: soperations.rounded-away-from-zero.1~1
+  int undefined = 0;
+  for (const auto &row : kCppDivisionRows) {
+    const bool ub = row.b == 0 || (row.a == kInt64Min && row.b == -1);
+    ASSERT_EQ(row.roundedDefined, !ub) << "a=" << row.a << " b=" << row.b;
+    if (ub) {
+      ++undefined;
+      continue;
+    }
+    ASSERT_EQ(roundedAwayFromZero(row.a, row.b), row.rounded) << "a=" << row.a << " b=" << row.b;
+  }
+  ASSERT_GT(undefined, 0);
+}
+
+TEST(ProofOracle, saturatedIndexCpp_table) {
+  // covers: soperations.saturated-index.1~1
+  for (const auto &row : kCppSaturatedIndexRows)
+    ASSERT_EQ(saturatedIndex(row.index), row.result) << "index=" << text128(row.index);
+}
+
+TEST(ProofOracle, saturatedTailCpp_table) {
+  // covers: soperations.saturated-tail.1~1
+  int undefined = 0;
+  for (const auto &row : kCppSaturatedTailRows) {
+    const std::string at = "N=" + text128(row.numerator) + " D=" + text128(row.denominator);
+    // C++ liczy (numerator + denominator) - 1, wiec UB jest juz sama suma ponad zakres __int128.
+    const bool ub = row.numerator > kInt128Max - row.denominator;
+    ASSERT_EQ(row.defined, !ub) << at;
+    if (ub) {
+      ++undefined;
+      continue;
+    }
+    ASSERT_EQ(saturatedTail(row.numerator, row.denominator), row.tail) << at;
+  }
+  ASSERT_GT(undefined, 0);
+}
+
+TEST(ProofOracle, hashLeftCountCpp_table) {
+  // covers: soperations.hash-left-count.1~1
+  for (const auto &row : kCppReadRows)
+    ASSERT_EQ(hashLeftCount(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i), row.leftCount) << readRow(row);
+}
+
+TEST(ProofOracle, hashCpp_table) {
+  // covers: soperations.hash.1~1, soperations.hash.3~1
+  for (const auto &row : kCppReadRows) {
+    int pos         = -1;
+    const bool from = Hash(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i, pos);
+    ASSERT_EQ(from, row.fromB) << readRow(row);
+    ASSERT_EQ(pos, row.pos) << readRow(row);
+  }
+}
+
+TEST(ProofOracle, divCpp_table) {
+  // covers: soperations.div.2~1
+  for (const auto &row : kCppReadRows)
+    ASSERT_EQ(Div(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i), row.div) << readRow(row);
+}
+
+TEST(ProofOracle, modCpp_table) {
+  // covers: soperations.mod.2~1
+  for (const auto &row : kCppReadRows)
+    ASSERT_EQ(Mod(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i), row.mod) << readRow(row);
+}
+
+TEST(ProofOracle, subtractCpp_table) {
+  // covers: soperations.subtract.2~1
+  for (const auto &row : kCppReadRows)
+    ASSERT_EQ(Subtract(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i), row.subtract) << readRow(row);
+}
+
+TEST(ProofOracle, addCpp_table) {
+  // covers: soperations.add.2~1
+  for (const auto &row : kCppReadRows)
+    ASSERT_EQ(Add(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.i), row.add) << readRow(row);
+}
+
+TEST(ProofOracle, agseStartupLatencyCpp_table) {
+  // covers: soperations.agse-startup-latency.1~1
+  for (const auto &row : kCppAgseRows)
+    ASSERT_EQ(AgseStartupLatency(row.f, row.h, row.w), row.tail) << "F=" << row.f << " h=" << row.h << " W=" << row.w;
+}
+
+TEST(ProofOracle, agseLogicalOriginCpp_table) {
+  // covers: soperations.agse-logical-origin.1~1
+  for (const auto &row : kCppAgseOriginRows)
+    ASSERT_EQ(AgseLogicalOrigin(row.f, row.h, row.length, row.os), row.origin)
+        << "F=" << row.f << " h=" << row.h << " length=" << row.length << " Os=" << row.os;
+}
+
+TEST(ProofOracle, addStartupLatencyCpp_table) {
+  // covers: soperations.add-startup-latency.2~1
+  for (const auto &row : kCppPairTailRows)
+    ASSERT_EQ(AddStartupLatency(gridRational(row.s1, row.s2), gridRational(row.t1, row.t2), row.w), row.add) << pairTailRow(row);
+}
+
+TEST(ProofOracle, subtractStartupLatencyCpp_table) {
+  // covers: soperations.subtract-startup-latency.2~1
+  for (const auto &row : kCppPairTailRows)
+    ASSERT_EQ(SubtractStartupLatency(gridRational(row.s1, row.s2), gridRational(row.t1, row.t2), row.w), row.subtract)
+        << pairTailRow(row);
+}
+
+TEST(ProofOracle, nthetaStartupLatencyCpp_table) {
+  // covers: soperations.n-theta-startup-latency.2~1
+  for (const auto &row : kCppPairTailRows)
+    ASSERT_EQ(NThetaStartupLatency(gridRational(row.s1, row.s2), gridRational(row.t1, row.t2), row.w), row.ntheta)
+        << pairTailRow(row);
+}
+
+TEST(ProofOracle, thetaStartupLatencyCpp_table) {
+  // covers: soperations.theta-startup-latency.2~1
+  for (const auto &row : kCppThetaTailRows)
+    ASSERT_EQ(
+        ThetaStartupLatency(gridRational(row.s1, row.s2), gridRational(row.t1, row.t2), gridRational(row.o1, row.o2), row.w),
+        row.tail)
+        << std::format("s={}/{} t={}/{} o={}/{} W={}", row.s1, row.s2, row.t1, row.t2, row.o1, row.o2, row.w);
+}
+
+TEST(ProofOracle, phaseStartupLatencyCpp_table) {
+  // covers: soperations.phase-startup-latency.2~1
+  for (const auto &row : kCppPhaseTailRows)
+    ASSERT_EQ(PhaseStartupLatency(gridRational(row.k1, row.k2), gridRational(row.r1, row.r2), row.w), row.tail)
+        << std::format("k={}/{} r={}/{} W={}", row.k1, row.k2, row.r1, row.r2, row.w);
+}
+
+TEST(ProofOracle, hashStartupLatencyCpp_table) {
+  // covers: soperations.hash-startup-latency.4~1
+  for (const auto &row : kCppHashTailRows)
+    ASSERT_EQ(HashStartupLatency(gridRational(row.a1, row.a2), gridRational(row.b1, row.b2), row.wa, row.wb), row.tail)
+        << std::format("a={}/{} b={}/{} WA={} WB={}", row.a1, row.a2, row.b1, row.b2, row.wa, row.wb);
 }
