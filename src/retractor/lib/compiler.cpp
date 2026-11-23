@@ -1200,14 +1200,12 @@ std::string compiler::expandIndexWildcards(query &q) {
       return internalCompilerError(fmt::format("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id));
     }
     if (minSizeFlat <= 0) {
-      // minSizeFlat == 0 znaczy, ze zrodlo ma PUSTY deskryptor, a jedyna droga do tego jest
-      // okno AGSE o dlugosci zero: query::descriptorFrom iteruje `for (i=0; i<abs(length); i++)`,
-      // wiec @(k,0) nie wytwarza ani jednego pola. Komunikat mowi o oknie, a nie o "flat size",
-      // bo to okno uzytkownik napisal.
-      return fmt::format(
-          "Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
-          "produces nothing to expand",
-          q.id);
+      // Zrodlo bez pol to zlamany niezmiennik, a nie blad planu: deklaracja ma co najmniej jedno
+      // pole, lista SELECT nie jest pusta, a okno `@(k,0)` - dawniej jedyna droga do pustego
+      // deskryptora - parser odrzuca od #308/#440 (`|window| >= 1`, takze `-0` i stala LET).
+      // Straz zostaje, bo bez niej petla nizej rozwinelaby `[_]` po cichu do zera pol (#647).
+      return internalCompilerError(
+          fmt::format("compiler::expandIndexWildcards: '[_]' source of query '{}' has no fields", q.id));
     }
 
     for (int i = 0; i < minSizeFlat; i++) {
