@@ -2043,13 +2043,19 @@ namespace {
 /// Nazwa funkcji jest w gramatyce zwyklym ID, wiec bledna nazwa NIE jest bledem skladni
 /// i nie konczy procesu - wychodzi lagodnie przez wartosc zwracana z compile(), tym samym
 /// kanalem co pozostale kontrole planu. Dlatego te testy nie potrzebuja EXPECT_EXIT.
-std::string compileRql(const std::string &rql) {
+std::string compileRql(const std::string &rql, const std::optional<int> &historyBudgetMib = std::nullopt) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, rql);
   if (parseResult != "OK") return parseResult;
   compiler compilerInstance(instance);
+  if (historyBudgetMib) compilerInstance.setHistoryMemoryBudget(*historyBudgetMib);
   return compilerInstance.compile();
 }
+
+/// Plany z ogonem rzedu 10^6..10^9 potrzebuja historii ponad domyslny budzet pamieci. Do 2026-11-23
+/// miescily sie w nim tylko dlatego, ze pojemnosci liczone w rational<int> wychodzily zanizone (#637).
+/// Testy ogona i zakresu pojemnosci sprawdzaja rachunek, nie budzet, wiec dostaja budzet najwiekszy.
+constexpr int kLargestHistoryBudgetMib = std::numeric_limits<int>::max();
 
 std::string selectRql(const std::string &selectList) {
   return "SUBSTRAT 'memory'\n"
@@ -3107,7 +3113,7 @@ TEST(xcompiler, hash_startup_latency_beyond_int_is_a_plan_error) {
   };
   const std::string verdict = compileRql(plan("1/999999989"));
   EXPECT_TRUE(verdict.contains("Stream 'z' has a startup latency of 2636363637 slots; the limit is 2147483647")) << verdict;
-  EXPECT_EQ(compileRql(plan("1/100000000")), "OK");
+  EXPECT_EQ(compileRql(plan("1/100000000"), kLargestHistoryBudgetMib), "OK");
 }
 
 // Plan z #635: rozplot przeplotu 1/48000 # 60. Do 2026-11-23 ThetaStartupLatency() liczyl
@@ -3150,6 +3156,7 @@ TEST(xcompiler, add_startup_latency_beyond_int_is_a_plan_error) {
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, plan("1/100000"));
   ASSERT_EQ(parseResult, "OK");
   compiler compilerInstance(instance);
+  compilerInstance.setHistoryMemoryBudget(kLargestHistoryBudgetMib);
   ASSERT_EQ(compilerInstance.compile(), "OK");
   EXPECT_EQ(instance.getQuery("z").startupLatency, 5999999);
 }
@@ -3167,12 +3174,68 @@ TEST(xcompiler, reduction_inherits_large_startup_latency) {
                                                                  "SELECT * STREAM r FROM MIN(c)\n");
   ASSERT_EQ(parseResult, "OK");
   compiler compilerInstance(instance);
+  compilerInstance.setHistoryMemoryBudget(kLargestHistoryBudgetMib);
   ASSERT_EQ(compilerInstance.compile(), "OK");
   ASSERT_EQ(instance.getQuery("c").rInterval, boost::rational<int>(42000, 288000007));
   ASSERT_EQ(instance.getQuery("r").rInterval, instance.getQuery("c").rInterval);
   // Swiadek lezy w obszarze przepelnienia dawnego rachunku: W*42000 > INT_MAX.
   ASSERT_GT(std::int64_t{instance.getQuery("c").startupLatency} * 42000, std::numeric_limits<int>::max());
   EXPECT_EQ(instance.getQuery("r").startupLatency, instance.getQuery("c").startupLatency);
+}
+
+// Plan z #637: pojemnosc historii zrodla przeplotu 1/48000 # 60. Wzor `#` to
+// max(4, ceil(W_c*Delta_c/Delta_src) - W_src + 2), przy Delta_c = 60/2880001 i W_c = 2880000. Wartosci
+// policzono niezaleznie, dokladnie, ulamkami Pythona: a 2880002, b 4, c 4 (z rozplotow `&` i `%`).
+// Do 2026-11-23 wzor liczyl w rational<int>, ktory mnozyl 172800000 * 48000 i dawal a 287 - plan
+// przechodzil przy budzecie 1 MiB, choc sama historia a to ok. 2,9 * 10^6 rekordow.
+TEST(xcompiler, hash_capacity_over_48khz_interleave_is_exact) {
+  // covers: compiler.compiler.8~1
+  const std::string rql =
+      "DECLARE v INTEGER STREAM a, 1/48000 TEXTFILE 'a.txt'\n"
+      "DECLARE v INTEGER STREAM b, 60 TEXTFILE 'b.txt'\n"
+      "SELECT * STREAM c FROM a # b\n"
+      "SELECT * STREAM da FROM c & 60\n"
+      "SELECT * STREAM db FROM c % 1/48000\n";
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, rql);
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  ASSERT_EQ(instance.getQuery("c").startupLatency, 2880000);
+  EXPECT_EQ(instance.maxCapacity.at("a"), 2880002);
+  EXPECT_EQ(instance.maxCapacity.at("b"), 4);
+  EXPECT_EQ(instance.maxCapacity.at("c"), 4);
+
+  qTree budgeted;
+  ASSERT_EQ(std::get<0>(parserRQLString(budgeted, rql)), "OK");
+  compiler budgetedCompiler(budgeted);
+  budgetedCompiler.setHistoryMemoryBudget(1);
+  const std::string verdict = budgetedCompiler.compile();
+  EXPECT_TRUE(verdict.contains("history_memory_mib = 1")) << verdict;
+  EXPECT_TRUE(verdict.contains("largest share: stream 'a'")) << verdict;
+}
+
+// Pojemnosc spoza int to blad planu (#637), jak ogon spoza int (#635). Roznica a - k nad deklaracja
+// o interwale 1/10^9 ma ogon 0 i iloraz calkowity k*10^9, wiec pojemnosc a to floor(1*k*10^9) + 2:
+// przy k = 3 3000000002 > INT_MAX, przy k = 2 2000000002 i plan przechodzi. Liczby policzono
+// niezaleznie ulamkami Pythona. Do 2026-11-23 iloraz interwalow liczyl rational<int> i przy k = 3
+// przepelnial sie po cichu.
+TEST(xcompiler, subtract_capacity_beyond_int_is_a_plan_error) {
+  // covers: compiler.compiler.8~1
+  const auto plan = [](const std::string &target) {
+    return "DECLARE v INTEGER STREAM a, 1/1000000000 TEXTFILE 'a.txt'\nSELECT * STREAM s FROM a - " + target + "\n";
+  };
+  const std::string verdict = compileRql(plan("3"));
+  EXPECT_TRUE(verdict.contains("Stream 'a' needs a history of 3000000002 records for stream 's'; the limit is 2147483647"))
+      << verdict;
+
+  qTree instance;
+  ASSERT_EQ(std::get<0>(parserRQLString(instance, plan("2"))), "OK");
+  compiler compilerInstance(instance);
+  compilerInstance.setHistoryMemoryBudget(kLargestHistoryBudgetMib);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_EQ(instance.getQuery("s").startupLatency, 0);
+  EXPECT_EQ(instance.maxCapacity.at("a"), 2000000002);
 }
 
 // Petla okresu AGSE w computeRequiredCapacities liczyla (n+1+Wout)*step w int: przy F = 65536 i kroku
