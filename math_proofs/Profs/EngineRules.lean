@@ -1,11 +1,12 @@
 import Profs.CppArith
+import Profs.InterleaveTailExact
 import Profs.ShiftMatching
 import Profs.StartupBoundaries
 
 namespace Profs
 
 /- Funkcje z src/include/SOperations.hpp jako przepisania w arytmetyce sprawdzanej z CppArith.lean
-   (#634, warstwa A, krok A2): funkcje pomocnicze i mapy odczytu.
+   (#634, warstwa A): funkcje pomocnicze i mapy odczytu (krok A2) oraz reguly rozruchowe (krok A3).
 
    Kazda funkcja C++ ma tu przepisanie w monadzie Option: ta sama kolejnosc dzialan, te same typy,
    a przy kazdym kroku komentarz z odpowiadajacym fragmentem C++. Wynik none oznacza
@@ -854,9 +855,9 @@ def agseLogicalOriginCpp (sourceWidth step length sourceOrigin : ℤ) : Option �
    - length != 0: okno @(k,0) odrzuca parser (RQLParser.cpp, exitSExpAgse: boundedSigned z min = 1,
      takze dla -0 i stalej LET; sprawdzone xretractor -c 2026-11-23). Przy length = 0 i Os = 0
      kod daje -1, a agseOrigin 0 (odejmowanie w N).
-   - 0 <= Os: compiler::computeLogicalOrigin zaczyna od 0 dla deklaracji, a kazda galaz daje
-     wynik >= origin zrodla - z wyjatkiem przepelnienia int przy >N i oknie rekordowym (#647),
-     po ktorym ujemny origin dochodzi tu jako sourceOrigin. Do poprawki #647 to jawna granica.
+   - 0 <= Os < 2^31: compiler::computeLogicalOrigin zaczyna od 0 dla deklaracji, kazda galaz daje
+     wynik >= origin zrodla, a od #647 kazda galaz, ktora origin zwieksza (AGSE, >N, okno
+     rekordowe), liczy w int64 i odrzuca wynik powyzej INT_MAX.
    Bez nasycenia: Os*F + |length| - 1 < 2^62 + 2^31 (agseLogicalOrigin_lt). -/
 theorem agseLogicalOriginCpp_eq {F h Os : ℕ} {length : ℤ} (hFl : F < 2 ^ 31) (hh : 0 < h) (hOs : Os < 2 ^ 31) (hl : inRange wInt length) (hl0 : length ≠ 0) :
     agseLogicalOriginCpp F h length Os = some (agseOrigin F h length.natAbs Os : ℤ) := by
@@ -1142,8 +1143,8 @@ theorem nthetaStartupLatencyCpp_eq_phase {s t : RatInt} (hs : s.Valid) (hs0 : 0 
 
 /- Wniosek jak addStartupLatencyCpp_exact: mapa odczytu affineRead p q 0 n = floor(n*t/s)
    (addRead_eq). Ze to mapa Mod(), czyli i + floor(i*u/v) z nthetaRead_eq, wynika dopiero przy
-   s = t*o/(t+o) dla parametru o rozplotu (theta_ratio) - kod tego nie sprawdza; ten krok
-   nalezy do A3b razem z Theta. -/
+   s = t*o/(t+o) dla parametru o rozplotu (theta_ratio) - kod tego nie sprawdza; ten krok to
+   nthetaStartupLatencyCpp_exact_mod w czesci A3b. -/
 theorem nthetaStartupLatencyCpp_exact {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
     (ht : t.Valid) (ht0 : 0 < t.val) {W W' N0 : ℕ} (hW : W < 2 ^ 31) (hW' : W' < 2 ^ 31) (tick : ℚ)
     (htick : 0 < tick) {v : ℤ} (hv : nthetaStartupLatencyCpp s t W = some v) :
@@ -1151,6 +1152,544 @@ theorem nthetaStartupLatencyCpp_exact {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s
   rw [nthetaStartupLatencyCpp_eq hs hs0 ht ht0 hW, Option.some.injEq] at hv
   rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
   exact affineTail_exact _ _ 0 W W' N0 (cross_pos ht ht0 hs) (cross_pos hs hs0 ht) tick htick
+
+/- ===== Reguly rozruchowe (krok A3b): Subtract, Theta, Hash =====
+
+   Hipotezy jak w A3a. Trzy reguly licza gcd (std::gcd na nieujemnych int64, gcd64). Wynik
+   jest w kazdej z nich postacia modelu na nieskroconych iloczynach krzyzowych (D6); postac
+   z wymagania w SOperations.hpp (skrocony iloraz) wynika z niej osobnym lematem. -/
+
+/- Przy g | q i q > 0 kres fazy (q-1) - (q-1) mod g z affineTail to q - g. -/
+theorem pred_sub_mod_of_dvd {q g : ℕ} (hg : 0 < g) (hgq : g ∣ q) (hq : 0 < q) :
+    q - 1 - (q - 1) % g = q - g := by
+  obtain ⟨k, rfl⟩ := hgq
+  rcases k with _ | k
+  · simp at hq
+  · have e : g * (k + 1) - 1 = (g - 1) + g * k := by
+      rw [Nat.mul_succ]; generalize g * k = A; omega
+    rw [e, Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt (by omega), Nat.mul_succ]
+    generalize g * k = A
+    omega
+
+/- Skrocenie kresu fazy przez g: (g*k - g)/(g*m) = (k-1)/m. -/
+theorem phaseBound_reduce (g k m : ℕ) (hg : 0 < g) :
+    ((g * k - g : ℕ) : ℚ) / ((g * m : ℕ) : ℚ) = ((k - 1 : ℕ) : ℚ) / (m : ℚ) := by
+  rw [← Nat.mul_sub_one]
+  push_cast
+  exact mul_div_mul_left _ _ (by exact_mod_cast hg.ne')
+
+/- Iloraz dwoch dodatnich interwalow jako iloraz nieskroconych iloczynow krzyzowych (D6). -/
+theorem ratInt_ratio_cross {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) : t.val / s.val = ((cross t s : ℕ) : ℚ) / ((cross s t : ℕ) : ℚ) := by
+  obtain ⟨hq, -⟩ := cross_spec hs hs0 ht
+  obtain ⟨hp, -⟩ := cross_spec ht ht0 hs
+  rw [ratInt_val_div ht hs hs0]
+  have hp' : ((cross t s : ℕ) : ℚ) = ((t.num * s.den : ℤ) : ℚ) := by rw [← hp, Int.cast_natCast]
+  have hq' : ((cross s t : ℕ) : ℚ) = ((t.den * s.num : ℤ) : ℚ) := by
+    rw [mul_comm t.den, ← hq, Int.cast_natCast]
+  rw [hp', hq']
+
+/- ===== SubtractStartupLatency ===== -/
+
+-- ANCHOR: subtract_startup_latency_cpp
+def subtractStartupLatencyCpp (s t : RatInt) (W : ℤ) : Option ℤ := do
+  -- const std::int64_t sourceScaled = std::int64_t{deltaTarget.denominator()} * deltaSource.numerator();
+  let sourceScaled ← mulC wInt64 t.den s.num
+  -- const std::int64_t targetScaled = std::int64_t{deltaTarget.numerator()} * deltaSource.denominator();
+  let targetScaled ← mulC wInt64 t.num s.den
+  -- const std::int64_t h = std::gcd(targetScaled, sourceScaled);
+  let h ← gcd64 targetScaled sourceScaled
+  -- (__int128{sourceLatency} + 2) * sourceScaled
+  let a ← addC wInt128 W 2
+  let b ← mulC wInt128 a sourceScaled
+  -- const __int128 numerator = (...) - h;
+  let numerator ← subC wInt128 b h
+  -- return saturatedTail(numerator, targetScaled);
+  saturatedTailCpp numerator targetScaled
+-- ANCHOR_END: subtract_startup_latency_cpp
+
+/- p = t1*s2, q = t2*s1, g = gcd(p, q): affineTail p q (q-1) W = ((W+2)*q - g + p - 1)/p - 1,
+   bo g | q daje (q-1) - (q-1) mod g = q - g. To ten sam ogon, ktorego mape odczytu daje
+   subtractCpp_eq, i bez zalozenia Coprime z subtractTail_exact. Licznik < 2^94, mianownik
+   < 2^62. -/
+theorem subtractStartupLatencyCpp_eq {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    subtractStartupLatencyCpp s t W =
+      some (min (affineTail (cross t s) (cross s t) (cross s t - 1) W : ℤ) int64Max) := by
+  obtain ⟨s1p, s1l, s2p, s2l⟩ := ratInt_pos_bounds hs hs0
+  obtain ⟨t1p, t1l, t2p, t2l⟩ := ratInt_pos_bounds ht ht0
+  obtain ⟨hq, -⟩ := cross_spec hs hs0 ht
+  obtain ⟨hp, -⟩ := cross_spec ht ht0 hs
+  have hp0 := cross_pos ht ht0 hs
+  have hq0 := cross_pos hs hs0 ht
+  have eq : t.den * s.num = ((cross s t : ℕ) : ℤ) := by rw [hq]; ring
+  have ep : t.num * s.den = ((cross t s : ℕ) : ℤ) := by rw [hp]
+  have bq : t.den * s.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul t2l.le s1l.le s1p.le (by norm_num)
+  have bp : t.num * s.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul t1l.le s2l.le s2p.le (by norm_num)
+  rw [eq] at bq
+  rw [ep] at bp
+  clear eq ep
+  generalize cross t s = p at *
+  generalize cross s t = q at *
+  have hg0 : 0 < Nat.gcd p q := Nat.gcd_pos_of_pos_left q hp0
+  have hgq : Nat.gcd p q ≤ q := Nat.le_of_dvd hq0 (Nat.gcd_dvd_right p q)
+  have hgZ : ((Nat.gcd p q : ℕ) : ℤ) ≤ q := by exact_mod_cast hgq
+  have hWZ : (W : ℤ) < 2 ^ 31 := by exact_mod_cast hW
+  have hpZ : (0 : ℤ) < p := by exact_mod_cast hp0
+  have hqZ : (0 : ℤ) < q := by exact_mod_cast hq0
+  have l5 : ((W : ℤ) + 2) * q ≤ (2 ^ 31 + 1) * (2 ^ 31 * 2 ^ 31) :=
+    mul_le_mul (by linarith) bq hqZ.le (by norm_num)
+  have l5' : (q : ℤ) ≤ ((W : ℤ) + 2) * q := by nlinarith
+  have eN : ((W : ℤ) + 2) * q - (Nat.gcd p q : ℕ) = ((q - Nat.gcd p q + q * (1 + W) : ℕ) : ℤ) := by
+    rw [Nat.cast_add, Nat.cast_sub hgq]; push_cast; ring
+  have r64 : ∀ x : ℕ, (x : ℤ) ≤ 2 ^ 31 * 2 ^ 31 → inRange wInt64 (x : ℤ) := fun x hx =>
+    inRange64_of_nonneg (by positivity) (by unfold int64Max; linarith)
+  have s1 : mulC wInt64 t.den s.num = some (q : ℤ) := by
+    rw [mulC_of_inRange (by rw [mul_comm, ← hq]; exact r64 q bq), hq, mul_comm]
+  have s2 : mulC wInt64 t.num s.den = some (p : ℤ) := by
+    rw [mulC_of_inRange (by rw [← hp]; exact r64 p bp), hp]
+  have s3 : gcd64 (p : ℤ) (q : ℤ) = some ((Nat.gcd p q : ℕ) : ℤ) := by
+    rw [gcd64_of_nonneg (by positivity) (by positivity) (r64 p bp) (r64 q bq), Int.gcd_natCast_natCast]
+    rfl
+  have s4 : addC wInt128 (W : ℤ) 2 = some ((W : ℤ) + 2) :=
+    addC_of_inRange (inRange128_of_le (by linarith) (show (W : ℤ) + 2 ≤ 2 ^ 31 + 2 by linarith)
+      (by norm_num))
+  have s5 : mulC wInt128 ((W : ℤ) + 2) q = some (((W : ℤ) + 2) * q) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) l5 (by norm_num))
+  have s6 : subC wInt128 (((W : ℤ) + 2) * q) ((Nat.gcd p q : ℕ) : ℤ) =
+      some ((q - Nat.gcd p q + q * (1 + W) : ℕ) : ℤ) := by
+    rw [subC_of_inRange (inRange128_of_le (by linarith)
+      (show ((W : ℤ) + 2) * q - ((Nat.gcd p q : ℕ) : ℤ) ≤ (2 ^ 31 + 1) * (2 ^ 31 * 2 ^ 31) by linarith)
+      (by norm_num)), eN]
+  have s7 := saturatedTailCpp_natCast (X := q - Nat.gcd p q + q * (1 + W)) hp0
+    (by rw [← eN]; linarith)
+  have hT : affineTail p q (q - 1) W = (q - Nat.gcd p q + q * (1 + W) + p - 1) / p - 1 := by
+    unfold affineTail
+    rw [pred_sub_mod_of_dvd hg0 (Nat.gcd_dvd_right p q) hq0]
+  unfold subtractStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some, s5,
+    Option.bind_some, s6, Option.bind_some, s7, hT]
+
+/- Postac z wymagania [soperations.subtract-startup-latency.1]: PhaseStartupLatency((q'-1)/q',
+   t/s, W) z q' = q/g, mianownikiem skroconego t/s. -/
+theorem subtractTail_phase {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) (W : ℕ) :
+    affineTail (cross t s) (cross s t) (cross s t - 1) W =
+      phaseStartupLatency (((cross s t / Nat.gcd (cross t s) (cross s t) - 1 : ℕ) : ℚ) /
+        (cross s t / Nat.gcd (cross t s) (cross s t) : ℕ)) (t.val / s.val) W := by
+  have hp0 := cross_pos ht ht0 hs
+  have hq0 := cross_pos hs hs0 ht
+  rw [affineTail_eq_phase _ _ _ W hp0 hq0, ratInt_ratio_cross hs hs0 ht ht0,
+    pred_sub_mod_of_dvd (Nat.gcd_pos_of_pos_left _ hp0) (Nat.gcd_dvd_right _ _) hq0]
+  generalize cross t s = p at *
+  generalize cross s t = q at *
+  have hg0 : 0 < Nat.gcd p q := Nat.gcd_pos_of_pos_left q hp0
+  obtain ⟨k, hk⟩ := Nat.gcd_dvd_right p q
+  generalize Nat.gcd p q = g at *
+  subst hk
+  rw [Nat.mul_div_cancel_left _ hg0, phaseBound_reduce _ _ _ hg0]
+
+theorem subtractStartupLatencyCpp_eq_phase {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    subtractStartupLatencyCpp s t W =
+      some (min (phaseStartupLatency (((cross s t / Nat.gcd (cross t s) (cross s t) - 1 : ℕ) : ℚ) /
+        (cross s t / Nat.gcd (cross t s) (cross s t) : ℕ)) (t.val / s.val) W : ℤ) int64Max) := by
+  rw [← subtractTail_phase hs hs0 ht ht0, subtractStartupLatencyCpp_eq hs hs0 ht ht0 hW]
+
+/- Wniosek: ogon kodu nie przekracza W' z zakresu int dokladnie wtedy, gdy od kazdego progu N0
+   rekord czytany przez Subtract (affineRead p q (q-1), subtractCpp_eq) jest gotowy. -/
+theorem subtractStartupLatencyCpp_exact {s t : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) {W W' N0 : ℕ} (hW : W < 2 ^ 31) (hW' : W' < 2 ^ 31) (tick : ℚ)
+    (htick : 0 < tick) {v : ℤ} (hv : subtractStartupLatencyCpp s t W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady (cross t s) (cross s t) (cross s t - 1) W W' tick n := by
+  rw [subtractStartupLatencyCpp_eq hs hs0 ht ht0 hW, Option.some.injEq] at hv
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
+  exact affineTail_exact _ _ _ W W' N0 (cross_pos ht ht0 hs) (cross_pos hs hs0 ht) tick htick
+
+/- ===== ThetaStartupLatency ===== -/
+
+-- ANCHOR: theta_startup_latency_cpp
+def thetaStartupLatencyCpp (s t o : RatInt) (W : ℤ) : Option ℤ := do
+  -- const std::int64_t spanNumerator = std::int64_t{deltaTarget.numerator()} * other.denominator();
+  let spanNumerator ← mulC wInt64 t.num o.den
+  -- const std::int64_t spanDenominator = std::int64_t{deltaTarget.denominator()} * other.numerator();
+  let spanDenominator ← mulC wInt64 t.den o.num
+  -- const std::int64_t g = std::gcd(spanNumerator, spanDenominator);
+  let g ← gcd64 spanNumerator spanDenominator
+  -- (__int128{sourceLatency} + 2) * spanDenominator
+  let a ← addC wInt128 W 2
+  let b ← mulC wInt128 a spanDenominator
+  -- spanNumerator + (...) - g   (int64 + __int128 -> __int128)
+  let c ← addC wInt128 spanNumerator b
+  let d ← subC wInt128 c g
+  -- const __int128 numerator = (...) * deltaSource.numerator();
+  let numerator ← mulC wInt128 d s.num
+  -- const __int128 denominator = __int128{other.numerator()} * deltaTarget.numerator() * deltaSource.denominator();
+  let e ← mulC wInt128 o.num t.num
+  let denominator ← mulC wInt128 e s.den
+  -- return saturatedTail(numerator, denominator);
+  saturatedTailCpp numerator denominator
+-- ANCHOR_END: theta_startup_latency_cpp
+
+/- u = t1*o2, v = t2*o1, g = gcd(u, v): PhaseStartupLatency((u+v-g)/v, t/s, W) dla dowolnego
+   deltaSource s. Licznik (u + (W+2)*v - g)*s1 lezy w (0, 2^125), mianownik o1*t1*s2 w (0, 2^93). -/
+theorem thetaStartupLatencyCpp_eq {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    thetaStartupLatencyCpp s t o W =
+      some (min (phaseStartupLatency
+        (((cross t o + cross o t - Nat.gcd (cross t o) (cross o t) : ℕ) : ℚ) / (cross o t : ℕ))
+        (t.val / s.val) W : ℤ) int64Max) := by
+  obtain ⟨s1p, s1l, s2p, s2l⟩ := ratInt_pos_bounds hs hs0
+  obtain ⟨t1p, t1l, t2p, t2l⟩ := ratInt_pos_bounds ht ht0
+  obtain ⟨o1p, o1l, o2p, o2l⟩ := ratInt_pos_bounds ho ho0
+  obtain ⟨hu, -⟩ := cross_spec ht ht0 ho
+  obtain ⟨hv, -⟩ := cross_spec ho ho0 ht
+  have hu0 := cross_pos ht ht0 ho
+  have hv0 := cross_pos ho ho0 ht
+  have bu : t.num * o.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul t1l.le o2l.le o2p.le (by norm_num)
+  have bv : t.den * o.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul t2l.le o1l.le o1p.le (by norm_num)
+  rw [← hu] at bu
+  rw [mul_comm, ← hv] at bv
+  generalize cross t o = u at *
+  generalize cross o t = v at *
+  have hg0 : 0 < Nat.gcd u v := Nat.gcd_pos_of_pos_left v hu0
+  have hgv : Nat.gcd u v ≤ v := Nat.le_of_dvd hv0 (Nat.gcd_dvd_right u v)
+  generalize hG : Nat.gcd u v = g at *
+  have hgZ : (g : ℤ) ≤ v := by exact_mod_cast hgv
+  have hguv : g ≤ u + v := by omega
+  have hWZ : (W : ℤ) < 2 ^ 31 := by exact_mod_cast hW
+  have huZ : (0 : ℤ) < u := by exact_mod_cast hu0
+  have hvZ : (0 : ℤ) < v := by exact_mod_cast hv0
+  have hg0Z : (0 : ℤ) < g := by exact_mod_cast hg0
+  -- Zakresy wyrazow posrednich.
+  have lb : ((W : ℤ) + 2) * v ≤ (2 ^ 31 + 1) * (2 ^ 31 * 2 ^ 31) :=
+    mul_le_mul (by linarith) bv hvZ.le (by norm_num)
+  have lb' : 2 * (v : ℤ) ≤ ((W : ℤ) + 2) * v := by nlinarith
+  have ld1 : (0 : ℤ) < (u : ℤ) + ((W : ℤ) + 2) * v - g := by linarith
+  have ld2 : (u : ℤ) + ((W : ℤ) + 2) * v - g ≤ (2 ^ 31 + 2) * (2 ^ 31 * 2 ^ 31) := by linarith
+  have ln1 : 0 ≤ ((u : ℤ) + ((W : ℤ) + 2) * v - g) * s.num := mul_nonneg ld1.le s1p.le
+  have ln2 : ((u : ℤ) + ((W : ℤ) + 2) * v - g) * s.num ≤ (2 ^ 31 + 2) * (2 ^ 31 * 2 ^ 31) * 2 ^ 31 :=
+    mul_le_mul ld2 s1l.le s1p.le (by norm_num)
+  have le1 : o.num * t.num ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul o1l.le t1l.le t1p.le (by norm_num)
+  have le2 : o.num * t.num * s.den ≤ 2 ^ 31 * 2 ^ 31 * 2 ^ 31 := mul_le_mul le1 s2l.le s2p.le (by norm_num)
+  have pe : 0 < o.num * t.num * s.den := mul_pos (mul_pos o1p t1p) s2p
+  have r64 : ∀ x : ℕ, (x : ℤ) ≤ 2 ^ 31 * 2 ^ 31 → inRange wInt64 (x : ℤ) := fun x hx =>
+    inRange64_of_nonneg (by positivity) (by unfold int64Max; linarith)
+  have s1 : mulC wInt64 t.num o.den = some (u : ℤ) := by
+    rw [mulC_of_inRange (by rw [← hu]; exact r64 u bu), hu]
+  have s2 : mulC wInt64 t.den o.num = some (v : ℤ) := by
+    rw [mulC_of_inRange (by rw [mul_comm, ← hv]; exact r64 v bv), hv, mul_comm]
+  have s3 : gcd64 (u : ℤ) (v : ℤ) = some (g : ℤ) := by
+    rw [gcd64_of_nonneg (by positivity) (by positivity) (r64 u bu) (r64 v bv), Int.gcd_natCast_natCast,
+      hG]
+    rfl
+  have s4 : addC wInt128 (W : ℤ) 2 = some ((W : ℤ) + 2) :=
+    addC_of_inRange (inRange128_of_le (by linarith) (show (W : ℤ) + 2 ≤ 2 ^ 31 + 2 by linarith)
+      (by norm_num))
+  have s5 : mulC wInt128 ((W : ℤ) + 2) v = some (((W : ℤ) + 2) * v) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) lb (by norm_num))
+  have s6 : addC wInt128 (u : ℤ) (((W : ℤ) + 2) * v) = some ((u : ℤ) + ((W : ℤ) + 2) * v) :=
+    addC_of_inRange (inRange128_of_le (by linarith)
+      (show (u : ℤ) + ((W : ℤ) + 2) * v ≤ (2 ^ 31 + 2) * (2 ^ 31 * 2 ^ 31) by linarith) (by norm_num))
+  have s7 : subC wInt128 ((u : ℤ) + ((W : ℤ) + 2) * v) (g : ℤ) =
+      some ((u : ℤ) + ((W : ℤ) + 2) * v - g) :=
+    subC_of_inRange (inRange128_of_le (by linarith) ld2 (by norm_num))
+  have s8 : mulC wInt128 ((u : ℤ) + ((W : ℤ) + 2) * v - g) s.num =
+      some (((u : ℤ) + ((W : ℤ) + 2) * v - g) * s.num) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) ln2 (by norm_num))
+  have s9 : mulC wInt128 o.num t.num = some (o.num * t.num) :=
+    mulC_of_inRange (inRange128_of_le (by linarith [mul_pos o1p t1p]) le1 (by norm_num))
+  have s10 : mulC wInt128 (o.num * t.num) s.den = some (o.num * t.num * s.den) :=
+    mulC_of_inRange (inRange128_of_le (by linarith) le2 (by norm_num))
+  have hq : ((((u + v - g : ℕ) : ℚ) / (v : ℕ)) + (W : ℚ) + 1) / (t.val / s.val) =
+      ((((u : ℤ) + ((W : ℤ) + 2) * v - g) * s.num : ℤ) : ℚ) / ((o.num * t.num * s.den : ℤ) : ℚ) := by
+    have hvq : (v : ℚ) = (o.num : ℚ) * t.den := by exact_mod_cast hv
+    unfold RatInt.val
+    have h1 : (t.den : ℚ) ≠ 0 := by exact_mod_cast t2p.ne'
+    have h2 : (s.den : ℚ) ≠ 0 := by exact_mod_cast s2p.ne'
+    have h3 : (s.num : ℚ) ≠ 0 := by exact_mod_cast s1p.ne'
+    have h4 : (t.num : ℚ) ≠ 0 := by exact_mod_cast t1p.ne'
+    have h5 : (o.num : ℚ) ≠ 0 := by exact_mod_cast o1p.ne'
+    rw [Nat.cast_sub hguv]
+    push_cast
+    rw [hvq]
+    field_simp
+    ring
+  rw [phaseStartupLatency_eq_engine, hq]
+  unfold thetaStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some, s5,
+    Option.bind_some, s6, Option.bind_some, s7, Option.bind_some, s8, Option.bind_some, s9,
+    Option.bind_some, s10, Option.bind_some,
+    saturatedTailCpp_eq ln1 pe (inRange128_of_le (B := (2 ^ 31 + 2) * (2 ^ 31 * 2 ^ 31) * 2 ^ 31 +
+      2 ^ 31 * 2 ^ 31 * 2 ^ 31) (by linarith) (by linarith) (by norm_num))]
+
+/- Postac z wymagania [soperations.theta-startup-latency.1]: (u+v-g)/v = (a+b-1)/b dla
+   skroconego a/b = u/v = deltaTarget/other. -/
+theorem thetaPhaseBound_reduce (u v : ℕ) (hu : 0 < u) :
+    ((u + v - Nat.gcd u v : ℕ) : ℚ) / (v : ℕ) =
+      ((u / Nat.gcd u v + v / Nat.gcd u v - 1 : ℕ) : ℚ) / (v / Nat.gcd u v : ℕ) := by
+  have hg0 : 0 < Nat.gcd u v := Nat.gcd_pos_of_pos_left v hu
+  obtain ⟨a, ha⟩ := Nat.gcd_dvd_left u v
+  obtain ⟨b, hb⟩ := Nat.gcd_dvd_right u v
+  generalize Nat.gcd u v = g at *
+  subst ha hb
+  rw [Nat.mul_div_cancel_left _ hg0, Nat.mul_div_cancel_left _ hg0, ← Nat.mul_add,
+    phaseBound_reduce _ _ _ hg0]
+
+theorem thetaStartupLatencyCpp_eq_phase {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val) {W : ℕ} (hW : W < 2 ^ 31) :
+    thetaStartupLatencyCpp s t o W =
+      some (min (phaseStartupLatency
+        (((cross t o / Nat.gcd (cross t o) (cross o t) + cross o t / Nat.gcd (cross t o) (cross o t) - 1
+          : ℕ) : ℚ) / (cross o t / Nat.gcd (cross t o) (cross o t) : ℕ))
+        (t.val / s.val) W : ℤ) int64Max) := by
+  rw [← thetaPhaseBound_reduce _ _ (cross_pos ht ht0 ho), thetaStartupLatencyCpp_eq hs hs0 ht ht0 ho ho0 hW]
+
+/- Wejscie rozplotu jest przeplotem o skladowej t i parametrze o: s = t*o/(t+o) daje
+   t/s = (u+v)/v (theta_ratio) dla u = t1*o2, v = t2*o1. -/
+theorem thetaRatio_cross {s t o : RatInt} (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid)
+    (ho0 : 0 < o.val) (hso : s.val = t.val * o.val / (t.val + o.val)) :
+    t.val / s.val = ((cross t o + cross o t : ℕ) : ℚ) / ((cross o t : ℕ) : ℚ) := by
+  rw [hso, theta_ratio _ _ _ _ ht0 ho0 (cross_pos ho ho0 ht) (ratInt_ratio_cross ho ho0 ht ht0)]
+
+/- Przy s = t*o/(t+o), czyli gdy wejscie rozplotu jest przeplotem o skladowej t (theta_ratio),
+   regula to affineTail (u+v) v (u+v-1) W: ogon mapy odczytu Div z divCpp_eq. Kod tej rownosci
+   nie sprawdza, wiec jest hipoteza. -/
+theorem thetaTail_affine {s t o : RatInt} (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val)
+    (hso : s.val = t.val * o.val / (t.val + o.val)) (W : ℕ) :
+    phaseStartupLatency
+        (((cross t o + cross o t - Nat.gcd (cross t o) (cross o t) : ℕ) : ℚ) / (cross o t : ℕ))
+        (t.val / s.val) W =
+      affineTail (cross t o + cross o t) (cross o t) (cross t o + cross o t - 1) W := by
+  have hu0 := cross_pos ht ht0 ho
+  have hv0 := cross_pos ho ho0 ht
+  rw [thetaRatio_cross ht ht0 ho ho0 hso, affineTail_eq_phase _ _ _ W (by omega) hv0]
+  generalize cross t o = u at *
+  generalize cross o t = v at *
+  have hg : Nat.gcd (u + v) v = Nat.gcd u v := by
+    rw [Nat.gcd_comm, Nat.gcd_add_self_right, Nat.gcd_comm]
+  rw [hg, pred_sub_mod_of_dvd (Nat.gcd_pos_of_pos_left v hu0)
+    (Nat.dvd_add (Nat.gcd_dvd_left u v) (Nat.gcd_dvd_right u v)) (by omega)]
+
+theorem thetaStartupLatencyCpp_eq_affine {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val)
+    (hso : s.val = t.val * o.val / (t.val + o.val)) {W : ℕ} (hW : W < 2 ^ 31) :
+    thetaStartupLatencyCpp s t o W =
+      some (min (affineTail (cross t o + cross o t) (cross o t) (cross t o + cross o t - 1) W : ℤ)
+        int64Max) := by
+  rw [← thetaTail_affine ht ht0 ho ho0 hso, thetaStartupLatencyCpp_eq hs hs0 ht ht0 ho ho0 hW]
+
+/- Wniosek: przy s = t*o/(t+o) ogon kodu nie przekracza W' z zakresu int dokladnie wtedy, gdy od
+   kazdego progu N0 rekord czytany przez Div(t, o) (divCpp_eq) jest gotowy. Bez zalozenia
+   Coprime z thetaTail_exact. -/
+theorem thetaStartupLatencyCpp_exact {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val)
+    (hso : s.val = t.val * o.val / (t.val + o.val)) {W W' N0 : ℕ} (hW : W < 2 ^ 31)
+    (hW' : W' < 2 ^ 31) (tick : ℚ) (htick : 0 < tick) {v : ℤ}
+    (hv : thetaStartupLatencyCpp s t o W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n →
+      affineReady (cross t o + cross o t) (cross o t) (cross t o + cross o t - 1) W W' tick n := by
+  rw [thetaStartupLatencyCpp_eq_affine hs hs0 ht ht0 ho ho0 hso hW, Option.some.injEq] at hv
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
+  have hv0 := cross_pos ho ho0 ht
+  exact affineTail_exact _ _ _ W W' N0 (by omega) hv0 tick htick
+
+/- ~Theta przy s = t*o/(t+o): ogon NThetaStartupLatency(s, t, W) = affineTail (t1*s2) (s1*t2) 0 W
+   (nthetaStartupLatencyCpp_eq) to affineTail (u+v) v 0 W, ogon mapy odczytu Mod(o, t) z modCpp_eq
+   (dataModel.cpp wola Mod(param, rInterval, n)). Oba zaleza tylko od ilorazu s/t = v/(u+v)
+   (addTail_eq). -/
+theorem nthetaTail_affine {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val) (ht : t.Valid)
+    (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val)
+    (hso : s.val = t.val * o.val / (t.val + o.val)) (W : ℕ) :
+    affineTail (cross t s) (cross s t) 0 W = affineTail (cross t o + cross o t) (cross o t) 0 W := by
+  have hu0 := cross_pos ht ht0 ho
+  rw [addTail_eq _ _ W (cross_pos ht ht0 hs), addTail_eq _ _ W (by omega), ← inv_div,
+    ← ratInt_ratio_cross hs hs0 ht ht0, thetaRatio_cross ht ht0 ho ho0 hso, inv_div]
+
+theorem nthetaStartupLatencyCpp_exact_mod {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ht0 : 0 < t.val) (ho : o.Valid) (ho0 : 0 < o.val)
+    (hso : s.val = t.val * o.val / (t.val + o.val)) {W W' N0 : ℕ} (hW : W < 2 ^ 31)
+    (hW' : W' < 2 ^ 31) (tick : ℚ) (htick : 0 < tick) {v : ℤ}
+    (hv : nthetaStartupLatencyCpp s t W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady (cross t o + cross o t) (cross o t) 0 W W' tick n := by
+  rw [nthetaStartupLatencyCpp_eq hs hs0 ht ht0 hW, nthetaTail_affine hs hs0 ht ht0 ho ho0 hso,
+    Option.some.injEq] at hv
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'), Nat.cast_le]
+  have hv0 := cross_pos ho ho0 ht
+  exact affineTail_exact _ _ _ W W' N0 (by omega) hv0 tick htick
+
+/- ===== HashStartupLatency ===== -/
+
+-- ANCHOR: hash_startup_latency_cpp
+def hashStartupLatencyCpp (a b : RatInt) (WA WB : ℤ) : Option ℤ := do
+  -- const std::int64_t left = std::int64_t{deltaA.numerator()} * deltaB.denominator();
+  let left ← mulC wInt64 a.num b.den
+  -- const std::int64_t right = std::int64_t{deltaB.numerator()} * deltaA.denominator();
+  let right ← mulC wInt64 b.num a.den
+  -- const std::int64_t h = std::gcd(left, right);
+  let h ← gcd64 left right
+  -- const __int128 p = left / h;   (dzielenie w int64, potem poszerzenie)
+  let p ← tdivC wInt64 left h
+  -- const __int128 q = right / h;
+  let q ← tdivC wInt64 right h
+  -- const __int128 period = p + q;
+  let period ← addC wInt128 p q
+  -- const std::int64_t boundA = saturatedTail((latencyA * period) + q, q);
+  let a1 ← mulC wInt128 WA period
+  let nA ← addC wInt128 a1 q
+  let boundA ← saturatedTailCpp nA q
+  -- const std::int64_t boundB = saturatedTail(((__int128{latencyB} + 1) * period) + p - 1, p);
+  let b1 ← addC wInt128 WB 1
+  let b2 ← mulC wInt128 b1 period
+  let b3 ← addC wInt128 b2 p
+  let nB ← subC wInt128 b3 1
+  let boundB ← saturatedTailCpp nB p
+  -- return std::max(boundA, boundB);
+  some (max boundA boundB)
+-- ANCHOR_END: hash_startup_latency_cpp
+
+/- Skladowe skroconego ilorazu L/R: p = L/gcd, q = R/gcd, dodatnie i wzglednie pierwsze. -/
+theorem reduced_pos {L R : ℕ} (hL : 0 < L) (hR : 0 < R) :
+    0 < L / Nat.gcd L R ∧ 0 < R / Nat.gcd L R := by
+  have hg := Nat.gcd_pos_of_pos_left R hL
+  exact ⟨Nat.div_pos (Nat.le_of_dvd hL (Nat.gcd_dvd_left L R)) hg,
+    Nat.div_pos (Nat.le_of_dvd hR (Nat.gcd_dvd_right L R)) hg⟩
+
+/- L = a1*b2, R = b1*a2, h = gcd(L, R): p = L/h i q = R/h sa wzglednie pierwsze
+   (Nat.coprime_div_gcd_div_gcd), a oba kresy kodu to kresy exactInterleaveTail_closed:
+   saturatedTail(W_A*(p+q) + q, q) = (W_A*(p+q) + q - 1)/q i
+   saturatedTail((1+W_B)*(p+q) + p - 1, p) = ((1+W_B)*(p+q) + p - 2)/p, oba nasycone.
+   p, q < 2^62, licznik < 2^95. -/
+theorem hashStartupLatencyCpp_eq {a b : RatInt} (ha : a.Valid) (ha0 : 0 < a.val) (hb : b.Valid)
+    (hb0 : 0 < b.val) {WA WB : ℕ} (hWA : WA < 2 ^ 31) (hWB : WB < 2 ^ 31) :
+    hashStartupLatencyCpp a b WA WB =
+      some (min (exactInterleaveTail (cross a b / Nat.gcd (cross a b) (cross b a))
+        (cross b a / Nat.gcd (cross a b) (cross b a)) WA WB) int64Max) := by
+  obtain ⟨a1p, a1l, a2p, a2l⟩ := ratInt_pos_bounds ha ha0
+  obtain ⟨b1p, b1l, b2p, b2l⟩ := ratInt_pos_bounds hb hb0
+  obtain ⟨hL, -⟩ := cross_spec ha ha0 hb
+  obtain ⟨hR, -⟩ := cross_spec hb hb0 ha
+  have hL0 := cross_pos ha ha0 hb
+  have hR0 := cross_pos hb hb0 ha
+  have bL : a.num * b.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul a1l.le b2l.le b2p.le (by norm_num)
+  have bR : b.num * a.den ≤ 2 ^ 31 * 2 ^ 31 := mul_le_mul b1l.le a2l.le a2p.le (by norm_num)
+  rw [← hL] at bL
+  rw [← hR] at bR
+  generalize cross a b = L at *
+  generalize cross b a = R at *
+  obtain ⟨hP0, hQ0⟩ := reduced_pos hL0 hR0
+  have hg0 : 0 < Nat.gcd L R := Nat.gcd_pos_of_pos_left R hL0
+  have hcop := Nat.coprime_div_gcd_div_gcd hg0
+  have bLn : L ≤ 2 ^ 31 * 2 ^ 31 := by exact_mod_cast bL
+  have bRn : R ≤ 2 ^ 31 * 2 ^ 31 := by exact_mod_cast bR
+  have hPL : L / Nat.gcd L R ≤ L := Nat.div_le_self _ _
+  have hQR : R / Nat.gcd L R ≤ R := Nat.div_le_self _ _
+  rw [exactInterleaveTail_closed _ _ WA WB hP0 hQ0 hcop]
+  have r64 : ∀ x : ℕ, x ≤ 2 ^ 31 * 2 ^ 31 → inRange wInt64 (x : ℤ) := fun x hx =>
+    inRange64_of_nonneg (by positivity) (by unfold int64Max; norm_num; omega)
+  have r128 : ∀ x : ℕ, x ≤ 2 ^ 126 → inRange wInt128 (x : ℤ) := fun x hx =>
+    inRange128_of_nonneg (by linarith [(Nat.cast_nonneg x : (0 : ℤ) ≤ x)]) (by exact_mod_cast hx)
+  have s1 : mulC wInt64 a.num b.den = some (L : ℤ) := by
+    rw [mulC_of_inRange (by rw [← hL]; exact r64 L bLn), hL]
+  have s2 : mulC wInt64 b.num a.den = some (R : ℤ) := by
+    rw [mulC_of_inRange (by rw [← hR]; exact r64 R bRn), hR]
+  have s3 : gcd64 (L : ℤ) (R : ℤ) = some ((Nat.gcd L R : ℕ) : ℤ) := by
+    rw [gcd64_of_nonneg (by positivity) (by positivity) (r64 L bLn) (r64 R bRn), Int.gcd_natCast_natCast]
+    rfl
+  have s4 := tdivC_natCast (w := wInt64) L (Nat.gcd L R) hg0 (r64 L bLn)
+  have s5 := tdivC_natCast (w := wInt64) R (Nat.gcd L R) hg0 (r64 R bRn)
+  unfold hashStartupLatencyCpp
+  simp only [Option.bind_eq_bind]
+  rw [s1, Option.bind_some, s2, Option.bind_some, s3, Option.bind_some, s4, Option.bind_some, s5,
+    Option.bind_some]
+  clear s1 s2 s3 s4 s5 hcop
+  generalize L / Nat.gcd L R = P at *
+  generalize R / Nat.gcd L R = Q at *
+  have hPQ : P + Q ≤ 2 ^ 63 := by omega
+  have hA1 : WA * (P + Q) ≤ 2 ^ 31 * 2 ^ 63 := Nat.mul_le_mul hWA.le hPQ
+  have hB1 : (WB + 1) * (P + Q) ≤ 2 ^ 31 * 2 ^ 63 := Nat.mul_le_mul hWB hPQ
+  have hB2 : P + Q ≤ (WB + 1) * (P + Q) := Nat.le_mul_of_pos_left _ (by omega)
+  have c126 : ∀ x : ℕ, x ≤ 2 ^ 126 → (x : ℤ) ≤ 2 ^ 126 := fun x hx => by exact_mod_cast hx
+  have e6 : (P : ℤ) + Q = ((P + Q : ℕ) : ℤ) := by push_cast; ring
+  have e7 : (WA : ℤ) * ((P + Q : ℕ) : ℤ) = ((WA * (P + Q) : ℕ) : ℤ) := by push_cast; ring
+  have e8 : ((WA * (P + Q) : ℕ) : ℤ) + Q = ((WA * (P + Q) + Q : ℕ) : ℤ) := by push_cast; ring
+  have e10 : (WB : ℤ) + 1 = ((WB + 1 : ℕ) : ℤ) := by push_cast; ring
+  have e11 : ((WB + 1 : ℕ) : ℤ) * ((P + Q : ℕ) : ℤ) = (((WB + 1) * (P + Q) : ℕ) : ℤ) := by push_cast; ring
+  have e12 : (((WB + 1) * (P + Q) : ℕ) : ℤ) + P = (((WB + 1) * (P + Q) + P : ℕ) : ℤ) := by
+    push_cast; ring
+  have e13 : (((WB + 1) * (P + Q) + P : ℕ) : ℤ) - 1 = (((WB + 1) * (P + Q) + P - 1 : ℕ) : ℤ) := by
+    omega
+  have s6 : addC wInt128 (P : ℤ) (Q : ℤ) = some ((P + Q : ℕ) : ℤ) := by
+    rw [addC_of_inRange (by rw [e6]; exact r128 _ (by omega)), e6]
+  have s7 : mulC wInt128 (WA : ℤ) ((P + Q : ℕ) : ℤ) = some ((WA * (P + Q) : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (by rw [e7]; exact r128 _ (by omega)), e7]
+  have s8 : addC wInt128 ((WA * (P + Q) : ℕ) : ℤ) (Q : ℤ) = some ((WA * (P + Q) + Q : ℕ) : ℤ) := by
+    rw [addC_of_inRange (by rw [e8]; exact r128 _ (by omega)), e8]
+  have s9 := saturatedTailCpp_natCast (X := WA * (P + Q) + Q) hQ0
+    (by rw [← Nat.cast_add]; exact c126 _ (by omega))
+  have s10 : addC wInt128 (WB : ℤ) 1 = some ((WB + 1 : ℕ) : ℤ) := by
+    rw [addC_of_inRange (by rw [e10]; exact r128 _ (by omega)), e10]
+  have s11 : mulC wInt128 ((WB + 1 : ℕ) : ℤ) ((P + Q : ℕ) : ℤ) = some (((WB + 1) * (P + Q) : ℕ) : ℤ) := by
+    rw [mulC_of_inRange (by rw [e11]; exact r128 _ (by omega)), e11]
+  have s12 : addC wInt128 (((WB + 1) * (P + Q) : ℕ) : ℤ) (P : ℤ) =
+      some (((WB + 1) * (P + Q) + P : ℕ) : ℤ) := by
+    rw [addC_of_inRange (by rw [e12]; exact r128 _ (by omega)), e12]
+  have s13 : subC wInt128 (((WB + 1) * (P + Q) + P : ℕ) : ℤ) 1 =
+      some (((WB + 1) * (P + Q) + P - 1 : ℕ) : ℤ) := by
+    rw [subC_of_inRange (by rw [e13]; exact r128 _ (by omega)), e13]
+  have s14 := saturatedTailCpp_natCast (X := (WB + 1) * (P + Q) + P - 1) hP0
+    (by rw [← Nat.cast_add]; exact c126 _ (by omega))
+  have hA : (WA * (P + Q) + Q + Q - 1) / Q - 1 = (WA * (P + Q) + Q - 1) / Q := by
+    rw [show WA * (P + Q) + Q + Q - 1 = (WA * (P + Q) + Q - 1) + Q by omega, Nat.add_div_right _ hQ0,
+      Nat.add_sub_cancel]
+  have hB : ((WB + 1) * (P + Q) + P - 1 + P - 1) / P - 1 = ((1 + WB) * (P + Q) + P - 2) / P := by
+    rw [Nat.add_comm 1 WB, show (WB + 1) * (P + Q) + P - 1 + P - 1 = ((WB + 1) * (P + Q) + P - 2) + P by
+      omega, Nat.add_div_right _ hP0, Nat.add_sub_cancel]
+  rw [s6, Option.bind_some, s7, Option.bind_some, s8, Option.bind_some, s9, Option.bind_some, s10,
+    Option.bind_some, s11, Option.bind_some, s12, Option.bind_some, s13, Option.bind_some, s14,
+    Option.bind_some, hA, hB, Nat.cast_max, min_max_distrib_right]
+
+/- Wniosek: ogon kodu nie przekracza W' z zakresu int dokladnie wtedy, gdy od kazdego progu N0
+   kazdy rekord przeplotu skroconych p, q jest gotowy (exactInterleaveTail_exact). -/
+theorem hashStartupLatencyCpp_exact {a b : RatInt} (ha : a.Valid) (ha0 : 0 < a.val) (hb : b.Valid)
+    (hb0 : 0 < b.val) {WA WB W' N0 : ℕ} (hWA : WA < 2 ^ 31) (hWB : WB < 2 ^ 31) (hW' : W' < 2 ^ 31)
+    (tick : ℚ) (htick : 0 < tick) {v : ℤ} (hv : hashStartupLatencyCpp a b WA WB = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → interleaveReady (cross a b / Nat.gcd (cross a b) (cross b a))
+      (cross b a / Nat.gcd (cross a b) (cross b a)) WA WB W' tick n := by
+  rw [hashStartupLatencyCpp_eq ha ha0 hb hb0 hWA hWB, Option.some.injEq] at hv
+  obtain ⟨hP0, hQ0⟩ := reduced_pos (cross_pos ha ha0 hb) (cross_pos hb hb0 ha)
+  rw [← hv, min_int64Max_le_iff (by exact_mod_cast hW'),
+    ← exactInterleaveTail_exact _ _ WA WB W' N0 hP0 hQ0 tick htick]
+  have hE := exactInterleaveTail_closed _ _ WA WB hP0 hQ0
+    (Nat.coprime_div_gcd_div_gcd (Nat.gcd_pos_of_pos_left _ (cross_pos ha ha0 hb)))
+  omega
+
+/- Wybor skladowej w Hash nie zalezy od skali L, R (A2: hashCpp_eq na nieskroconych L, R),
+   wiec Hash wybiera wedlug tego samego przeplotu p, q, o ktorym mowi HashStartupLatency. -/
+theorem progress_mul_left (h a b n : ℕ) (hh : 0 < h) : progress (h * a) (h * b) n = progress a b n := by
+  unfold progress
+  rw [← Nat.mul_add, mul_left_comm, Nat.mul_div_mul_left _ _ hh]
+
+theorem hashCpp_eq_reduced {a b : RatInt} (ha : a.Valid) (ha0 : 0 < a.val) (hb : b.Valid)
+    (hb0 : 0 < b.val) {i : ℤ} (hi0 : 0 ≤ i) (hi : inRange wInt i) :
+    hashCpp a b i = some
+      (!selectsA (cross a b / Nat.gcd (cross a b) (cross b a))
+        (cross b a / Nat.gcd (cross a b) (cross b a)) i.toNat,
+       (selectedIndex (cross a b / Nat.gcd (cross a b) (cross b a))
+        (cross b a / Nat.gcd (cross a b) (cross b a)) i.toNat : ℤ)) := by
+  rw [hashCpp_eq ha ha0 hb hb0 hi0 hi]
+  have hg0 := Nat.gcd_pos_of_pos_left (cross b a) (cross_pos ha ha0 hb)
+  obtain ⟨P, hP⟩ := Nat.gcd_dvd_left (cross a b) (cross b a)
+  obtain ⟨Q, hQ⟩ := Nat.gcd_dvd_right (cross a b) (cross b a)
+  generalize cross a b = L at *
+  generalize cross b a = R at *
+  generalize Nat.gcd L R = g at *
+  subst hP hQ
+  rw [Nat.mul_div_cancel_left _ hg0, Nat.mul_div_cancel_left _ hg0]
+  unfold selectedIndex selectsA
+  simp only [progress_mul_left g P Q _ hg0]
 
 end Cpp
 

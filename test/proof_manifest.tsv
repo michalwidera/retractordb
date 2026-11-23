@@ -88,6 +88,27 @@ EngineRules	nthetaStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
 EngineRules	nthetaTail_phase	POZA_ZAKRESEM:lemat pomocniczy
 EngineRules	nthetaStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
 EngineRules	nthetaStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	pred_sub_mod_of_dvd	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	phaseBound_reduce	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	ratInt_ratio_cross	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	subtractStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	subtractTail_phase	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	subtractStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
+EngineRules	subtractStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaPhaseBound_reduce	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	thetaStartupLatencyCpp_eq_phase	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaRatio_cross	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	thetaTail_affine	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	thetaStartupLatencyCpp_eq_affine	NIEPOKRYTE:test w A4 (D5)
+EngineRules	thetaStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	nthetaTail_affine	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	nthetaStartupLatencyCpp_exact_mod	NIEPOKRYTE:test w A4 (D5)
+EngineRules	reduced_pos	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	hashStartupLatencyCpp_eq	NIEPOKRYTE:test w A4 (D5)
+EngineRules	hashStartupLatencyCpp_exact	NIEPOKRYTE:test w A4 (D5)
+EngineRules	progress_mul_left	POZA_ZAKRESEM:lemat pomocniczy
+EngineRules	hashCpp_eq_reduced	NIEPOKRYTE:test w A4 (D5)
 Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
 Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
 Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original
