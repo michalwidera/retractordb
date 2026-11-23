@@ -175,7 +175,7 @@ TEST(embedEnginePlan, compile_step_and_read_the_result) {
   EXPECT_TRUE(engine.endOfInput());
   EXPECT_FALSE(engine.failed());
   EXPECT_EQ(engine.slotsDone(), slots);
-  EXPECT_EQ(engine.time(), boost::rational<int>(static_cast<int>(slots), 2));
+  EXPECT_EQ(engine.time(), boost::rational<std::int64_t>(static_cast<std::int64_t>(slots), 2));
   // Po koncu wejscia step() odpowiada nullopt i niczego nie liczy.
   EXPECT_FALSE(rdbtest::ok(engine.step()).has_value());
   EXPECT_EQ(engine.slotsDone(), slots);
@@ -471,13 +471,13 @@ TEST(embedEnginePlan, shortest_input_eof_keeps_the_last_slot_and_stops_every_str
   EXPECT_EQ(rdbtest::ok(engine->step()), std::optional<std::uint64_t>{0});
   EXPECT_TRUE(engine->endOfInput());
   EXPECT_EQ(engine->slotsDone(), 1U);
-  EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+  EXPECT_EQ(engine->time(), boost::rational<std::int64_t>(1, 2));
   EXPECT_EQ(firstValue(rdbtest::ok(engine->record("short_dst", 0))), 14);
   EXPECT_EQ(firstValue(rdbtest::ok(engine->record("long_dst", 0))), 20);
   for (int i = 0; i < 3; ++i) {
     EXPECT_FALSE(rdbtest::ok(engine->step()));
     EXPECT_EQ(engine->slotsDone(), 1U);
-    EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+    EXPECT_EQ(engine->time(), boost::rational<std::int64_t>(1, 2));
     EXPECT_EQ(rdbtest::ok(engine->recordCount("long_dst")), 1U);
   }
 }

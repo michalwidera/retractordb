@@ -237,6 +237,27 @@ TEST_F(AppConfigTest, rt_priority_accepts_both_bounds_and_refuses_one_above) {
   }
 }
 
+// [timing] horizon (#640): reakcja na horyzont osi czasu. Brak klucza = "stop"; warstwa pozniejsza
+// nadpisuje wczesniejsza; zla wartosc albo zly typ wraca do "stop" z ostrzezeniem.
+TEST_F(AppConfigTest, timing_horizon_accepts_stop_and_restart_only) {
+  // covers: appconfig.load-app-config.8~1
+  EXPECT_FALSE(loadAppConfig().timingHorizonRestart);
+  const auto file = tmpDir / "horizon.toml";
+  writeFile(file, "[timing]\nhorizon = \"restart\"\n");
+  EXPECT_TRUE(loadAppConfig(file.string()).timingHorizonRestart);
+  writeFile(file, "[timing]\nhorizon = \"stop\"\n");
+  EXPECT_FALSE(loadAppConfig(file.string()).timingHorizonRestart);
+  for (const std::string value : {"\"Restart\"", "\"\"", "1", "true"}) {
+    SCOPED_TRACE(value);
+    writeFile(file, "[timing]\nhorizon = " + value + "\n");
+    LogCapture log;
+    EXPECT_FALSE(loadAppConfig(file.string()).timingHorizonRestart);
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+    EXPECT_TRUE(log.text().contains("timing.horizon"));
+#endif
+  }
+}
+
 TEST_F(AppConfigTest, loaded_from_empty_when_no_file_found) {
   // covers: appconfig.load-app-config.6~1
   // Brak pliku → loadedFrom puste (sygnał, że użyto wartości domyślnych).

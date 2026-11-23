@@ -124,7 +124,9 @@ Trace runPlan(qTree &instance, const rational<int> &horizon) {
   rdbtest::ok(proc.processZeroStep());
 
   Trace trace;
-  for (auto now = timeline.getNextTimeSlot(); now <= horizon; now = timeline.getNextTimeSlot()) {
+  // Os liczy w int64 (#640); slad zostaje w rational<int>, bo horyzonty tych planow sa male.
+  const CRationalStreamMath::TimePoint end(horizon.numerator(), horizon.denominator());
+  for (auto now = rdbtest::ok(timeline.getNextTimeSlot()); now <= end; now = rdbtest::ok(timeline.getNextTimeSlot())) {
     // Zbior nazw sluzy filtrowaniu sladu ponizej; processRows bierze maske pozycyjna.
     std::set<std::string> due;
     std::vector<char> dueMask(instance.size(), 0);
@@ -145,7 +147,8 @@ Trace runPlan(qTree &instance, const rational<int> &horizon) {
       if (count == before[q.id]) continue;
       const auto row  = rdbtest::ok(proc.getRow(q.id, 0));
       const int value = std::holds_alternative<int>(row.at(0)) ? std::get<int>(row.at(0)) : -1;
-      trace[q.id][q.logicalOrigin + static_cast<int>(count) - 1] = {value, now, row.at(0)};
+      const rational<int> at(static_cast<int>(now.numerator()), static_cast<int>(now.denominator()));
+      trace[q.id][q.logicalOrigin + static_cast<int>(count) - 1] = {value, at, row.at(0)};
     }
   }
   pProc = nullptr;

@@ -101,6 +101,11 @@ struct AppConfig {
   /// Timeout braku danych (ms) w pętli select xqry, po którym klient uznaje serwer za martwy.
   int timingQueryNoDataTimeoutMs{appcfg::kDefaultTimingQueryNoDataTimeoutMs};
 
+  /// Reakcja silnika na horyzont osi czasu (#640): `timing.horizon = "stop"` (domyślnie) kończy pracę
+  /// błędem silnika, `"restart"` zaczyna nową epokę tego samego planu - jak `xqry --reset` z tym samym
+  /// tekstem planu, bez zapytań dołączonych ad hoc.
+  bool timingHorizonRestart{false};
+
   // === [scheduling] ===
 
   /// Priorytet schedulera SCHED_FIFO w trybie real-time (zakres 1–99).
@@ -179,6 +184,7 @@ struct AppConfig {
 ///   Nietestowalne: loadedFrom po kilku warstwach systemowych to kontrola strukturalna st_stage12_contracts, nie asercja na plikach /etc.
 /// - [appconfig.load-app-config.7~1] po wczytaniu zastępować wartościami domyślnymi, z ostrzeżeniem w logu, niedodatnie wartości kluczy `[ipc]`, `[timing]` i `limits.history_memory_mib` oraz `scheduling.rt_priority` spoza 1..99, a do niepustego storage.dir dopisywać końcowy '/'.
 ///   Ograniczenie: ostrzezenia WARN sa sprawdzane tylko przy poziomie kompilacji, ktory je zachowuje.
+/// - [appconfig.load-app-config.8~1] przyjmować `timing.horizon` równe "stop" albo "restart" (ustawiając timingHorizonRestart), a każdą inną wartość, także innego typu niż napis, zastępować domyślnym "stop" z ostrzeżeniem w logu.
 ///
 /// @note Jawna sciezka to zadanie uzytkownika, wiec jej blad jest twardy. Warstwa systemowa ma kilka sciezek,
 ///       bo na macOS /etc nalezy do systemu (SIP), a oprogramowanie spoza systemu trzyma konfiguracje w

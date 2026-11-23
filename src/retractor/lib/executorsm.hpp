@@ -75,6 +75,9 @@ class dataModel;
 /// - [executorsm.executorsm.20~1] przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
 ///   Zakres testow: `it_signal_stop-run` (wyjście kodem 0 we wszystkich trybach; część C: subskrybent kończy się kodem 0 na znaczniku po każdym sygnale i po kill). Kontrola strukturalna: ipcServer.stop() i removeAllObjects() przed `return` w executorsm::run.
 /// - [executorsm.executorsm.21~1] obsługiwać komendę vars: dla każdej zmiennej VAR planu, w kolejności deklaracji, nazwę, typ z deklaracji i wartość zatwierdzoną na końcu ostatniego slotu (NULL jako null), dla planu bez zmiennych pustą listę, a przy braku planu i w trakcie zamykania odpowiedź jak na get.
+/// - [executorsm.executorsm.22~1] obsługiwać komendę horizon: nazwa strumienia o najszybszym interwale, ten interwał, bieżąca chwila osi, horyzont osi i czas do niego w sekundach czasu logicznego (przed budową osi epoki chwila 0 i horyzont z planu), a przy braku planu i w trakcie zamykania odpowiedź jak na get.
+/// - [executorsm.executorsm.23~1] w adhoc odrzucać przed roszczeniem nazw zapytanie, po którym horyzont osi planu leżałby przed bieżącą chwilą powiększoną o najszybszy interwał osi albo podstawa osi wyszłaby poza int64, z komunikatem podającym ten horyzont, i liczyć dalej dotychczasowy plan.
+/// - [executorsm.executorsm.24~1] przy `timing.horizon = "restart"` po osiągnięciu horyzontu osi w epoce z co najmniej jednym slotem kończyć epokę rozesłaniem znacznika końca pracy i zaczynać nową z tekstu planu bieżącej epoki (bez zapytań ad hoc i bez kontroli DO SYSTEM), a bez tej opcji albo przed pierwszym slotem kończyć pracę błędem silnika z nazwą strumienia wyznaczającego horyzont.
 struct executorsm {
   /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
   rdb::Refusal initializationError;
@@ -108,6 +111,28 @@ struct executorsm {
   /// `[sources] timeout_s` (#347): termin DEVICE bez klauzuli TIMEOUT - dla fazy DEVICE w petli
   /// slotow i dla ostrzezen kompilacji w kanale ad-hoc i `--reset`.
   static std::optional<double> cfgSourcesTimeout;
+  /// `timing.horizon = "restart"` (#640): horyzont osi zaczyna nowa epoke tego samego planu.
+  static bool cfgHorizonRestart;
+
+  /// Stan osi czasu dla watku komunikacyjnego (#640): `xqry --horizon` i odmowa zapytania ad hoc,
+  /// ktorego horyzont juz minal. Pisze go petla slotow pod core_mutex - przy budowie osi, po zmianie
+  /// zbioru interwalow i w bloku collectAwaitedStreams kazdego slotu, wiec w slocie nie dochodzi
+  /// zadna blokada. `now` spoznia sie wobec osi najwyzej o jeden slot najszybszego interwalu:
+  /// handler trzymajacy blokade epoki zatrzymuje petle przed blokiem slotu, a do niego petla zdazy
+  /// pobrac co najwyzej jeden nastepny slot. `running` gasnie na poczatku kazdej epoki.
+  struct AxisState {
+    bool running{false};
+    CRationalStreamMath::TimePoint now{0};
+    CRationalStreamMath::TimePoint horizon{0};
+    boost::rational<int> fastest{0};
+  };
+  static AxisState axis_;
+  /// Wolajacy MUSI trzymac core_mutex.
+  static void publishAxis(const CRationalStreamMath::TimeLine &tl);
+  /// Restart na horyzoncie osi (`timing.horizon = "restart"`, #640): zglasza wymiane planu na tekst
+  /// biezacej epoki ta sama droga co resetCommit. Reset klienta w toku ma pierwszenstwo. Blad to
+  /// odmowa walidacji - plan, ktorego nie da sie zarezerwowac, konczy prace jak na horyzoncie.
+  [[nodiscard]] static rdb::Result<> requestHorizonRestart();
   /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
   /// dyrektywy z drzewa planu - w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
   /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.
@@ -131,6 +156,9 @@ struct executorsm {
   /// Odpowiedz na 'vars' (#531, etap D): zmienne VAR planu w kolejnosci deklaracji. Wolajacy trzyma
   /// plan_epoch_mutex, wiec odczyt wypada miedzy slotami.
   static ptree collectVariables();
+  /// Odpowiedz na 'horizon' (#640): strumien wyznaczajacy horyzont, jego interwal, biezaca chwila,
+  /// horyzont i czas do niego, w sekundach czasu logicznego osi. Wolajacy trzyma plan_epoch_mutex.
+  static ptree collectHorizon();
   static ptree getAdHoc(const std::string &adHocQuery);
   static ptree attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName);
 
@@ -143,7 +171,9 @@ struct executorsm {
   /// Sprawdza zestaw RQL tak, jak zrobilby to start: parsowanie, kompilacja, limity i
   /// rozlacznosc nazw wzgledem POZOSTALYCH zywych instancji. Przy sukcesie rezerwuje zasoby
   /// nowego planu; przy odmowie nie zmienia planu ani jego aktywnych roszczen.
-  static std::string validatePlanText(const std::string &planText);
+  /// @param planAlreadyAccepted plan juz raz przyjety (restart na horyzoncie osi, #640): pomija
+  ///        kontrole `DO SYSTEM`, ktora dotyczy tylko planu przychodzacego kanalem `reset`.
+  static std::string validatePlanText(const std::string &planText, bool planAlreadyAccepted = false);
 
   /// Wymienia plan na przyjety wczesniej `pendingPlanText` i przygotowuje kolejna epoke:
   /// aktywacja rezerwacji magistrali, skasowanie artefaktow, licznik rotacji, plik zapytan.

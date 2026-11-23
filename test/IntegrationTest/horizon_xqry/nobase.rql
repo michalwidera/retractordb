@@ -1,0 +1,6 @@
+# Plan testu it_horizon_xqry (#640): NWW mianownikow 2147483647, 2147483646 i 2147483645 ma ok. 2^93,
+# wiec os czasu nie ma wspolnej podstawy w int64 - `-c --horizon` konczy sie bledem.
+STORAGE 'temp'
+DECLARE v INTEGER STREAM a, 1/2147483647 TEXTFILE 'data.txt'
+DECLARE v INTEGER STREAM b, 1/2147483646 TEXTFILE 'data.txt'
+DECLARE v INTEGER STREAM c, 1/2147483645 TEXTFILE 'data.txt'

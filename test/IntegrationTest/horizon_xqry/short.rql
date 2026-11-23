@@ -1,0 +1,8 @@
+# Plan testu it_horizon_xqry (#640): horyzont osi osiagalny w kilka tysiecy slotow. Interwaly
+# 1048576/2147483647 s i 1048576/2147483646 s (= 524288/1073741823 s) maja podstawe
+# 524288/(2147483647 * 1073741823) s, wiec licznik taktow w int64 konczy os po ok. 4,0 s:
+# 8192 sloty strumienia `a`, ktory wyznacza horyzont.
+STORAGE 'temp'
+DECLARE v INTEGER STREAM a, 1048576/2147483647 TEXTFILE 'data.txt'
+DECLARE v INTEGER STREAM b, 1048576/2147483646 TEXTFILE 'data.txt'
+SELECT a[0] + b[0] STREAM out FROM a + b STORAGE MEMORY

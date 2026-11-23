@@ -71,6 +71,7 @@ const char *toString(selectResult result);
 ///   Ograniczenie: st_api_real wymaga osobnego zbudowania i wykonania przez test-api; sam ninja test nie wykonuje protokolu strumieniowego API.
 /// - [qry.qry.15~1] przez vars zwracać tabelę zmiennych VAR planu z nazwą, typem i wartością w kolejności z odpowiedzi serwera, a przez varsYaml dokument YAML z tą samą listą albo z pustą listą dla planu bez zmiennych i instancji bezczynnej; dla instancji bezczynnej vars zwraca wydruk braku planu, a dla braku odpowiedzi, odpowiedzi bez listy zmiennych lub zamykania obie zwracają werdykt zamiast wydruku.
 /// - [qry.qry.16~1] w select po wyczerpaniu limitu elementów kończyć się bez oczekiwania na opróżnienie kolejki producenta, niezależnie od tempa strumienia.
+/// - [qry.qry.17~1] przez horizon zwracać czas do horyzontu osi w postaci `D d H h M min S s` (bez zerowych członów wiodących, sekundy zawsze) oraz horyzont, bieżącą chwilę i strumień wyznaczający horyzont z jego interwałem; dla instancji bezczynnej wydruk braku planu, a dla braku odpowiedzi, odpowiedzi bez horyzontu lub zamykania werdykt zamiast wydruku.
 class qry {
   int elemLimitCnt{0};
   int serverNoDataTimeoutMs_{kDefaultServerNoDataTimeoutMs};
@@ -122,6 +123,8 @@ class qry {
   /// slocie - albo werdykt, jak dir().
   std::expected<std::string, selectResult> vars();
   std::expected<std::string, selectResult> varsYaml();
+  /// Raport horyzontu osi czasu (#640): odliczanie dla czlowieka i wartosci w sekundach.
+  std::expected<std::string, selectResult> horizon();
   virtual boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/);
   virtual ~qry();
 };

@@ -125,7 +125,8 @@ static routing::Resolution resolveTarget(const boost::program_options::variables
                                          const std::vector<bus::InstanceInfo> &instances, int elemLimit,
                                          const std::string &stream, const std::string &detail, const std::string &adHoc) {
   if (instances.size() <= 1) return routing::forSingleTarget(instances);
-  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir") || vm.contains("vars"))
+  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir") || vm.contains("vars") ||
+      vm.contains("horizon"))
     return routing::forSingleTarget(instances);
   // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia - a instancja bezczynna
   // nie serwuje zadnego strumienia, wiec po strumieniu nie da sie jej wskazac. Przy wiecej
@@ -196,6 +197,7 @@ int main(int argc, char *argv[]) {
         ("kill,k", "kill xretractor server")                                                                          //
         ("dir,d", "list of queries")                                                                                  //
         ("vars,v", "list plan variables (VAR) with their current values")                                             //
+        ("horizon", "show the time left to the time horizon of the plan and the stream that sets it")                 //
         ("yaml,y", "yaml output format for --dir, --detail, --vars and --bus")                                        //
         ("jsonl,j", "versioned JSON Lines API output")                                                                //
         ("idle-timeout,i", po::value<int>(&idleTimeoutMs)->default_value(0), "JSONL idle timeout in ms; 0 disables")  //
@@ -264,7 +266,8 @@ int main(int argc, char *argv[]) {
     }
     if (vm.contains("jsonl") &&
         (vm.contains("yaml") || vm.contains("kill") || vm.contains("null") || vm.contains("wait-server") || vm.contains("bus") ||
-         vm.contains("reset") || vm.contains("adhoc") || vm.contains("vars") || elemLimit < 0 || idleTimeoutMs < 0)) {
+         vm.contains("reset") || vm.contains("adhoc") || vm.contains("vars") || vm.contains("horizon") || elemLimit < 0 ||
+         idleTimeoutMs < 0)) {
       std::println(std::cerr, "xqry: --jsonl supports --hello, --dir, --detail or --select with nonnegative limits");
       return system::errc::invalid_argument;
     }
@@ -327,10 +330,11 @@ int main(int argc, char *argv[]) {
     // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
     // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
     const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") +
-                              vm.count("hello") + vm.count("reset") + vm.count("vars");
+                              vm.count("hello") + vm.count("reset") + vm.count("vars") + vm.count("horizon");
     if (commandCount > 1) {
-      std::println(std::cerr,
-                   "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --vars, --bus, --hello)");
+      std::println(
+          std::cerr,
+          "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --vars, --horizon, --bus, --hello)");
       return system::errc::invalid_argument;
     }
     // `-y` jest modyfikatorem formatu, nie komenda: sam z siebie nie wybiera niczego do
@@ -438,6 +442,13 @@ int main(int argc, char *argv[]) {
         return exitCodeFor(listing.error());
       }
       std::print("{}", *listing);
+    } else if (vm.contains("horizon")) {
+      const auto report = obj.horizon();
+      if (!report) {
+        std::println(std::cerr, "xqry: {}", toString(report.error()));
+        return exitCodeFor(report.error());
+      }
+      std::print("{}", *report);
     } else if (vm.contains("reset")) {
       // Plik czyta KLIENT, nie serwer: usluga chodzi zwykle na innym koncie (User=retractor
       // w jednostce systemd) i pliku operatora zwyczajnie nie otworzy. Kanalem IPC idzie

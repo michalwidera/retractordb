@@ -158,7 +158,7 @@ class Engine {
   [[nodiscard]] std::uint64_t slotsDone() const noexcept;
 
   /// Czas ostatniego wykonanego slotu na osi planu (sekundy); 0 przed pierwszym slotem.
-  [[nodiscard]] boost::rational<int> time() const noexcept;
+  [[nodiscard]] boost::rational<std::int64_t> time() const noexcept;
 
   /// Czy step() zglosil juz koniec wejscia.
   [[nodiscard]] bool endOfInput() const noexcept;

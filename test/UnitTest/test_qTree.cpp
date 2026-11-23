@@ -281,6 +281,21 @@ TEST(qTree, getAvailableTimeIntervals_returns_unique_intervals) {
   EXPECT_TRUE(intervals.count(rational(1, 1)));
 }
 
+// streamOfInterval (#640): nazwa strumienia wyznaczajacego horyzont - pierwszy o danym interwale,
+// z pominieciem dyrektyw; brak takiego to pusty napis.
+TEST(qTree, streamOfInterval_returns_first_stream_with_interval) {
+  // covers: qtree.q-tree.12~1
+  qTree qt;
+  qt.push_back(makeQuery(":STORAGE", 1, 2));
+  qt.push_back(makeQuery("slow", 1, 1));
+  qt.push_back(makeQuery("fast", 1, 2));
+  qt.push_back(makeQuery("fast2", 1, 2));
+
+  EXPECT_EQ(qt.streamOfInterval(rational(1, 2)), "fast");
+  EXPECT_EQ(qt.streamOfInterval(rational(1, 1)), "slow");
+  EXPECT_EQ(qt.streamOfInterval(rational(1, 3)), "");
+}
+
 TEST(qTree, getAvailableTimeIntervals_skips_compiler_directives) {
   qTree qt;
   qt.push_back(makeQuery("s1", 1, 1));

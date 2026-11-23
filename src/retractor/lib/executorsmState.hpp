@@ -107,6 +107,10 @@ extern bool noClockMode;
 extern std::atomic<bool> planResetRequested;
 /// Tresc przyjetego zestawu RQL. Chroniona przez core_mutex.
 extern std::string pendingPlanText;
+/// Tekst planu biezacej epoki - pliku startowego albo ostatniego przyjetego resetu, bez zapytan
+/// dolaczonych ad hoc. Z niego restart na horyzoncie osi (#640) buduje nowa epoke. Chroniony przez
+/// core_mutex.
+extern std::string epochPlanText;
 
 /// Czy trwa wymiana planu: od PRZYJECIA zestawu az do aktywacji jego rezerwacji na magistrali.
 /// Osobna od planResetRequested, bo tamta gasnie na POCZATKU wymiany, a rezerwacja zyje jeszcze
@@ -117,10 +121,11 @@ extern std::string pendingPlanText;
 /// juz czego aktywowac i konczyla sie FatalError -- w trybie --service takze wyczyszczeniem
 /// pliku zapytan, czyli restartem uslugi BEZ planu. Odtworzone dwoma rownoleglymi `xqry -q`.
 ///
-/// Flaga ma dokladnie jednego pisarza z kazdej strony: podnosi ja watek komunikacyjny
-/// (IpcServer prowadzi jedna petle komend), zdejmuje watek glowny i dopiero PO aktywacji.
-/// Odczyt "false" znaczy wiec, ze ani rezerwacja nie wisi, ani wymiana nie trwa -- sprawdzenie
-/// w resetCommit() nie potrzebuje muteksu.
+/// Podnosza ja dwa watki: komunikacyjny (resetCommit) i glowny (restart na horyzoncie osi, #640),
+/// zawsze przez compare_exchange PRZED walidacja, ktora rezerwuje zasoby - wiec rezerwuje tylko
+/// ten, kto flage zdobyl. Odmowa walidacji zdejmuje ja od razu; przyjeta wymiana zdejmuje dopiero
+/// watek glowny PO aktywacji. "false" znaczy wiec, ze ani rezerwacja nie wisi, ani wymiana nie
+/// trwa, a samo zajecie nie potrzebuje muteksu.
 extern std::atomic<bool> planSwapInFlight;
 
 /// Plik zapytan uslugi, do ktorego trafia przyjety plan i ktory jest oprozniany po bledzie

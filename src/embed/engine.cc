@@ -51,7 +51,7 @@ struct Engine::Plan {
   bool bootstrapped{false};
   bool endOfInput{false};
   std::uint64_t slotsDone{0};
-  boost::rational<int> time{0};
+  boost::rational<std::int64_t> time{0};
   /// Maska strumieni naleznych w slocie, pozycyjna wzgledem drzewa - ta sama, ktora buduje
   /// executorsm::collectAwaitedStreams. Pole planu, a nie zmienna slotu: pojemnosc zostaje miedzy
   /// taktami.
@@ -254,7 +254,14 @@ Result<std::optional<std::uint64_t>> Engine::stepPlan(Plan &plan) {
 
   // Cialo slotu z executorsm::run(), bez czekania na zegar i bez rozglaszania IPC:
   // os czasu -> maska strumieni oczekujacych w tym slocie -> przeliczenie.
-  const boost::rational<int> slot = plan.timeline->getNextTimeSlot();
+  auto nextSlot = plan.timeline->getNextTimeSlot();
+  if (!nextSlot) [[unlikely]] {
+    // Horyzont osi (#640) - ten sam komunikat co w petli demona, z nazwa strumienia najszybszego interwalu.
+    const std::string stream = plan.tree.streamOfInterval(plan.timeline->fastestInterval());
+    if (stream.empty()) return std::unexpected(std::move(nextSlot).error());
+    return fail(nextSlot.error().code(), std::format("{} - stream '{}'", nextSlot.error().message(), stream));
+  }
+  const boost::rational<std::int64_t> slot = *nextSlot;
   plan.dueMask.assign(plan.tree.size(), 0);
   std::size_t position = 0;
   for (const auto &qry : plan.tree) {
@@ -278,7 +285,7 @@ bool Engine::failed() const noexcept { return plan_ != nullptr && plan_->failure
 
 std::uint64_t Engine::slotsDone() const noexcept { return plan_ ? plan_->slotsDone : 0; }
 
-boost::rational<int> Engine::time() const noexcept { return plan_ ? plan_->time : boost::rational<int>(0); }
+boost::rational<std::int64_t> Engine::time() const noexcept { return plan_ ? plan_->time : boost::rational<std::int64_t>(0); }
 
 bool Engine::endOfInput() const noexcept { return plan_ != nullptr && plan_->endOfInput; }
 

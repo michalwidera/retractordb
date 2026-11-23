@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -34,6 +35,7 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
+#include "humanDuration.hpp"
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
@@ -51,6 +53,7 @@
 #include "lib/shmBudget.hpp"
 #include "rdb/error.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
+#include "rdb/rationalFormat.hpp"
 #include "uxSysTermTools.hpp"
 
 /// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
@@ -154,6 +157,7 @@
 ///   jest przerywany z błędem konfiguracji.
 /// - [launcher.xretractor.43~1] Konfigurację wspiera bibliteka toml++.
 ///   Nietestowalne: wybor biblioteki implementacji; format pliku sprawdza `it_config_storage_validation-config-errors`.
+/// - [launcher.xretractor.44~1] Przy --onlycompile z --horizon dopisywać po wyjściu planu wiersz z horyzontem osi czasu (sekundy, odliczanie, strumień wyznaczający horyzont i jego interwał), dla planu bez wspólnej podstawy interwałów w int64 kończyć się błędem z komunikatem, a połączenie z -d, -m albo -w odrzucać, bo dokleiłoby wiersz do wyjścia dla maszyn.
 
 using namespace boost;
 
@@ -441,6 +445,7 @@ int main(int argc, char *argv[]) try {
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("shmbudget,z", "show shared memory budget of the compiled plan")          //
+          ("horizon", "show the time horizon of the compiled plan")                  //
           ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")  //
           ;
     } else {
@@ -596,6 +601,8 @@ int main(int argc, char *argv[]) try {
         return refusePlan();
       }
       processedLines = loaded.lines;
+      // Tekst planu startowego - z niego restart na horyzoncie osi (#640) buduje nastepna epoke.
+      esm::epochPlanText = planText.str();
       // Nieuzyta stala LET (#440) zawsze, takze z --quiet: plany sprzed LET tego wyjscia nie dostana.
       for (const std::string &warning : loaded.warnings) {
         std::println(std::cerr, "{}: warning: {}", argv[0], warning);
@@ -663,11 +670,35 @@ int main(int argc, char *argv[]) try {
       }
 
       if (onlyCompile) {
+        // Horyzont osi czasu (#640): ten sam rachunek co przy starcie osi, wiec `-c` mowi z gory, jak
+        // dlugo plan moze liczyc. Wiersz idzie PO wyjsciu planu; z -d, -m i -w stdout jest plikiem dla
+        // maszyn (dot, csv, diagram), wiec takie polaczenie jest odmowa, a nie zepsuta skladnia.
+        std::string horizonLine;
+        if (vm.contains("horizon")) {
+          if (vm.contains("dot") || vm.contains("csv") || vm.contains("diagram")) {
+            std::println(std::cerr, "{}: fatal error: --horizon cannot be combined with -d, -m or -w", argv[0]);
+            return EPERM;
+          }
+          auto intervals = coreInstance.getAvailableTimeIntervals();
+          if (!intervals) {
+            std::println(std::cerr, "{}: error: {}", argv[0], intervals.error().message());
+            return EXIT_FAILURE;
+          }
+          const auto horizon = CRationalStreamMath::TimeLine::horizonOf(*intervals);
+          if (!horizon) {
+            std::println(std::cerr, "{}: error: {}", argv[0], horizon.error().message());
+            return EXIT_FAILURE;
+          }
+          const double seconds = boost::rational_cast<double>(horizon->at);
+          horizonLine = std::format("time horizon: {:.6f} s ({}) - stream {}, interval {} s", seconds, humanDuration(seconds),
+                                    coreInstance.streamOfInterval(horizon->fastest), horizon->fastest);
+        }
         // Budzet pamieci dzielonej jest osobnym pytaniem o plan, tak samo jak -d czy -w, wiec
         // konczy prace zamiast dokladac sie do wyjscia prezentera: przy -d na stdout stoi plik
         // dot, ktoremu doklejona tabela zepsulaby skladnie.
         if (vm.contains("shmbudget")) {
           std::cout << shmbudget::report(coreInstance, appCfg.ipcQueueBufferSeconds, appCfg.ipcMinQueueElements);
+          if (!horizonLine.empty()) std::println("{}", horizonLine);
           return system::errc::success;
         }
         // Rezerwacja stala nie zalezy od planu ani od liczby klientow: bez niej instancja nie
@@ -681,8 +712,11 @@ int main(int argc, char *argv[]) try {
         }
         if (!vm.contains("quiet")) {
           presenter dm(coreInstance);
-          return dm.run(vm);
+          const int presented = dm.run(vm);
+          if (presented == system::errc::success && !horizonLine.empty()) std::println("{}", horizonLine);
+          return presented;
         }
+        if (!horizonLine.empty()) std::println("{}", horizonLine);
         return system::errc::success;
       }
 

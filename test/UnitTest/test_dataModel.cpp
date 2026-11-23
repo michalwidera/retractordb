@@ -565,7 +565,7 @@ TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
   // Rekord fizyczny 0 zrodla nosi indeks logiczny n-2, wiec okno n ma komplet rekordow n-2..n.
   dataArea->qSet["str1"]->logicalIndexBase = n - 2;
 
-  rdbtest::ok(dataArea->processRows(dueMaskFor("agse1"), boost::rational<int>(n + 1)));
+  rdbtest::ok(dataArea->processRows(dueMaskFor("agse1"), boost::rational<std::int64_t>(n + 1)));
 
   // Baze dostaje tylko wezel, dla ktorego queryInputsAvailable odpowiedzialo "tak".
   EXPECT_EQ(dataArea->qSet["agse1"]->logicalIndexBase, std::optional<int>(n));

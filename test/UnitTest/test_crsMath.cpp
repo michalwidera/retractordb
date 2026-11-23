@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <limits>
 #include <map>
 #include <set>
 #include <variant>
@@ -39,11 +40,11 @@ TEST(TimeLineUnitTest, GeneratesNearestNextTermsForSimpleDeltas) {
 
   TimeLine tl(deltas);
 
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 2));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(2, 1));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 2));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(3, 4));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 1));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(3, 2));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2, 1));
 }
 
 TEST(TimeLineUnitTest, FiltersOutNaturalMultiplesFromInputSet) {
@@ -58,9 +59,9 @@ TEST(TimeLineUnitTest, FiltersOutNaturalMultiplesFromInputSet) {
   TimeLine tl(deltas);
 
   // Expected behavior from constructor comments: {1, 4, 1/2, 3/4} -> {1/2, 3/4}.
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 2));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(3, 4));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 1));
 }
 
 TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
@@ -76,17 +77,17 @@ TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(0, 1)));
 
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 2));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(3, 4)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(0, 1)));
 
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(3, 4));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(3, 4)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
 
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 1));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
 }
@@ -95,16 +96,16 @@ TEST(TimeLineUnitTest, UpdatingIntervalsPreservesPositionAndSchedulesNewFasterRa
   // covers: crsmath.time-line.2~1
   TimeLine tl({boost::rational<int>(1, 10), boost::rational<int>(1, 5)});
 
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 10));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 5));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 10));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 5));
 
-  tl.updateTimeIntervals({boost::rational<int>(1, 20), boost::rational<int>(1, 10), boost::rational<int>(1, 5)});
+  rdbtest::ok(tl.updateTimeIntervals({boost::rational<int>(1, 20), boost::rational<int>(1, 10), boost::rational<int>(1, 5)}));
 
   // The timeline must neither restart at 1/20 nor skip to the old next slot 3/10.
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 4));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1, 4));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 20)));
   EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 10)));
-  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 10));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(3, 10));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 20)));
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 10)));
 }
@@ -179,7 +180,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   pProc           = &proc;  // This need to be set for dumpManager
 
   TimeLine tl(rdbtest::ok(coreInstance.getAvailableTimeIntervals()));
-  boost::rational<int> prev_interval(0);
+  TimePoint prev_interval(0);
 
   strstream << std::setw(colSize) << "Dlt: ";
 
@@ -208,7 +209,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   auto queryCounter{TEST_COUNT};
   while (queryCounter-- != 1) {
     const int msInSec = 1000;
-    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+    TimePoint interval(rdbtest::ok(tl.getNextTimeSlot()) * msInSec /* sec->ms */);
     int period(rational_cast<int>(interval - prev_interval));  // miliseconds
     prev_interval = interval;
 
@@ -356,7 +357,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   pProc           = &proc;  // This need to be set for dumpManager
 
   TimeLine tl(rdbtest::ok(coreInstance.getAvailableTimeIntervals()));
-  boost::rational<int> prev_interval(0);
+  TimePoint prev_interval(0);
 
   // Delta presentation
   strstream << std::setw(4) << " Dlt:";
@@ -389,7 +390,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   auto queryCounter{TEST_COUNT};
   while (queryCounter-- != 1) {
     const int msInSec = 1000;
-    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+    TimePoint interval(rdbtest::ok(tl.getNextTimeSlot()) * msInSec /* sec->ms */);
     int period(rational_cast<int>(interval - prev_interval));  // miliseconds
     prev_interval = interval;
 
@@ -436,5 +437,124 @@ TEST(TimeLineDeathTest, empty_interval_set_is_an_invariant_failure) {
   // covers: crsmath.time-line.1~1
   EXPECT_DEATH(TimeLine(std::set<boost::rational<int>>{}), "input interval set must not be empty");
   TimeLine timeline({boost::rational<int>(1)});
-  EXPECT_DEATH(timeline.updateTimeIntervals({}), "input interval set must not be empty");
+  EXPECT_DEATH(static_cast<void>(timeline.updateTimeIntervals({})), "input interval set must not be empty");
+}
+
+// #640: horyzont osi czasu. Wartosci oczekiwane policzone niezaleznie ulamkami Pythona
+// (fractions.Fraction); przypadki odpowiadaja punktom B-E kroku 0 w zgloszeniu.
+
+// B: horyzont to INT_MAX slotow najszybszego interwalu. Przy 1/48000 s dawna os rzucala
+// bad_rational ("zero denominator") w slocie INT_MAX + 1, czyli po ok. 12,43 h.
+TEST(TimeLineHorizonTest, HorizonIsIntMaxSlotsOfFastestInterval) {
+  // covers: crsmath.time-line.5~1
+  TimeLine audio({boost::rational<int>(1, 48000), boost::rational<int>(1, 44100)});
+  EXPECT_EQ(audio.horizon(), TimePoint(2147483647, 48000));
+  EXPECT_EQ(audio.fastestInterval(), boost::rational<int>(1, 48000));
+
+  // Interwal 2147483644 s, potem dolaczony 1 s: trzy sloty do granicy, czwarty to blad, nie zla chwila.
+  TimeLine tl({boost::rational<int>(2147483644)});
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2147483644));
+  rdbtest::ok(tl.updateTimeIntervals({boost::rational<int>(1), boost::rational<int>(2147483644)}));
+  EXPECT_EQ(tl.horizon(), TimePoint(2147483647));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2147483645));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2147483646));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2147483647));
+  EXPECT_RDB_ERROR(tl.getNextTimeSlot(), rdb::Errc::Config, "time horizon of the plan reached");
+  // Odmowa nie przesuwa osi: biezaca chwila zostaje ostatnim slotem przed horyzontem.
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1)));
+  EXPECT_RDB_ERROR(tl.getNextTimeSlot(), rdb::Errc::Config, "allows at most 2147483647 slots");
+}
+
+// C: interwal o liczniku 3. Dawna os liczyla 3 * 715827883 w int i po ok. 24,86 doby dawala
+// -2147483647/1000 s zamiast 2147483649/1000 s, a termin w ms wychodzil ujemny.
+TEST(TimeLineHorizonTest, SlotNumeratorAboveIntMaxIsExact) {
+  // covers: crsmath.slots-at.1~1
+  TimeLine tl({boost::rational<int>(3, 1000)});
+  EXPECT_EQ(tl.horizon(), TimePoint(6442450941, 1000));
+  const TimePoint slot(2147483649, 1000);
+  EXPECT_EQ(slotsAt(slot, boost::rational<int>(3, 1000)), 715827883);
+  EXPECT_EQ(slotsAt(slot, boost::rational<int>(1, 1000)), 2147483649);
+  EXPECT_EQ(slotsAt(slot, boost::rational<int>(1, 3)), std::nullopt);
+  EXPECT_EQ(slotsAt(slot, boost::rational<int>(0)), std::nullopt);
+}
+
+// D i E: dolaczenie interwalu ad hoc na chwili niewyrownanej z nim. Dawne rebuild() liczylo
+// (2149/2) / (1/1000003) w rational<int>: licznik 2149 * 1000003 = 2149006447 przepelnial sie,
+// nowy interwal dostawal zly licznik, a os cofala sie w czasie. Ta sama chwila w
+// isThisDeltaAwaitCurrentTimeSlot miala to samo przepelnienie (UB) w kazdym slocie.
+TEST(TimeLineHorizonTest, JoiningIntervalOnUnalignedSlotKeepsTimeExact) {
+  // covers: crsmath.time-line.6~1
+  TimeLine tl({boost::rational<int>(1, 2)});
+  TimePoint now;
+  for (int step = 0; step < 2149; ++step)
+    now = rdbtest::ok(tl.getNextTimeSlot());
+  ASSERT_EQ(now, TimePoint(2149, 2));
+  rdbtest::ok(tl.updateTimeIntervals({boost::rational<int>(1, 1000003), boost::rational<int>(1, 2)}));
+  EXPECT_EQ(tl.horizon(), TimePoint(2147483647, 1000003));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1074503224, 1000003));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1000003)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(1074503225, 1000003));
+}
+
+// Dolaczenie interwalu, ktorego horyzont juz minal: blad, a os liczy dalej po staremu. Dawna os
+// liczyla tu 2 * 2147483644 w int.
+TEST(TimeLineHorizonTest, JoiningIntervalPastItsHorizonIsRefused) {
+  // covers: crsmath.time-line.6~1
+  TimeLine tl({boost::rational<int>(2147483644)});
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(2147483644));
+  EXPECT_RDB_ERROR(tl.updateTimeIntervals({boost::rational<int>(1, 2), boost::rational<int>(2147483644)}), rdb::Errc::Config,
+                   "already past the time horizon");
+  EXPECT_EQ(rdbtest::ok(tl.getNextTimeSlot()), TimePoint(4294967288));
+}
+
+// Interwaly bez wspolnej podstawy w int64: NWW mianownikow 2147483647, 2147483646 i 2147483645
+// ma ok. 2^93. Blad wychodzi z pierwszego kroku osi i z kazdej proby przebudowy.
+TEST(TimeLineHorizonTest, IntervalsWithoutInt64TimeBaseAreRefused) {
+  // covers: crsmath.time-line.7~1
+  TimeLine tl({boost::rational<int>(1, 2147483647), boost::rational<int>(1, 2147483646), boost::rational<int>(1, 2147483645)});
+  EXPECT_RDB_ERROR(tl.getNextTimeSlot(), rdb::Errc::Config, "no common time base");
+  EXPECT_RDB_ERROR(tl.updateTimeIntervals({boost::rational<int>(1)}), rdb::Errc::Config, "no common time base");
+}
+
+// horizonOf: horyzont zbioru bez budowania osi, ten sam co horizon() osi z tego zbioru. Para
+// 1048576/2147483647 i 1048576/2147483646 (= 524288/1073741823) to plan testu horizon_xqry:
+// podstawa 524288/(2147483647 * 1073741823), horyzont uciety do (2^63 - 1) / 524288 taktow, czyli
+// 3074457345618083840/768614335330822827 s (ok. 4,0 s) - wartosc z fractions.Fraction.
+TEST(TimeLineHorizonTest, HorizonOfMatchesBuiltTimeLine) {
+  // covers: crsmath.time-line.8~1, crsmath.time-line.9~1
+  const std::set<boost::rational<int>> audio{boost::rational<int>(1, 48000), boost::rational<int>(1, 44100)};
+  const auto audioHorizon = rdbtest::ok(TimeLine::horizonOf(audio));
+  EXPECT_EQ(audioHorizon.at, TimeLine(audio).horizon());
+  EXPECT_EQ(audioHorizon.fastest, boost::rational<int>(1, 48000));
+
+  const std::set<boost::rational<int>> shortPlan{boost::rational<int>(1048576, 2147483647),
+                                                 boost::rational<int>(1048576, 2147483646)};
+  const auto shortHorizon = rdbtest::ok(TimeLine::horizonOf(shortPlan));
+  EXPECT_EQ(shortHorizon.at, TimePoint(3074457345618083840, 768614335330822827));
+  EXPECT_EQ(shortHorizon.at, TimeLine(shortPlan).horizon());
+  EXPECT_EQ(shortHorizon.fastest, boost::rational<int>(1048576, 2147483647));
+
+  // Zapytanie ad hoc 1/2147483647 s na planie 1/1000 s: horyzont INT_MAX slotow, czyli 1 s.
+  EXPECT_EQ(rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(1, 1000), boost::rational<int>(1, 2147483647)})).at,
+            TimePoint(1));
+
+  // admits: t + step <= horyzont. Na granicy 1 s: 0,999 s + 1/1000 s miesci sie, 1 s + 1/1000 s juz nie.
+  const auto adHoc = rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(1, 1000), boost::rational<int>(1, 2147483647)}));
+  EXPECT_TRUE(adHoc.admits(TimePoint(999, 1000), boost::rational<int>(1, 1000)));
+  EXPECT_FALSE(adHoc.admits(TimePoint(1), boost::rational<int>(1, 1000)));
+  EXPECT_TRUE(adHoc.admits(TimePoint(0), boost::rational<int>(1)));
+  EXPECT_FALSE(adHoc.admits(TimePoint(1), boost::rational<int>(1, 2147483647)));
+  EXPECT_TRUE(adHoc.admits(TimePoint(2147483646, 2147483647), boost::rational<int>(1, 2147483647)));
+  // Interwal 2147483647 s: horyzont uciety terminem w ms do 4294967 slotow. Chwila INT64_MAX s plus
+  // krok wychodzi poza int64, a odpowiedz nadal jest dokladna.
+  const auto wide = rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(2147483647)}));
+  EXPECT_EQ(wide.at, TimePoint(std::int64_t{4294967} * 2147483647));
+  EXPECT_TRUE(wide.admits(TimePoint(std::int64_t{4294966} * 2147483647), boost::rational<int>(2147483647)));
+  EXPECT_FALSE(wide.admits(TimePoint(std::int64_t{4294967} * 2147483647), boost::rational<int>(2147483647)));
+  EXPECT_FALSE(wide.admits(TimePoint(std::numeric_limits<std::int64_t>::max()), boost::rational<int>(2147483647)));
+
+  EXPECT_RDB_ERROR(TimeLine::horizonOf({boost::rational<int>(1, 2147483647), boost::rational<int>(1, 2147483646),
+                                        boost::rational<int>(1, 2147483645)}),
+                   rdb::Errc::Config, "no common time base");
 }

@@ -8,11 +8,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <expected>
+#include <format>
 #include <iostream>
 #include <print>
 #include <sstream>
 #include <stdexcept>
 #include <stop_token>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -21,6 +23,7 @@
 
 #include "constants.hpp"
 #include "formatters.hpp"
+#include "humanDuration.hpp"
 #include "ipcClient.hpp"
 #include "uxSysTermTools.hpp"
 
@@ -646,6 +649,23 @@ std::expected<std::string, selectResult> qry::vars() {
   for (const auto &v : (*ptvars)->get_child("db.vars"))
     rows.push_back({v.second.get<std::string>(""), v.second.get<std::string>("type"), v.second.get<std::string>("value")});
   return columnTable({"name", "type", "value"}, rows);
+}
+
+std::expected<std::string, selectResult> qry::horizon() {
+  const ptree pt = netClient("horizon", "");
+  // Odpowiedz niesie `db.horizon`; reszta przechodzi sitem 'get' jak w varsNode - takze `db.stream`
+  // bez horyzontu, ktore sito uznaloby za liste strumieni.
+  if (!pt.get_optional<std::string>("error.response") && pt.get_optional<std::string>("db.horizon")) {
+    const double remaining = pt.get<double>("db.remaining");
+    return std::format("remaining {}\nhorizon   {} s\ntime      {} s\nstream    {} (interval {} s)\n", humanDuration(remaining),
+                       pt.get<std::string>("db.horizon"), pt.get<std::string>("db.time"), pt.get<std::string>("db.stream"),
+                       pt.get<std::string>("db.interval"));
+  }
+  answerVerdict verdict = classifyAnswer(pt);
+  if (verdict == answerVerdict::idle) return std::string(constants::kNoActivePlanReply) + "\n";
+  if (verdict == answerVerdict::streams) verdict = answerVerdict::malformed;
+  SPDLOG_ERROR("qry::horizon: {}", describe(verdict));
+  return std::unexpected(toSelectResult(verdict));
 }
 
 std::expected<std::string, selectResult> qry::varsYaml() {

@@ -374,9 +374,9 @@ bool rtKeepThreadOffRtCpus([[maybe_unused]] pthread_t handle) {
 #endif
 }
 
-long rtSlotDeadlineMs(const boost::rational<int> &slotSeconds) {
-  constexpr long kMsPerSec = 1000;
-  return static_cast<long>(slotSeconds.numerator()) * kMsPerSec / slotSeconds.denominator();
+long rtSlotDeadlineMs(const boost::rational<std::int64_t> &slotSeconds) {
+  constexpr __int128 kMsPerSec = 1000;
+  return static_cast<long>(static_cast<__int128>(slotSeconds.numerator()) * kMsPerSec / slotSeconds.denominator());
 }
 
 bool rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {

@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>  // unique_ptr
 #include <mutex>
 #include <optional>
@@ -21,6 +22,7 @@
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
+#include "CRSMath.hpp"
 #include "executorsmState.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/error.hpp"
@@ -340,7 +342,7 @@ rdb::Result<> dataModel::processZeroStep() {
   return {};
 }
 
-rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot) {
+rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost::rational<std::int64_t> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
 
   // Maska jest pozycyjna, wiec rozjazd dlugosci znaczy, ze opisuje INNY uklad planu niz ten,
@@ -410,11 +412,12 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
       continue;
     }
 
-    const auto slotNumber = currentTimeSlot / q.rInterval;
-    RDB_ASSERT(slotNumber.denominator() == 1,
+    // Liczba slotow interwalu liczona dokladnie (#640); horyzont osi trzyma ja w int.
+    const auto slotNumber = CRationalStreamMath::slotsAt(currentTimeSlot, q.rInterval);
+    RDB_ASSERT(slotNumber.has_value() && *slotNumber <= std::numeric_limits<int>::max(),
                "dataModel::processRows: current slot {} is not aligned with interval {} for declaration '{}'", currentTimeSlot,
                q.rInterval, q.id);
-    runtime.logicalIndexBase = slotNumber.numerator() - 1;
+    runtime.logicalIndexBase = static_cast<int>(*slotNumber - 1);
     RDB_TRY(bootstrapDeclaration(q));
   }
 
@@ -445,11 +448,11 @@ rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost:
       //   T = (n + 1 + W) * Delta  =>  n = T/Delta - 1 - W.
       // Nie wolno zaczynać ponownie od query::logicalOrigin, bo fizyczny rekord 0 niósłby
       // wtedy bieżącą wartość oznaczoną historycznym indeksem.
-      const auto slotNumber = currentTimeSlot / q.rInterval;
-      RDB_ASSERT(slotNumber.denominator() == 1,
+      const auto slotNumber = CRationalStreamMath::slotsAt(currentTimeSlot, q.rInterval);
+      RDB_ASSERT(slotNumber.has_value() && *slotNumber <= std::numeric_limits<int>::max(),
                  "dataModel::processRows: current slot {} is not aligned with interval {} for '{}'", currentTimeSlot,
                  q.rInterval, q.id);
-      const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
+      const int firstLogicalIndex = static_cast<int>(*slotNumber - 1 - q.startupLatency);
       if (firstLogicalIndex < q.logicalOrigin || !queryInputsAvailable(q, firstLogicalIndex)) continue;
 
       runtime.logicalIndexBase = firstLogicalIndex;

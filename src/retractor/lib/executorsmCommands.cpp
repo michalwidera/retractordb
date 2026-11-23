@@ -123,6 +123,42 @@ ptree executorsm::collectVariables() {
   return ptRetval;
 }
 
+ptree executorsm::collectHorizon() {
+  if (coreInstancePtr == nullptr) return engineErrorResponse("horizon", "executorsm::collectHorizon: coreInstancePtr is null");
+  if (pProc == nullptr) return engineErrorResponse("horizon", "executorsm::collectHorizon: pProc is null");
+  AxisState axis;
+  std::string stream;
+  {
+    std::scoped_lock lock(core_mutex);
+    axis = axis_;
+    // Przed budowa osi epoki (bramka --xqrywait, krok zerowy) horyzont liczy sie z planu, a chwila to 0.
+    if (!axis.running) {
+      auto intervals = coreInstancePtr->getAvailableTimeIntervals();
+      if (!intervals) return engineErrorResponse("horizon", intervals.error().message());
+      auto horizon = CRationalStreamMath::TimeLine::horizonOf(*intervals);
+      if (!horizon) {
+        ptree ptRetval;
+        ptRetval.put("error.response", horizon.error().message());
+        return ptRetval;
+      }
+      axis = {.running = false, .now = 0, .horizon = horizon->at, .fastest = horizon->fastest};
+    }
+    stream = coreInstancePtr->streamOfInterval(axis.fastest);
+  }
+  // Sekundy jako liczby dziesietne: odliczanie jest dla czlowieka, a horyzont 1/48000 s (ok. 44739 s)
+  // ma w double blad ponizej mikrosekundy. Dokladne wartosci zostaja w silniku.
+  const double now     = boost::rational_cast<double>(axis.now);
+  const double horizon = boost::rational_cast<double>(axis.horizon);
+  ptree ptRetval;
+  ptRetval.put("db.stream", stream);
+  ptRetval.put("db.interval", axis.fastest.denominator() == 1 ? boost::lexical_cast<std::string>(axis.fastest.numerator())
+                                                              : boost::lexical_cast<std::string>(axis.fastest));
+  ptRetval.put("db.time", std::format("{:.6f}", now));
+  ptRetval.put("db.horizon", std::format("{:.6f}", horizon));
+  ptRetval.put("db.remaining", std::format("{:.6f}", horizon - now));
+  return ptRetval;
+}
+
 ptree executorsm::commandProcessor(const ptree &ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
@@ -156,8 +192,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     if (const char *delayMs = std::getenv("RDB_FAULT_SHOW_DELAY"); delayMs != nullptr && command == "show")
       std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
 
-    const bool requiresDataModel =
-        command == "get" || command == "adhoc" || command == "detail" || command == "show" || command == "vars";
+    const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show" ||
+                                   command == "vars" || command == "horizon";
     // Blokada epoki zyje az do wyjscia z handlera -- patrz plan_epoch_mutex. Brana dopiero PO
     // przebudzeniu na core_mutex, nigdy przed: czekanie na model pod blokada epoki zamykaloby
     // droge watkowi, ktory ten model ma dopiero opublikowac.
@@ -187,6 +223,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
 
     if (command == "vars" && pProc != nullptr) ptRetval = collectVariables();
+
+    if (command == "horizon" && pProc != nullptr) ptRetval = collectHorizon();
 
     if (command == "adhoc" && pProc != nullptr) ptRetval = getAdHoc(ptInval.get("db.argument", ""));
     //

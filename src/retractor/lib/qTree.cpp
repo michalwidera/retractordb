@@ -175,6 +175,12 @@ rdb::Result<std::set<boost::rational<int>>> qTree::getAvailableTimeIntervals() {
   return lstTimeIntervals;
 }
 
+std::string qTree::streamOfInterval(const boost::rational<int> &interval) const {
+  const auto found =
+      std::ranges::find_if(*this, [&interval](const query &q) { return !q.isCompilerDirective() && q.rInterval == interval; });
+  return found == end() ? std::string{} : found->id;
+}
+
 query &qTree::getQuery(const std::string &query_name) {
   // Warunek wstepny: nazwa istnieje w planie. Odwolania z tresci planu sprawdza kompilator
   // (compiler::checkStreamReferences) zanim ktorykolwiek przebieg tu siegnie, a nazwy od klienta

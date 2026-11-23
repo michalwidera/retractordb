@@ -49,6 +49,7 @@ struct planVariable {
 /// - [qtree.q-tree.9~1] przez getAvailableTimeIntervals zwracać zbiór interwałów wszystkich węzłów poza dyrektywami, traktując zerowy interwał węzła niebędącego dyrektywą jako naruszenie niezmiennika.
 /// - [qtree.q-tree.10~1] przez dumpCore wypisywać tabelę z pozycją, interwałem, pojemnością i nazwą każdego węzła.
 /// - [qtree.q-tree.11~1] przy przeniesieniu przekazywać zawartość i rewizję do celu, opróżniać źródło i nadawać mu nową rewizję; samoprzypisanie przenoszące pozostawia drzewo bez zmian.
+/// - [qtree.q-tree.12~1] przez streamOfInterval zwracać nazwę pierwszego w kolejności planu węzła niebędącego dyrektywą o danym interwale, a pusty napis, gdy takiego nie ma.
 class qTree : private std::vector<query> {
   /* Topological sort vars */
   std::map<std::string, bool> visited_;
@@ -124,6 +125,8 @@ class qTree : private std::vector<query> {
   boost::rational<int> getDelta(const std::string &query_name);
   void dumpCore();
   [[nodiscard]] rdb::Result<std::set<boost::rational<int>>> getAvailableTimeIntervals();
+  /// Strumien wyznaczajacy horyzont osi czasu (#640): pierwszy o najszybszym interwale osi.
+  [[nodiscard]] std::string streamOfInterval(const boost::rational<int> &interval) const;
 
   std::map<std::string, int> maxCapacity;
 
