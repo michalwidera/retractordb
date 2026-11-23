@@ -1,0 +1,5 @@
+# Plan testu it_horizon_xqry (#640): interwal 1/1000 s, horyzont INT_MAX slotow = 2147483,647 s
+# (24 d 20 h 31 min 23 s).
+STORAGE 'temp'
+DECLARE v INTEGER STREAM src, 1/1000 TEXTFILE 'data.txt'
+SELECT src[0] * 2 STREAM dbl FROM src STORAGE MEMORY

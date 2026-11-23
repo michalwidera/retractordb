@@ -257,10 +257,9 @@ Result<std::optional<std::uint64_t>> Engine::stepPlan(Plan &plan) {
   auto nextSlot = plan.timeline->getNextTimeSlot();
   if (!nextSlot) [[unlikely]] {
     // Horyzont osi (#640) - ten sam komunikat co w petli demona, z nazwa strumienia najszybszego interwalu.
-    const auto fastest =
-        std::ranges::find_if(plan.tree, [&plan](const query &q) { return q.rInterval == plan.timeline->fastestInterval(); });
-    if (fastest == plan.tree.end()) return std::unexpected(std::move(nextSlot).error());
-    return fail(nextSlot.error().code(), std::format("{} - stream '{}'", nextSlot.error().message(), fastest->id));
+    const std::string stream = plan.tree.streamOfInterval(plan.timeline->fastestInterval());
+    if (stream.empty()) return std::unexpected(std::move(nextSlot).error());
+    return fail(nextSlot.error().code(), std::format("{} - stream '{}'", nextSlot.error().message(), stream));
   }
   const boost::rational<std::int64_t> slot = *nextSlot;
   plan.dueMask.assign(plan.tree.size(), 0);

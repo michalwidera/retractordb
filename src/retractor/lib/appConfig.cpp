@@ -196,6 +196,15 @@ void applyTable(const toml::table &tbl, AppConfig &cfg, const std::string &path)
   if (auto v = tbl.at_path("timing.server_startup_wait_s").value<int>(); v) cfg.timingServerStartupWaitSeconds = *v;
   if (auto v = tbl.at_path("timing.server_startup_poll_ms").value<int>(); v) cfg.timingServerStartupPollIntervalMs = *v;
   if (auto v = tbl.at_path("timing.query_no_data_timeout_ms").value<int>(); v) cfg.timingQueryNoDataTimeoutMs = *v;
+  if (auto v = tbl.at_path("timing.horizon"); v) {
+    const auto mode = v.value<std::string>();
+    if (mode == "stop" || mode == "restart")
+      cfg.timingHorizonRestart = *mode == "restart";
+    else {
+      SPDLOG_WARN("Invalid config timing.horizon in '{}' (allowed \"stop\" or \"restart\"). Using default \"stop\".", path);
+      cfg.timingHorizonRestart = false;
+    }
+  }
 
   if (auto v = tbl.at_path("scheduling.rt_priority").value<int>(); v) cfg.schedulingRtPriority = *v;
 

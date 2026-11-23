@@ -190,6 +190,36 @@ void executorsm::collectAwaitedStreams(TimeLine &tl, qTree *coreInstancePtr) {
   }
 }
 
+void executorsm::publishAxis(const TimeLine &tl) {
+  axis_ = {.running = true, .now = tl.now(), .horizon = tl.horizon(), .fastest = tl.fastestInterval()};
+}
+
+rdb::Result<> executorsm::requestHorizonRestart() {
+  // Rezerwuje ten, kto zdobyl flage wymiany (patrz planSwapInFlight). Zajeta flaga to reset
+  // klienta w toku: przyjety zastapi plan biezacy, wiec restart jest zbedny; odrzucony zdejmie
+  // flage po swojej walidacji i nastepna proba ja zdobedzie.
+  for (bool idle = false; !planSwapInFlight.compare_exchange_strong(idle, true, std::memory_order_acq_rel); idle = false) {
+    if (planResetRequested.load(std::memory_order_acquire)) return {};
+    std::this_thread::yield();
+  }
+  std::string text;
+  {
+    std::scoped_lock lock(core_mutex);
+    text = epochPlanText;
+  }
+  if (const std::string refusal = validatePlanText(text, true); !refusal.empty()) {
+    planSwapInFlight.store(false, std::memory_order_release);
+    return rdb::fail(rdb::Errc::Config, "restart at the time horizon refused: " + refusal);
+  }
+  {
+    std::scoped_lock lock(core_mutex);
+    pendingPlanText = std::move(text);
+  }
+  planResetRequested.store(true, std::memory_order_release);
+  cv.notify_all();
+  return {};
+}
+
 void executorsm::collectDueDevices(TimeLine &tl, dataModel &proc, const std::chrono::steady_clock::time_point wake) {
   deviceWaits_.clear();
   for (const auto &q : *coreInstancePtr) {
@@ -220,6 +250,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgHistoryMemoryMib   = cfg.historyMemoryMib;
   executorsm::cfgDefaultRetention   = cfg.defaultRetention;
   executorsm::cfgSourcesTimeout     = cfg.sourcesTimeoutSeconds;
+  executorsm::cfgHorizonRestart     = cfg.timingHorizonRestart;
   // Tryb nieograniczony zostawia slad w dzienniku ZAWSZE, nie tylko przy pierwszej regule:
   // po incydencie pytanie brzmi "czy ta instancja przyjmowala polecenia powloki", a odpowiedz
   // ma byc w logu startu, a nie do odtworzenia z pliku konfiguracyjnego, ktory mogl sie zmienic.
@@ -422,6 +453,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     // przyjac inaczej niz przez restart procesu.
     while (iLoopLimitCnt != executorsm::stop_now) {
       dataModelExpected = !coreInstancePtr->empty();
+      {
+        // Stan osi poprzedniej epoki nie opisuje nastepnej (#640): do budowy osi `xqry --horizon`
+        // liczy horyzont z planu, a ad hoc nie ma czego porownywac.
+        std::scoped_lock lock(core_mutex);
+        axis_.running = false;
+      }
 
       if (coreInstancePtr->empty()) {
         //
@@ -554,6 +591,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           break;
         }
         TimeLine tl(timeIntervals);
+        {
+          std::scoped_lock lock(core_mutex);
+          publishAxis(tl);
+        }
+        // Restart na horyzoncie (#640) tylko po co najmniej jednym slocie epoki: os, ktora nie daje
+        // ani jednego (podstawa poza int64), restartowalaby sie w nieskonczonosc.
+        bool epochHasSlot = false;
         //
         // Main loop of data processing
         //
@@ -669,6 +713,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
                 engineError = std::move(updated).error();
                 break;
               }
+              publishAxis(tl);
               timeIntervals = std::move(availableTimeIntervals);
             }
             planDevices = countDevices(*coreInstancePtr);
@@ -685,15 +730,28 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           if (!nextSlot) [[unlikely]] {
             // Horyzont osi (#640): blad silnika zamiast slotu, ktorego indeks rekordu wyszedlby poza int.
             // Komunikat dostaje nazwe strumienia najszybszego interwalu - to on wyznacza horyzont.
-            engineError = std::move(nextSlot).error();
-            std::scoped_lock lock(core_mutex);
-            const auto fastest =
-                std::ranges::find_if(*coreInstancePtr, [&tl](const query &q) { return q.rInterval == tl.fastestInterval(); });
-            if (fastest != coreInstancePtr->end())
-              engineError =
-                  rdb::Error(engineError->code(), std::format("{} - stream '{}'", engineError->message(), fastest->id));
+            rdb::Error horizonError = std::move(nextSlot).error();
+            {
+              std::scoped_lock lock(core_mutex);
+              if (const std::string stream = coreInstancePtr->streamOfInterval(tl.fastestInterval()); !stream.empty())
+                horizonError = rdb::Error(horizonError.code(), std::format("{} - stream '{}'", horizonError.message(), stream));
+            }
+            if (!cfgHorizonRestart || !epochHasSlot) {
+              engineError = std::move(horizonError);
+              break;
+            }
+            // `timing.horizon = "restart"`: epoka konczy sie zwykla droga, a petla epok buduje nastepna
+            // z tekstu tego samego planu - jak po `xqry --reset`. Poziom ERROR jak przy wykazie D8:
+            // Release wycina nizsze, a to jedna linia na epoke.
+            if (auto restarted = requestHorizonRestart(); !restarted) {
+              engineError = std::move(restarted).error();
+              break;
+            }
+            SPDLOG_ERROR("{}; restarting the plan in a new epoch (timing.horizon = restart).", horizonError.message());
+            if (vm.contains("verbose")) std::cout << "Time horizon reached. Restarting the plan.\n";
             break;
           }
+          epochHasSlot                                        = true;
           const boost::rational<std::int64_t> currentTimeSlot = *nextSlot;
           const long deadlineMs                               = rtSlotDeadlineMs(currentTimeSlot);
 
@@ -761,6 +819,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
               // nadal samo processRows.
               std::scoped_lock lock(core_mutex);
               collectAwaitedStreams(tl, coreInstancePtr);
+              publishAxis(tl);
             }
             slotBench.beginCompute();
             // mierzony rdzeń obliczeń jednego interwału (E1); sprawdzenie wyniku to jedna galaz

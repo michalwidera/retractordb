@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <limits>
 #include <map>
 #include <set>
 #include <variant>
@@ -514,4 +515,46 @@ TEST(TimeLineHorizonTest, IntervalsWithoutInt64TimeBaseAreRefused) {
   TimeLine tl({boost::rational<int>(1, 2147483647), boost::rational<int>(1, 2147483646), boost::rational<int>(1, 2147483645)});
   EXPECT_RDB_ERROR(tl.getNextTimeSlot(), rdb::Errc::Config, "no common time base");
   EXPECT_RDB_ERROR(tl.updateTimeIntervals({boost::rational<int>(1)}), rdb::Errc::Config, "no common time base");
+}
+
+// horizonOf: horyzont zbioru bez budowania osi, ten sam co horizon() osi z tego zbioru. Para
+// 1048576/2147483647 i 1048576/2147483646 (= 524288/1073741823) to plan testu horizon_xqry:
+// podstawa 524288/(2147483647 * 1073741823), horyzont uciety do (2^63 - 1) / 524288 taktow, czyli
+// 3074457345618083840/768614335330822827 s (ok. 4,0 s) - wartosc z fractions.Fraction.
+TEST(TimeLineHorizonTest, HorizonOfMatchesBuiltTimeLine) {
+  // covers: crsmath.time-line.8~1, crsmath.time-line.9~1
+  const std::set<boost::rational<int>> audio{boost::rational<int>(1, 48000), boost::rational<int>(1, 44100)};
+  const auto audioHorizon = rdbtest::ok(TimeLine::horizonOf(audio));
+  EXPECT_EQ(audioHorizon.at, TimeLine(audio).horizon());
+  EXPECT_EQ(audioHorizon.fastest, boost::rational<int>(1, 48000));
+
+  const std::set<boost::rational<int>> shortPlan{boost::rational<int>(1048576, 2147483647),
+                                                 boost::rational<int>(1048576, 2147483646)};
+  const auto shortHorizon = rdbtest::ok(TimeLine::horizonOf(shortPlan));
+  EXPECT_EQ(shortHorizon.at, TimePoint(3074457345618083840, 768614335330822827));
+  EXPECT_EQ(shortHorizon.at, TimeLine(shortPlan).horizon());
+  EXPECT_EQ(shortHorizon.fastest, boost::rational<int>(1048576, 2147483647));
+
+  // Zapytanie ad hoc 1/2147483647 s na planie 1/1000 s: horyzont INT_MAX slotow, czyli 1 s.
+  EXPECT_EQ(rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(1, 1000), boost::rational<int>(1, 2147483647)})).at,
+            TimePoint(1));
+
+  // admits: t + step <= horyzont. Na granicy 1 s: 0,999 s + 1/1000 s miesci sie, 1 s + 1/1000 s juz nie.
+  const auto adHoc = rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(1, 1000), boost::rational<int>(1, 2147483647)}));
+  EXPECT_TRUE(adHoc.admits(TimePoint(999, 1000), boost::rational<int>(1, 1000)));
+  EXPECT_FALSE(adHoc.admits(TimePoint(1), boost::rational<int>(1, 1000)));
+  EXPECT_TRUE(adHoc.admits(TimePoint(0), boost::rational<int>(1)));
+  EXPECT_FALSE(adHoc.admits(TimePoint(1), boost::rational<int>(1, 2147483647)));
+  EXPECT_TRUE(adHoc.admits(TimePoint(2147483646, 2147483647), boost::rational<int>(1, 2147483647)));
+  // Interwal 2147483647 s: horyzont uciety terminem w ms do 4294967 slotow. Chwila INT64_MAX s plus
+  // krok wychodzi poza int64, a odpowiedz nadal jest dokladna.
+  const auto wide = rdbtest::ok(TimeLine::horizonOf({boost::rational<int>(2147483647)}));
+  EXPECT_EQ(wide.at, TimePoint(std::int64_t{4294967} * 2147483647));
+  EXPECT_TRUE(wide.admits(TimePoint(std::int64_t{4294966} * 2147483647), boost::rational<int>(2147483647)));
+  EXPECT_FALSE(wide.admits(TimePoint(std::int64_t{4294967} * 2147483647), boost::rational<int>(2147483647)));
+  EXPECT_FALSE(wide.admits(TimePoint(std::numeric_limits<std::int64_t>::max()), boost::rational<int>(2147483647)));
+
+  EXPECT_RDB_ERROR(TimeLine::horizonOf({boost::rational<int>(1, 2147483647), boost::rational<int>(1, 2147483646),
+                                        boost::rational<int>(1, 2147483645)}),
+                   rdb::Errc::Config, "no common time base");
 }

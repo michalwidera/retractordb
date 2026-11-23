@@ -41,6 +41,8 @@ using TimePoint = rational<std::int64_t>;
 /// - [crsmath.time-line.5~1] zamiast slotu za horyzontem osi zwracać błąd Config podający horyzont i najszybszy interwał, bez zmiany stanu osi.
 /// - [crsmath.time-line.6~1] przy zmianie zbioru interwałów zachowywać dokładnie bieżącą chwilę i zaczynać nowy interwał od jego pierwszego wystąpienia po niej, a gdy podstawa osi albo chwila nie mieści się w int64, zwracać błąd zamiast liczyć.
 /// - [crsmath.time-line.7~1] dla zbioru interwałów, którego podstawa nie mieści się w int64, zwracać błąd z pierwszego wywołania getNextTimeSlot.
+/// - [crsmath.time-line.8~1] dostarczać funkcji statycznej horizonOf, zwracającej dla zbioru interwałów ten sam horyzont i najszybszy interwał, który miałaby zbudowana z niego oś, a błąd Config, gdy podstawa zbioru nie mieści się w int64.
+/// - [crsmath.time-line.9~1] odpowiadać z horyzontu zwróconego przez horizonOf, czy chwila t powiększona o krok step leży nie dalej niż horyzont, dokładnie także wtedy, gdy t + step nie mieści się w int64.
 
 class TimeLine : private boost::noncopyable {
   /// Interwal po odfiltrowaniu wielokrotnosci: k = interwal / tau i numer nastepnego wystapienia.
@@ -70,9 +72,41 @@ class TimeLine : private boost::noncopyable {
   /** blad konstrukcji, oddawany z pierwszego getNextTimeSlot */
   std::optional<rdb::Error> pending_;
 
+  /// Podstawa osi wyznaczona ze zbioru interwalow - wspolna dla rebuild i horizonOf.
+  struct Base {
+    std::vector<Rate> rates;
+    std::int64_t tauNum{1};
+    std::int64_t tauDen{1};
+    std::int64_t horizonTicks{0};
+    rational<int> fastest;
+  };
+
+  static rdb::Result<Base> computeBase(const set<rational<int>> &inSet);
+
   rdb::Result<> rebuild(const set<rational<int>> &inSet);
 
  public:
+  /// Horyzont zbioru interwalow: ostatnia dopuszczalna chwila osi i interwal, ktory ja wyznacza.
+  struct Horizon {
+    TimePoint at;
+    rational<int> fastest;
+    /// Podstawa osi i horyzont w jej taktach - do dokladnego porownania w admits.
+    std::int64_t tauNum{1};
+    std::int64_t tauDen{1};
+    std::int64_t ticks{0};
+
+    /** Czy chwila t + step nie wychodzi za horyzont. Liczone w taktach tej podstawy w __int128;
+     * suma t + step w TimePoint moglaby przepelnic int64. Chwila niewyrownana z podstawa jest
+     * zaokraglana w gore, wiec odpowiedz bywa ostrozniejsza, nigdy zbyt laskawa.
+     */
+    [[nodiscard]] bool admits(const TimePoint &t, const rational<int> &step) const;
+  };
+
+  /** Horyzont osi, ktora powstalaby z danego zbioru interwalow - bez budowania osi. Sluzy
+   * odmowie dolaczenia zapytania ad hoc, ktorego horyzont juz minal (#640).
+   */
+  [[nodiscard]] static rdb::Result<Horizon> horizonOf(const set<boost::rational<int>> &inSet);
+
   /** This constructor fills inherited set of values filtered
    * During call of constructor list with minimal times is created
    * Times that are multiplicity of other values are removed
@@ -101,6 +135,9 @@ class TimeLine : private boost::noncopyable {
 
   /** Najszybszy interwal osi - ten, ktory wyznacza horyzont. */
   [[nodiscard]] const rational<int> &fastestInterval() const noexcept { return fastest_; }
+
+  /** Biezaca chwila osi: ostatni slot zwrocony przez getNextTimeSlot, przed pierwszym 0. */
+  [[nodiscard]] const TimePoint &now() const noexcept { return ctSlot_; }
 
   /** Horyzont osi w sekundach: ostatnia chwila, ktora getNextTimeSlot moze zwrocic. */
   [[nodiscard]] TimePoint horizon() const;

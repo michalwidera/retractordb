@@ -24,6 +24,7 @@
 #include "fatalError.hpp"  // wylacznie hak RDB_FAULT_FATAL_IN_ADHOC
 #include "planSource.hpp"
 #include "rdb/error.hpp"
+#include "rdb/rationalFormat.hpp"
 #include "RQLParser.hpp"
 
 // Kanal ad-hoc: dolaczenie pojedynczej instrukcji SELECT/DECLARE albo reguly do planu, ktory
@@ -198,6 +199,37 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
     SPDLOG_ERROR("Compile chain of adhoc failed: {}", response);
     return ptRetval;
+  }
+
+  // Horyzont osi planu z tym zapytaniem (#640). Nowy interwal moze go skrocic ponizej chwili, w
+  // ktorej silnik juz jest - wtedy odmowa, zamiast bledu osi, ktory zatrzymalby caly silnik w
+  // nastepnym slocie. Chwila opublikowana przez petle spoznia sie najwyzej o jeden slot
+  // najszybszego interwalu (patrz AxisState), wiec warunek bierze ja z tym zapasem. Przed budowa
+  // osi (running == false) liczy sie tylko to, czy podstawa w ogole istnieje.
+  {
+    auto intervals = coreInstanceCopy.getAvailableTimeIntervals();
+    if (!intervals) return engineErrorResponse("adhoc", intervals.error().message());
+    auto horizon = CRationalStreamMath::TimeLine::horizonOf(*intervals);
+    if (!horizon) {
+      ptRetval.put(std::string("db"), "Rejected: " + horizon.error().message());
+      SPDLOG_ERROR("AdHoc rejected: {}", horizon.error().message());
+      return ptRetval;
+    }
+    AxisState axis;
+    {
+      std::scoped_lock lock(core_mutex);
+      axis = axis_;
+    }
+    if (axis.running && !horizon->admits(axis.now, axis.fastest)) {
+      const std::string message = std::format(
+          "Rejected: the time horizon of the plan with this query is {:.6f} s (stream '{}', interval {} s), "
+          "the engine is already at {:.6f} s",
+          boost::rational_cast<double>(horizon->at), coreInstanceCopy.streamOfInterval(horizon->fastest), horizon->fastest,
+          boost::rational_cast<double>(axis.now));
+      ptRetval.put(std::string("db"), message);
+      SPDLOG_ERROR("AdHoc rejected: {}", message);
+      return ptRetval;
+    }
   }
 
   // Roszczenie nazw powolanych ad-hoc: PO lokalnej kompilacji (dopiero wtedy znane sa takze

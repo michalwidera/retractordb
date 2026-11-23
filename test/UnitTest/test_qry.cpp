@@ -14,6 +14,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "humanDuration.hpp"
 #include "qry/qry.hpp"
 
 // ctest -R '^ut-xqry' -V
@@ -849,4 +850,16 @@ TEST(xqry, detail_forms_preserve_stopping_and_plan_swap_verdicts) {
     ASSERT_FALSE(reloaded.has_value());
     EXPECT_EQ(reloaded.error(), selectResult::noActivePlan);
   }
+}
+
+// humanDuration (#640): odliczanie do horyzontu w `xqry --horizon` i `xretractor -c --horizon`.
+TEST(xqry, human_duration_drops_leading_zero_units) {
+  // covers: humanduration.human-duration.1~1
+  EXPECT_EQ(humanDuration(-3.5), "0 s");
+  EXPECT_EQ(humanDuration(0.999), "0 s");
+  EXPECT_EQ(humanDuration(59.9), "59 s");
+  EXPECT_EQ(humanDuration(60), "1 min 0 s");
+  EXPECT_EQ(humanDuration(3600), "1 h 0 min 0 s");
+  EXPECT_EQ(humanDuration(44739.242), "12 h 25 min 39 s");
+  EXPECT_EQ(humanDuration(2147483.647), "24 d 20 h 31 min 23 s");
 }

@@ -22,6 +22,7 @@ Server-directed commands require a running engine. `--bus` reads accessible inst
 - Raw text is the default subscription format; Graphite, InfluxDB and gnuplot output are also available.
 - `--yaml` formats instance, stream, detail and variable listings. `--jsonl` supplies the versioned application protocol for `--hello`, `--dir`, `--detail` and `--select`.
 - `--adhoc` adds one `SELECT`, `DECLARE` or `RULE` to an active plan. `--reset file.rql` submits a complete replacement plan, including directives. Reset ends existing subscriptions; clients must subscribe again.
+- `--horizon` reports how long the plan can still run: the engine stops (or, with `timing.horizon = "restart"` in `retractor.toml`, restarts the plan) after `INT_MAX` slots of its fastest interval. The report shows the countdown, the horizon, the current slot time and the stream that sets the horizon, all in logical time of the time axis (with `--no-clock` that is not wall time). An ad-hoc statement whose interval would put the horizon behind the current slot is rejected.
 - A reset accepted by a service is not a guarantee that its startup file was saved or that late activation will succeed. Follow the replacement contract and inspect the engine logs.
 
 For example, a bounded JSON Lines subscription is:

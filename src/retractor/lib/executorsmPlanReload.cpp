@@ -75,7 +75,7 @@ void purgeStaleResetTransfers(std::chrono::steady_clock::time_point now) {
 }
 }  // namespace
 
-std::string executorsm::validatePlanText(const std::string &planText) {
+std::string executorsm::validatePlanText(const std::string &planText, const bool planAlreadyAccepted) {
   qTree candidate;
   const PlanSource loaded = parsePlanText(candidate, planText);
   if (loaded.status != "OK") return "Fail parse: " + loaded.status;
@@ -127,7 +127,10 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   // NA CZYM TEN TRYB STOI: z kluczem ON kanal reset jest kanalem zdalnego wykonania kodu,
   // bramkowanym juz wylacznie uprawnieniami obiektow IPC. Dlatego sa one pinowane jawnie -
   // patrz ipc::kObjectPermissions; inaczej tryb zalezalby od umaska jednostki systemd.
-  if (!cfgUnrestricted)
+  //
+  // RESTART NA HORYZONCIE (#640) tej kontroli nie przechodzi: jego tekst to plan biezacej epoki,
+  // czyli plik operatora albo zestaw, ktory ta kontrola juz raz przepuscila.
+  if (!cfgUnrestricted && !planAlreadyAccepted)
     for (const auto &q : candidate)
       for (const auto &r : q.lRules)
         if (r.action == rule::SYSTEM)
@@ -296,11 +299,26 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
   // zasoby w gniezdzie magistrali, a rezerwacja jest tam pojedyncza - patrz planSwapInFlight.
   // Odmowa jest przy okazji uczciwsza od poprzedniego "ostatni wygrywa": zestaw przyjety
   // i nadpisany przez nastepny nigdy nie ruszal, a jego klient dostawal "OK".
-  if (planSwapInFlight.load(std::memory_order_acquire)) {
+  //
+  // Zajecie przez compare_exchange, a nie odczyt i pozniejszy zapis: od #640 flage podnosi takze
+  // watek glowny (restart na horyzoncie osi), wiec miedzy odczytem a zapisem mogl wejsc drugi
+  // rezerwujacy.
+  if (bool idle = false; !planSwapInFlight.compare_exchange_strong(idle, true, std::memory_order_acq_rel)) {
     ptRetval.put("db", "Rejected: a plan reload is already in progress");
     SPDLOG_ERROR("reset-commit rejected: a plan reload is already in progress");
     return ptRetval;
   }
+  // Zdobyta flaga gasnie na kazdej drodze wyjscia poza przyjeciem, takze po wyjatku z walidacji:
+  // zostawiona w gorze odrzucalaby kazdy nastepny reset i zatrzymala restart na horyzoncie.
+  struct SwapClaim {
+    bool accepted{false};
+    SwapClaim()                             = default;
+    SwapClaim(const SwapClaim &)            = delete;
+    SwapClaim &operator=(const SwapClaim &) = delete;
+    ~SwapClaim() {
+      if (!accepted) planSwapInFlight.store(false, std::memory_order_release);
+    }
+  } claim;
 
   if (const std::string refusal = validatePlanText(planText); !refusal.empty()) {
     ptRetval.put("db", refusal);
@@ -312,10 +330,10 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
     std::scoped_lock lock(core_mutex);
     pendingPlanText = std::move(planText);
   }
-  // Kolejnosc zapisow jest istotna: znacznik wymiany PRZED zadaniem wymiany. Odwrotnie watek
-  // glowny zdazylby przeprowadzic cala wymiane i zdjac flage, ktora dopiero potem zostalaby
-  // podniesiona - i zostalaby podniesiona na zawsze, odrzucajac kazdy nastepny reset.
-  planSwapInFlight.store(true, std::memory_order_release);
+  // Znacznik wymiany jest juz podniesiony (compare_exchange wyzej), a zadanie wymiany idzie
+  // dopiero teraz. Odwrotnie watek glowny zdazylby przeprowadzic cala wymiane i zdjac flage,
+  // ktora dopiero potem zostalaby podniesiona - na zawsze, odrzucajac kazdy nastepny reset.
+  claim.accepted = true;
   planResetRequested.store(true, std::memory_order_release);
   cv.notify_all();
   SPDLOG_INFO("Plan reload accepted; the running plan will be replaced.");
@@ -374,6 +392,9 @@ rdb::Result<> executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &x
         }
       }
     }
+    // Tekst, z ktorego restart na horyzoncie osi (#640) zbuduje nastepna epoke - tylko plan, ktory
+    // faktycznie wszedl.
+    epochPlanText = coreInstancePtr->empty() ? std::string{} : planText;
 
     // Domyslny katalog storage z konfiguracji - ta sama regula co przy starcie: dyrektywa
     // :STORAGE z RQL ma pierwszenstwo, a w planie pustym nie ma czego kierowac.

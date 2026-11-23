@@ -56,7 +56,7 @@ rdb::Result<> TimeLine::updateTimeIntervals(const set<boost::rational<int>> &inS
   return rebuild(inSet);
 }
 
-rdb::Result<> TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
+rdb::Result<TimeLine::Base> TimeLine::computeBase(const set<boost::rational<int>> &inSet) {
   // Plan bez ani jednego strumienia odrzucaja wolajacy (Engine::compile, executorsm) - tu to niezmiennik.
   RDB_ASSERT(!inSet.empty(), "TimeLine: input interval set must not be empty");
 
@@ -88,16 +88,56 @@ rdb::Result<> TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
                                    val));
   }
 
-  std::vector<Rate> rates;
-  rates.reserve(kept.size());
+  Base base;
+  base.rates.reserve(kept.size());
   for (const auto &val : kept) {
     const i128 k = (val.numerator() / tauNum) * (tauDen / val.denominator());
     if (k > kInt64Max)
       return rdb::fail(rdb::Errc::Config,
                        std::format("time line: interval {} s is more than int64 steps of the common time base {}/{} s", val,
                                    static_cast<std::int64_t>(tauNum), static_cast<std::int64_t>(tauDen)));
-    rates.push_back({.k = static_cast<std::int64_t>(k), .counter = 0});
+    base.rates.push_back({.k = static_cast<std::int64_t>(k), .counter = 0});
   }
+
+  // Horyzont: INT_MAX slotow najszybszego interwalu (indeks rekordu jest int, #636), uciety tak,
+  // zeby licznik chwili w sekundach (ticks * tauNum) i termin w ms (ticks * tauNum * 1000 / tauDen)
+  // miescily sie w int64. Najszybszy interwal jest pierwszy w posortowanym zbiorze i nigdy nie odpada.
+  i128 horizon = kIntMax * base.rates.front().k;
+  horizon      = std::min(horizon, kInt64Max / tauNum);
+  horizon      = std::min(horizon, kInt64Max * tauDen / (tauNum * kMsPerSec));
+
+  base.tauNum       = static_cast<std::int64_t>(tauNum);
+  base.tauDen       = static_cast<std::int64_t>(tauDen);
+  base.horizonTicks = static_cast<std::int64_t>(horizon);
+  base.fastest      = kept.front();
+  return base;
+}
+
+rdb::Result<TimeLine::Horizon> TimeLine::horizonOf(const set<boost::rational<int>> &inSet) {
+  RDB_TRY_ASSIGN(const Base base, computeBase(inSet));
+  return Horizon{.at      = TimePoint(base.horizonTicks * base.tauNum, base.tauDen),
+                 .fastest = base.fastest,
+                 .tauNum  = base.tauNum,
+                 .tauDen  = base.tauDen,
+                 .ticks   = base.horizonTicks};
+}
+
+bool TimeLine::Horizon::admits(const TimePoint &t, const rational<int> &step) const {
+  // x sekund to x.num * tauDen / (x.den * tauNum) taktow. Iloczyny maja ponizej 2^126, a oba wyniki
+  // nie przekraczaja 2^126, wiec suma miesci sie w __int128 ze znakiem.
+  const auto ticksUp = [this](i128 num, i128 den) {
+    const i128 n = num * tauDen;
+    const i128 d = den * tauNum;
+    return n / d + (n % d != 0 ? 1 : 0);
+  };
+  return ticksUp(t.numerator(), t.denominator()) + ticksUp(step.numerator(), step.denominator()) <= ticks;
+}
+
+rdb::Result<> TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
+  RDB_TRY_ASSIGN(Base base, computeBase(inSet));
+  const i128 tauNum  = base.tauNum;
+  const i128 tauDen  = base.tauDen;
+  const i128 horizon = base.horizonTicks;
 
   // Ta sama chwila w nowej podstawie. Zbior interwalow tylko rosnie (import ad hoc dopisuje
   // wezly), wiec nowa podstawa dzieli stara i przeliczenie jest mnozeniem przez liczbe calkowita.
@@ -115,29 +155,23 @@ rdb::Result<> TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
     ticks = static_cast<i128>(ticks_) * scale;
   }
 
-  // Horyzont: INT_MAX slotow najszybszego interwalu (indeks rekordu jest int, #636), uciety tak,
-  // zeby licznik chwili w sekundach (ticks * tauNum) i termin w ms (ticks * tauNum * 1000 / tauDen)
-  // miescily sie w int64. Najszybszy interwal jest pierwszy w posortowanym zbiorze i nigdy nie odpada.
-  i128 horizon = kIntMax * rates.front().k;
-  horizon      = std::min(horizon, kInt64Max / tauNum);
-  horizon      = std::min(horizon, kInt64Max * tauDen / (tauNum * kMsPerSec));
   if (ticks > horizon)
     return rdb::fail(rdb::Errc::Config,
                      std::format("time line: the current slot {} s is already past the time horizon {:.3f} s of "
                                  "the new interval set (fastest interval {} s)",
-                                 ctSlot_, toSeconds(horizon * tauNum, tauDen), kept.front()));
+                                 ctSlot_, toSeconds(horizon * tauNum, tauDen), base.fastest));
 
   // Kazdy interwal zaczyna od pierwszego wystapienia SCISLE po biezacej chwili;
   // przy konstrukcji chwila jest zerem, wiec kazdy licznik startuje od 1.
-  for (auto &rate : rates)
+  for (auto &rate : base.rates)
     rate.counter = static_cast<std::int64_t>(ticks / rate.k) + 1;
 
-  rates_        = std::move(rates);
-  tauNum_       = static_cast<std::int64_t>(tauNum);
-  tauDen_       = static_cast<std::int64_t>(tauDen);
+  rates_        = std::move(base.rates);
+  tauNum_       = base.tauNum;
+  tauDen_       = base.tauDen;
   ticks_        = static_cast<std::int64_t>(ticks);
-  horizonTicks_ = static_cast<std::int64_t>(horizon);
-  fastest_      = kept.front();
+  horizonTicks_ = base.horizonTicks;
+  fastest_      = base.fastest;
   return {};
 }
 
