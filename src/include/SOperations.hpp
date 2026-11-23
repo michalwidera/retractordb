@@ -376,7 +376,7 @@ constexpr std::int64_t NThetaStartupLatency(const rational<int> &deltaSource, co
 /// w math_proofs/Profs/InterleaveTailExact.lean; exactInterleaveTail_exact w tym samym
 /// pliku mówi, że to maksimum jest najmniejszym ogonem spełniającym warunek dostępności.
 ///
-/// Rachunek (#NNN): przy deltaA = a1/a2 i deltaB = b1/b2 jest p/q = a1*b2 / (b1*a2) po skróceniu
+/// Rachunek (#644): przy deltaA = a1/a2 i deltaB = b1/b2 jest p/q = a1*b2 / (b1*a2) po skróceniu
 /// przez h = gcd(a1*b2, b1*a2), więc p, q < 2^62 i L < 2^63. Interwał przeplotu w int NIE
 /// ogranicza p i q do int: dla 2/3 # 2000000002/5 jest p/q = 5/3000000003. Kresy liczy
 /// saturatedTail() w __int128: (1+W)*L + p < 2^31 * 2^63 + 2^62 < 2^95. Sam wynik może wyjść poza
