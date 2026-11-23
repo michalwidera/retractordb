@@ -445,7 +445,7 @@ int main(int argc, char *argv[]) try {
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("shmbudget,z", "show shared memory budget of the compiled plan")          //
-          ("horizon", "show the time horizon of the compiled plan")                  //
+          ("horizon,H", "show the time horizon of the compiled plan")                //
           ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")  //
           ;
     } else {
