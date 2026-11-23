@@ -361,6 +361,7 @@ constexpr std::int64_t NThetaStartupLatency(const rational<int> &deltaSource, co
 /// - [soperations.hash-startup-latency.1~2] dla każdego okresu fazowego L = p+q (p/q to skrócone deltaA/deltaB) zwracać dokładny ogon przeplotu w postaci zamkniętej max(ceil(W_A*L/q), ceil(((1+W_B)*L + p - 1)/p) - 1), równej maksimum po i z [0, L) wartości ceil((j(i) + 1 + W_src(i)) * Delta_src(i) / Delta_c) - 1 - i, gdzie składową i jej indeks j(i) wybiera Hash, a Delta_c = deltaA*deltaB/(deltaA+deltaB).
 /// - [soperations.hash-startup-latency.2~2] liczyć w int64 bez przepełnienia dla wszystkich p, q, W_A, W_B z zakresu int i zwracać wynik w int64; wynik spoza zakresu int odrzuca wołający.
 /// - [soperations.hash-startup-latency.3~1] nigdy nie zaniżać ogona: zaniżenie oznacza rekord wyemitowany przed określeniem zależności.
+/// - [soperations.hash-startup-latency.4~1] dla dodatnich deltaA i deltaB o składowych z zakresu int liczyć p i q dokładnie także wtedy, gdy wychodzą poza int, a wynik większy niż INT64_MAX zastępować wartością INT64_MAX.
 ///
 /// Ogon przeplotu (`#`). Rekord i strumienia C = A#B niesie treść rekordu j(i)
 /// jednej ze składowych, wybranej przez Hash(); jest określony w chwili
@@ -375,26 +376,34 @@ constexpr std::int64_t NThetaStartupLatency(const rational<int> &deltaSource, co
 /// w math_proofs/Profs/InterleaveTailExact.lean; exactInterleaveTail_exact w tym samym
 /// pliku mówi, że to maksimum jest najmniejszym ogonem spełniającym warunek dostępności.
 ///
-/// Zakres: p, q <= INT_MAX, więc L < 2^32, a (1+W)*L + p < 2^31 * 2^32 = 2^63 dla
-/// W <= INT_MAX - żaden człon pośredni nie przepełnia int64. Sam wynik może wyjść poza
-/// int (np. W_A*L/q przy q = 1); nie jest obcinany, odmawia compiler::computeStartupLatency().
+/// Rachunek (#NNN): przy deltaA = a1/a2 i deltaB = b1/b2 jest p/q = a1*b2 / (b1*a2) po skróceniu
+/// przez h = gcd(a1*b2, b1*a2), więc p, q < 2^62 i L < 2^63. Interwał przeplotu w int NIE
+/// ogranicza p i q do int: dla 2/3 # 2000000002/5 jest p/q = 5/3000000003. Kresy liczy
+/// saturatedTail() w __int128: (1+W)*L + p < 2^31 * 2^63 + 2^62 < 2^95. Sam wynik może wyjść poza
+/// int (np. W_A*L/q przy q = 1), a przy p/q bliskim 2^62 także poza int64 - wtedy jest nasycony;
+/// każdą wartość ponad INT_MAX odrzuca compiler::computeStartupLatency().
 ///
 /// Do 2026-08-07 stała tu postać O(1) max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)); kampania
 /// K24p zmierzyła jej zgodność z granicą zdarzeniową na 92,1% węzłów `#`, z zawyżeniem
 /// o slot w pozostałych. Do 2026-11-10 (#616) ogon liczył przegląd jednego okresu fazowego,
 /// a powyżej p+q = 100 000 wracała tamta postać. Przegląd wołał Hash(), który liczy w
 /// rational<int>; przy q*(p+q) > 2^31 iloczyn się przepełniał i przegląd ZANIŻAŁ ogon
-/// (np. deltaA = 2, deltaB = 99997, W_B = 1: 99998 zamiast 99999).
+/// (np. deltaA = 2, deltaB = 99997, W_B = 1: 99998 zamiast 99999). Do 2026-11-23 iloraz p/q liczyło
+/// deltaA / deltaB w rational<int>, który nie wykrywa przepełnienia: 2/3 # 2000000002/5 dawało
+/// ogon 0 zamiast 600000002.
 inline std::int64_t HashStartupLatency(const rational<int> &deltaA, const rational<int> &deltaB, const int latencyA,
                                        const int latencyB) {
+  assert(deltaA > 0 && deltaB > 0);
   assert(latencyA >= 0 && latencyB >= 0);
-  const auto ratio          = deltaA / deltaB;
-  const std::int64_t p      = ratio.numerator();
-  const std::int64_t q      = ratio.denominator();
-  const std::int64_t period = p + q;
-  // Liczniki są nieujemne, a mianowniki dodatnie, więc ceil(x/y) = (x+y-1)/y.
-  // Kres B: ceil(((1+W_B)*L + p - 1)/p) - 1 = ((1+W_B)*L + p - 2)/p.
-  const std::int64_t boundA = (latencyA * period + q - 1) / q;
-  const std::int64_t boundB = ((1 + static_cast<std::int64_t>(latencyB)) * period + p - 2) / p;
+  const std::int64_t left  = std::int64_t{deltaA.numerator()} * deltaB.denominator();  // a1*b2
+  const std::int64_t right = std::int64_t{deltaB.numerator()} * deltaA.denominator();  // b1*a2
+  const std::int64_t h     = std::gcd(left, right);
+  const __int128 p         = left / h;
+  const __int128 q         = right / h;
+  const __int128 period    = p + q;
+  // Kres A: ceil(W_A*L/q) = ceil((W_A*L + q)/q) - 1.
+  // Kres B: ceil(((1+W_B)*L + p - 1)/p) - 1.
+  const std::int64_t boundA = saturatedTail((latencyA * period) + q, q);
+  const std::int64_t boundB = saturatedTail(((__int128{latencyB} + 1) * period) + p - 1, p);
   return std::max(boundA, boundB);
 }

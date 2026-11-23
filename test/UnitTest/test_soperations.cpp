@@ -470,6 +470,31 @@ TEST(xSOperations, hash_startup_latency_handles_the_int_range_edge) {
   EXPECT_GT(HashStartupLatency(boost::rational<int>(1), boost::rational<int>(big), 0, 1), std::int64_t{big});
 }
 
+// Interwał przeplotu w int nie ogranicza p i q do int (#NNN). Dla 2/3 # 2000000002/5 interwał
+// C to 1000000001/1500000004, a p/q = 5/3000000003, L = 3000000008. Wartości policzone na
+// ułamkach dokładnych (Python fractions):
+//   kres A = ceil(W_A*L/q): 0 dla W_A = 0, 4 dla W_A = 3 (3*L/q = 3,000000015);
+//   kres B = ((1+W_B)*L + p - 2)/p: 600000002 dla W_B = 0, 4800000013 dla W_B = 7.
+// Para odwrócona ma p/q = 3000000003/5: kres B = 2, kres A przy W_A = 1 wynosi ceil(L/5) = 600000002.
+// Do 2026-11-23 iloraz deltaA / deltaB w rational<int> przepełniał się po cichu i ogon wynosił
+// 0 zamiast 600000002, choć wynik dokładny mieści się w int.
+// Dla deltaA = INT_MAX i deltaB = 1/INT_MAX jest p/q = INT_MAX^2 / 1, więc kres A przy
+// W_A = INT_MAX przekracza INT64_MAX i musi się nasycić, a nie zawinąć.
+TEST(xSOperations, hash_startup_latency_handles_ratio_outside_int) {
+  // covers: soperations.hash-startup-latency.1~2, soperations.hash-startup-latency.4~1
+  const boost::rational<int> deltaA{2, 3};
+  const boost::rational<int> deltaB{2000000002, 5};
+  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, 0, 0), INT64_C(600000002));
+  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, 3, 0), INT64_C(600000002));
+  EXPECT_EQ(HashStartupLatency(deltaA, deltaB, 0, 7), INT64_C(4800000013));
+  EXPECT_EQ(HashStartupLatency(deltaB, deltaA, 0, 0), INT64_C(2));
+  EXPECT_EQ(HashStartupLatency(deltaB, deltaA, 1, 0), INT64_C(600000002));
+
+  constexpr int big = std::numeric_limits<int>::max();
+  EXPECT_EQ(HashStartupLatency(boost::rational<int>(big), boost::rational<int>(1, big), big, 0),
+            std::numeric_limits<std::int64_t>::max());
+}
+
 // Świadek, w którym postać zamknięta i zastąpiona postać O(1) DAJĄ RÓŻNE liczby: Da=1,
 // Db=2/5, W_B=1 - przegląd okresu daje 3, postać O(1) daje 4. Test wymaga wartości
 // dokładnej i osobno sprawdza, że postać O(1) jest tu naprawdę wyższa; bez drugiej połowy

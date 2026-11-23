@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
         ("kill,k", "kill xretractor server")                                                                          //
         ("dir,d", "list of queries")                                                                                  //
         ("vars,v", "list plan variables (VAR) with their current values")                                             //
-        ("horizon", "show the time left to the time horizon of the plan and the stream that sets it")                 //
+        ("horizon,H", "show the time left to the time horizon of the plan and the stream that sets it")               //
         ("yaml,y", "yaml output format for --dir, --detail, --vars and --bus")                                        //
         ("jsonl,j", "versioned JSON Lines API output")                                                                //
         ("idle-timeout,i", po::value<int>(&idleTimeoutMs)->default_value(0), "JSONL idle timeout in ms; 0 disables")  //
