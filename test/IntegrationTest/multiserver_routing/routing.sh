@@ -202,18 +202,35 @@ done
 
 # (5) Ad-hoc przez granice serwera: odmowa, i to BEZ skutku ubocznego. getAdHoc modyfikuje
 #     plan serwera, wiec sam fakt odmowy nie wystarcza -- plany musza zostac nietkniete.
-xqry --server alfa -d > dir_alfa_before.txt
-xqry --server beta -d > dir_beta_before.txt
+#
+#     Porownujemy tylko kolumny opisujace plan: name, duration, location, cap. Kolumny size
+#     i count licza rekordy biegnacych strumieni, wiec zmieniaja sie miedzy migawkami, gdy
+#     wypadnie miedzy nimi granica slotu - i tak padal ten test, przy tym samym planie (#646).
+#     Linia separatora odpada razem z nimi, bo jej odcinki maja szerokosci takze tych kolumn.
+#     Pelny wydruk zostaje w dir_<instancja>_<chwila>.txt do diagnozy.
+plan_snapshot() {
+  local server="$1" source="$2" moment="$3"
+  xqry --server "$server" -d > "dir_${server}_${moment}.txt"
+  awk -F ' [|] ' 'NF == 6 {
+      for (i = 1; i <= NF; i++) gsub(/^ +| +$/, "", $i)
+      print $1 " | " $2 " | " $5 " | " $6
+    }' "dir_${server}_${moment}.txt" > "plan_${server}_${moment}.txt"
+  grep -q "^${source} | " "plan_${server}_${moment}.txt" || {
+    echo "migawka planu instancji $server nie zawiera jej zrodla:"; cat "dir_${server}_${moment}.txt"; exit 1; }
+}
+
+plan_snapshot alfa srca before
+plan_snapshot beta srcb before
 
 expect_failure xqry -a 'SELECT dsta[0]+dstb[0] STREAM crossed FROM dsta,dstb'
 grep -q 'crosses a server boundary' expect_out.txt || {
   echo "ad-hoc przez granice nie zostal tak nazwany:"; cat expect_out.txt; exit 1; }
 
-xqry --server alfa -d > dir_alfa_after.txt
-xqry --server beta -d > dir_beta_after.txt
-diff dir_alfa_before.txt dir_alfa_after.txt || {
+plan_snapshot alfa srca after
+plan_snapshot beta srcb after
+diff plan_alfa_before.txt plan_alfa_after.txt || {
   echo "odrzucony ad-hoc zmienil plan instancji alfa"; exit 1; }
-diff dir_beta_before.txt dir_beta_after.txt || {
+diff plan_beta_before.txt plan_beta_after.txt || {
   echo "odrzucony ad-hoc zmienil plan instancji beta"; exit 1; }
 
 # Ad-hoc mieszczacy sie w jednej instancji przechodzi bez --server i trafia do wlasciciela.
