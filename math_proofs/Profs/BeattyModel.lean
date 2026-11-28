@@ -1,5 +1,9 @@
-import Mathlib.NumberTheory.Rayleigh
-import Mathlib.Tactic
+module
+
+public import Mathlib.NumberTheory.Rayleigh
+public import Mathlib.Tactic
+
+@[expose] public section
 
 namespace Profs
 

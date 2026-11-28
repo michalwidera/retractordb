@@ -1,5 +1,9 @@
-import Profs.ShiftMatching
-import Profs.InterleaveCovering
+module
+
+public import Profs.ShiftMatching
+public import Profs.InterleaveCovering
+
+@[expose] public section
 
 namespace Profs
 
@@ -180,13 +184,13 @@ theorem causal_shift_matching_read (a b i k : ℕ) (ha : 0 < a) (hb : 0 < b)
   by_cases hn : (causalShift (i + k) (causalInterleave a b ha hb A B)).origin ≤ n
   · have hl : (causalInterleave a b ha hb (causalShift i A) (causalShift k B)).origin ≤ n := by
       rwa [ho]
-    simp only [CausalStream.read, if_pos hn, if_pos hl]
+    simp only [CausalStream.read, ite_eq_left hn, ite_eq_left hl]
     apply congrArg some
     exact delayed_interleave_values a b i k n ha hb hmatch
       (by dsimp [causalShift] at hn; omega) A.value B.value
   · have hl : ¬ (causalInterleave a b ha hb (causalShift i A) (causalShift k B)).origin ≤ n := by
       rwa [ho]
-    simp only [CausalStream.read, if_neg hn, if_neg hl]
+    simp only [CausalStream.read, ite_eq_right hn, ite_eq_right hl]
 -- ANCHOR_END: causal_values
 
 theorem causal_shift_matching_tail (a b i k WA WB : ℕ) (ha : 0 < a) (hb : 0 < b)

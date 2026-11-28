@@ -1,6 +1,10 @@
-import Profs.EventOrder
-import Profs.BeattyPartition
-import Mathlib.Tactic
+module
+
+public import Profs.EventOrder
+public import Profs.BeattyPartition
+public import Mathlib.Tactic
+
+@[expose] public section
 
 namespace Profs
 

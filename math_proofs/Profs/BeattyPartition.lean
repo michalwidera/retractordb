@@ -1,4 +1,8 @@
-import Profs.BeattyModel
+module
+
+public import Profs.BeattyModel
+
+@[expose] public section
 
 namespace Profs
 

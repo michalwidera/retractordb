@@ -23,7 +23,7 @@ Ten katalog jest samodzielnym projektem Lean 4. Zawiera formalizacje twierdzeń 
 
 Twierdzenie Fraenkela (1969) publikacja cytuje bez dowodu, więc nie ma osobnego dokumentu.
 
-Pierwsze uruchomienie pobiera Lean 4.33.0, Mathlib i Verso 4.33.0:
+Pierwsze uruchomienie pobiera Lean 4.36.0, Mathlib i Verso 4.36.0:
 
 ```bash
 cd math_proofs

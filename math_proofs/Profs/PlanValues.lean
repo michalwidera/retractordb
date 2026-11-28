@@ -1,4 +1,8 @@
-import Profs.PlanInstances
+module
+
+public import Profs.PlanInstances
+
+@[expose] public section
 
 namespace Profs
 

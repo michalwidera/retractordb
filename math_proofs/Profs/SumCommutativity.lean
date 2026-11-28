@@ -1,5 +1,9 @@
-import Mathlib.Data.Rat.Floor
-import Mathlib.Tactic
+module
+
+public import Mathlib.Data.Rat.Floor
+public import Mathlib.Tactic
+
+@[expose] public section
 
 namespace Profs
 

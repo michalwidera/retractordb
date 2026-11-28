@@ -1,6 +1,10 @@
-import Profs.PlanComposition
-import Profs.StartupBoundaries
-import Profs.InterleaveTailExact
+module
+
+public import Profs.PlanComposition
+public import Profs.StartupBoundaries
+public import Profs.InterleaveTailExact
+
+@[expose] public section
 
 namespace Profs
 

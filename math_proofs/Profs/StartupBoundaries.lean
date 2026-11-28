@@ -1,6 +1,10 @@
-import Mathlib.Algebra.Order.Floor.Semifield
-import Mathlib.Data.Rat.Floor
-import Mathlib.Tactic
+module
+
+public import Mathlib.Algebra.Order.Floor.Semifield
+public import Mathlib.Data.Rat.Floor
+public import Mathlib.Tactic
+
+@[expose] public section
 
 namespace Profs
 
@@ -294,7 +298,6 @@ theorem dehash_interval_inverse (s o : ℚ) (hs : 0 < s) (hso : s < o) :
   have ho : o ≠ 0 := by linarith
   field_simp
   ring_nf
-  exact (mul_inv_cancel₀ ho).symm
 
 /- theta_ratio przy regule interwalu kompilatora zamiast wejscia bedacego przeplotem. -/
 theorem theta_ratio_compiler (s o : ℚ) (u v : ℕ) (hs : 0 < s) (hso : s < o) (hv : 0 < v)
