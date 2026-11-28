@@ -970,6 +970,139 @@ TEST(ProofOracle, theta_ratio) {
   }
 }
 
+// Rozploty nad wejsciem, ktore nie jest przeplotem (#651): zrodlo o dowolnym interwale, suma, okno AGSE
+// i inny rozplot. Wejscie ma interwal s, argument o > s; kompilator nadaje wynikowi interwal
+// s*o/(o-s) (resolveStreamIntervals), z czego wynika hipoteza theta_ratio (dehash_interval_inverse).
+namespace {
+
+// Ilorazy argumentu do interwalu wejscia, o/s > 1.
+constexpr std::pair<int, int> kDehashSpans[] = {{2, 1}, {3, 2}, {7, 4}, {10, 9}, {5, 1}};
+
+struct DehashCase {
+  std::string id;
+  std::string input;
+  rational<int> argument;
+  bool theta;  // Theta (&) albo ~Theta (%)
+};
+
+std::vector<DehashCase> compileDehashPlan(qTree &instance) {
+  SourcePlan plan;
+  std::vector<std::string> inputs;
+  // Zrodla o interwalach, ktore nie powstaly z ustalonych skladowych; 1/360 jak potok EKG.
+  for (const char *interval : {"1/360", "1/10", "3/100", "2/7", "5/12"})
+    inputs.push_back(plan.source(std::format("ds{}", inputs.size()), interval));
+  // Suma przeplotu z jego przesunieciem: wezel sumy o ogonie przeplotu (>= 1).
+  for (const auto [a, b] : {std::pair{1, 2}, std::pair{3, 5}}) {
+    const auto pa  = plan.source(std::format("dpa{}_{}", a, b), std::format("{}/100", a));
+    const auto pb  = plan.source(std::format("dpb{}_{}", a, b), std::format("{}/100", b));
+    const auto mix = std::format("dh{}_{}", a, b);
+    plan.text += std::format("SELECT * STREAM {} FROM {}#{}\n", mix, pa, pb);
+    inputs.push_back(std::format("dsum{}_{}", a, b));
+    plan.text += std::format("SELECT * STREAM {} FROM {}+{}\n", inputs.back(), mix, plan.shifted(mix, 1));
+  }
+  // Okno AGSE: poczatek 2, ogon 0.
+  inputs.push_back("dwin");
+  plan.text += "SELECT * STREAM dwin FROM ds1@(1,3)\n";
+  // Rozplot nad suma: wejscie z ogonem, samo bedace rozplotem.
+  inputs.push_back("dnest");
+  plan.text += "SELECT * STREAM dnest FROM dsum1_2&3/100\n";
+
+  qTree probe;
+  compilePlan(probe, plan.text);
+  if (::testing::Test::HasFatalFailure()) return {};
+
+  std::vector<DehashCase> cases;
+  for (const auto &input : inputs) {
+    const auto s = probe.getQuery(input).rInterval;
+    for (const auto [k, j] : kDehashSpans) {
+      const rational<int> o = s * rational<int>(k, j);
+      for (bool theta : {true, false}) {
+        cases.push_back({std::format("{}_{}_{}{}", theta ? "dt" : "dm", input, k, j), input, o, theta});
+        plan.text += std::format("SELECT * STREAM {} FROM {}{}{}/{}\n", cases.back().id, input, theta ? '&' : '%', o.numerator(),
+                                 o.denominator());
+      }
+    }
+  }
+  compilePlan(instance, plan.text);
+  return cases;
+}
+
+// Ogon rozplotu nad dowolnym wejsciem jest dokladna granica dostepnosci przy mapie odczytu Div albo Mod
+// i ilorazie (u+v)/v, u/v = t/o (theta_leastTail_compiler, ntheta_leastTail_compiler).
+void checkDehashTails(bool theta) {
+  qTree instance;
+  const auto cases = compileDehashPlan(instance);
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+  int withTail = 0;
+  int checked  = 0;
+  for (const auto &c : cases) {
+    if (c.theta != theta) continue;
+    const auto &node  = instance.getQuery(c.id);
+    const auto &input = instance.getQuery(c.input);
+    ASSERT_EQ(node.lProgram.back().getCommandID(), theta ? STREAM_DEHASH_DIV : STREAM_DEHASH_MOD) << c.id;
+    ASSERT_EQ(node.lProgram.begin()->getStr_(), c.input) << c.id;
+    // theta_ratio_compiler, dehash_ticks: t/s = (u+v)/v dla skroconego u/v = t/o.
+    const auto span   = node.rInterval / c.argument;
+    const int u       = span.numerator();
+    const int v       = span.denominator();
+    const auto [p, q] = ratioOf(node.rInterval, input.rInterval);
+    ASSERT_EQ(p, u + v) << c.id;
+    ASSERT_EQ(q, v) << c.id;
+    // Mapa odczytu silnika to affineRead (u+v) v c n (thetaRead_eq, nthetaRead_eq).
+    const int offset = theta ? u + v - 1 : 0;
+    const auto read  = [&](int n) {
+      return static_cast<int>(theta ? Div(node.rInterval, c.argument, n) : Mod(c.argument, node.rInterval, n));
+    };
+    for (int n = 0; n < 24; ++n)
+      ASSERT_EQ(read(n), (n * (u + v) + offset) / v) << c.id << " n=" << n;
+    ASSERT_TRUE(tailIsExact(u + v, v, input.startupLatency, node.startupLatency, read)) << c.id;
+    withTail += input.startupLatency > 0;
+    ++checked;
+  }
+  EXPECT_EQ(2 * checked, static_cast<int>(cases.size()));
+  EXPECT_GT(withTail, 0);
+}
+
+}  // namespace
+
+// Regula interwalu kompilatora: wynik rozplotu ma interwal s*o/(o-s), a wejscie spelnia wtedy
+// s = t*o/(t+o) (dehash_interval_inverse, dehash_hso); przy o <= s kompilator odmawia planu.
+TEST(ProofOracle, dehash_interval_inverse) {
+  qTree instance;
+  const auto cases = compileDehashPlan(instance);
+  ASSERT_FALSE(HasFatalFailure());
+  // Dziewiec wejsc, piec ilorazow, dwa rozploty.
+  ASSERT_EQ(cases.size(), 9 * 2 * std::size(kDehashSpans));
+  for (const auto &c : cases) {
+    const auto s = instance.getQuery(c.input).rInterval;
+    const auto t = instance.getQuery(c.id).rInterval;
+    ASSERT_EQ(t, s * c.argument / (c.argument - s)) << c.id;
+    ASSERT_EQ(s, t * c.argument / (t + c.argument)) << c.id;
+  }
+  for (const char *op : {"&", "%"})
+    for (const char *argument : {"1/10", "1/20"}) {
+      qTree refused;
+      const auto text = std::format(
+          "DECLARE value INTEGER STREAM src, 1/10 TEXTFILE 'a.txt'\n"
+          "SELECT * STREAM out FROM src{}{}\n",
+          op, argument);
+      const auto [parseResult, firstKeyword, streamName] = parserRQLString(refused, text);
+      ASSERT_EQ(parseResult, "OK") << text;
+      compiler compilerInstance(refused);
+      EXPECT_NE(compilerInstance.compile(), "OK") << text;
+    }
+}
+
+TEST(ProofOracle, theta_leastTail_compiler) {
+  // covers: soperations.theta-startup-latency.1~1
+  checkDehashTails(true);
+}
+
+TEST(ProofOracle, ntheta_leastTail_compiler) {
+  // covers: soperations.n-theta-startup-latency.1~1
+  checkDehashTails(false);
+}
+
 // Ogon sumy w skompilowanym planie to maksimum ogonow wzgledem skladowych i dokladna granica
 // dostepnosci obu skladowych jednoczesnie (sumTail_exact). Skladowe przeplotu maja ogon >= 1.
 TEST(ProofOracle, sumTail_exact) {

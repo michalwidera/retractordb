@@ -18,6 +18,7 @@ add_custom_target(
 set(RDB_TEST_CI_PROFILES
     commit
     nightly-debug
+    nightly-sanitize
     release
     make-build
     ablation-all-off

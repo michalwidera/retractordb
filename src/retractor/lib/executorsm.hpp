@@ -36,7 +36,7 @@ class dataModel;
 /// - [executorsm.executorsm.4~1] w trybie taktowanym spać do terminów slotów liczonych od wspólnej kotwicy, bez przesuwania jej po spóźnieniu;
 ///   przy --realtime wywoływać rtActivate dopiero po pomyślnym rtCheckAndPrint i kontynuować także przy nieudanej aktywacji;
 ///   w trybie --no-clock liczyć sloty bez czekania na zegar.
-///   Zakres testow: `it_slot_schedule-run` (kotwica, nadrabianie bez przesuwania, własna kotwica epoki po resecie, --realtime bez uprawnień RT z tym samym harmonogramem), `it_slot_schedule-vg-run`, `it_noclock_offline-run`. Kontrola strukturalna: rtActivate stoi w gałęzi `if (rtCheckAndPrint())`, a pętla slotów rusza niezależnie od wyniku obu wywołań.
+///   Zakres testow: `it_slot_schedule-run` (kotwica, nadrabianie bez przesuwania, własna kotwica epoki po resecie, --realtime bez uprawnień RT z tym samym harmonogramem), `it_noclock_offline-run`. Kontrola strukturalna: rtActivate stoi w gałęzi `if (rtCheckAndPrint())`, a pętla slotów rusza niezależnie od wyniku obu wywołań.
 /// - [executorsm.executorsm.5~1] przy --xqrywait wstrzymywać obliczenia do pierwszej obsłużonej komendy klienta.
 /// - [executorsm.executorsm.6~1] przy limicie pętli --llimitqry N wykonywać N obrotów licząc krok zerowy, czyli dokładnie N-1 slotów (-m 1 liczy wyłącznie
 ///   krok zerowy), a zatrzymanie klawiszem dopuszczać wyłącznie w przebiegu bez limitu i bez --noanykey.

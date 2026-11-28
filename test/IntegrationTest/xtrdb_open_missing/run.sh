@@ -16,7 +16,9 @@ run_xtrdb() {
   # shellcheck disable=SC2059 # wejscie jest formatem printf z \n
   printf "$1" | (
     # Darwin nie egzekwuje RLIMIT_AS i odrzuca `ulimit -v` bledem; tam straza zostaje sam limit czasu.
-    ulimit -v 2000000 2>/dev/null || true
+    # Tak samo pod ASan (RDB_SANITIZE z makra add_test): runtime rezerwuje na starcie ok. 15 TB
+    # przestrzeni adresowej na pamiec cienia i pod tym limitem xtrdb pada przed main().
+    [[ "${RDB_SANITIZE:-}" == *address* ]] || ulimit -v 2000000 2>/dev/null || true
     run_timeout 20 "$xtrdb" noprompt
   ) >out.txt 2>&1
   rc=$?

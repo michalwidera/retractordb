@@ -72,6 +72,21 @@ set_tests_properties(
   ${TestID}-dedup-exact-semantic
   PROPERTIES TIMEOUT 60)
 
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Galezie launchera dla --build-info i planu z deduplikacja dokladna.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-dedup-exact-semantic
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  verify.sh
+  ${IT_VG_SHIM}/xretractor
+  dedup-exact-semantic
+  ${OPTIMIZER_EXPECTED})
+set_tests_properties(${TestID}-vg-dedup-exact-semantic PROPERTIES TIMEOUT 300)
+
 # Do 2026-07-26 dwa testy tej macierzy były oznaczone WILL_FAIL jako jawnie
 # oczekiwane porażki ablacyjne:
 #

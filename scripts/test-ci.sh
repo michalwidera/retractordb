@@ -39,12 +39,13 @@ fi
 # `gate` jest w tej liscie, ale poza domyslnym uzyciem: to najdrozszy job
 # przebiegu nocnego (budowa czterech profili ablacji H9 + kampania 2 x 10010
 # planow), liczony w dziesiatkach minut.
-profile_names=(commit nightly-debug release make-build ablation-all-off ablation-probe-on gate)
+profile_names=(commit nightly-debug nightly-sanitize release make-build ablation-all-off ablation-probe-on gate)
 
 profile_job() {
     case "$1" in
         commit)            echo "build-debug-ninja-mydocker (workflow: commit)" ;;
         nightly-debug)     echo "build-debug-ninja-mydocker (L1 manual-nightly-full, Valgrind)" ;;
+        nightly-sanitize)  echo "build-debug-sanitize-mydocker (L1 manual-nightly-full, ASan/UBSan)" ;;
         release)           echo "build-release-ninja-mydocker (L1 manual-nightly-full)" ;;
         make-build)        echo "build-release (workflow: manual-make-build)" ;;
         ablation-all-off)  echo "build-release-ablation / ablation-all-off (L2)" ;;
@@ -55,7 +56,7 @@ profile_job() {
 
 profile_build_type() {
     case "$1" in
-        commit|nightly-debug) echo "Debug" ;;
+        commit|nightly-debug|nightly-sanitize) echo "Debug" ;;
         *)      echo "Release" ;;
     esac
 }
@@ -64,6 +65,7 @@ profile_desc() {
     case "$1" in
         commit)            echo "Debug + testy bez Valgrinda - to, co idzie po commicie" ;;
         nightly-debug)     echo "Debug + zwykle testy i Valgrind w manual-nightly-full" ;;
+        nightly-sanitize)  echo "Debug z ASan/UBSan + zwykle testy i kontrola raportow sanitizerow" ;;
         release)           echo "Release + zwykle testy bez Valgrinda" ;;
         make-build)        echo "Release na czystej Ubuntu: stockowy toolchain, make, pakietowanie" ;;
         ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + zwykle testy" ;;
@@ -141,7 +143,8 @@ show_help() {
     echo "  --cpus <n>         Limit CPU kontenera (domyslnie: $default_cpus - jak resource_class: large)"
     echo "  --memory <rozmiar> Limit RAM kontenera (domyslnie: $default_memory - jak resource_class: large)"
     echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size - zmierzone w CircleCI)"
-    echo "  --ctest-jobs <n>   Rownoleglosc ctest (domyslnie: $default_ctest_jobs - nproc zmierzone w CircleCI)"
+    echo "  --ctest-jobs <n>   Rownoleglosc ctest (domyslnie: $default_ctest_jobs - nproc zmierzone w CircleCI;"
+    echo "                     nightly-sanitize: 4, jak jego job)"
     echo "  --pull             Wymus pobranie obrazu przed uruchomieniem"
     echo "  --keep             Nie usuwaj kontenera po zakonczeniu (do grzebania recznie)"
     echo "  --reuse-build      Zachowaj katalog build/ miedzy przebiegami (szybko, ale NIE jak CI)"
@@ -176,13 +179,22 @@ default_shm_size="48g"
 # executor `large`), lokalnie tyle, ile ma maszyna - wiec liczba idzie tu wprost,
 # zeby przesubskrypcja 4 vCPU byla taka sama jak w CI.
 default_ctest_jobs="36"
+# Wyjatek: job build-debug-sanitize-mydocker podaje run-test `ctest_jobs: "4"`.
+# Pod ASan przy -j 36 na 4 vCPU padalo piec testow z limitem czasu albo
+# asercja czasowa, przy -j 4 jeden, a przebieg trwal tyle samo (2026-11-28).
+profile_ctest_jobs() {
+    case "$1" in
+        nightly-sanitize) echo "4" ;;
+        *)                echo "$default_ctest_jobs" ;;
+    esac
+}
 
 profile="commit"
 image=""
 cpus="$default_cpus"
 memory="$default_memory"
 shm_size="$default_shm_size"
-ctest_jobs="$default_ctest_jobs"
+ctest_jobs=""
 out_dir="$repo_root/build/test-ci"
 keep_container=0
 force_pull=0
@@ -222,6 +234,7 @@ if ! printf '%s\n' "${profile_names[@]}" | grep -qx -- "$profile"; then
     exit 1
 fi
 
+ctest_jobs="${ctest_jobs:-$(profile_ctest_jobs "$profile")}"
 build_type="$(profile_build_type "$profile")"
 build_tool="$(profile_build_tool "$profile")"
 container_user="$(profile_user "$profile")"
@@ -363,6 +376,9 @@ build_type="$2"
 work_dir="$3"
 build_tool="$4"
 ctest_jobs="$5"
+# Odpowiednik parametru `ctest_args` z run-test; ustawia go tylko profil
+# nightly-sanitize.
+ctest_args=""
 
 cd "$work_dir"
 
@@ -464,7 +480,7 @@ run_tests() {
     step "Integration & Unit test"
     local rc=0
     (cd "build/$build_type/test" && script -qefc \
-        "ctest -j $ctest_jobs -V -LE valgrind --output-junit test_results.xml" /dev/null < /dev/null) || rc=$?
+        "ctest -j $ctest_jobs -V -LE valgrind $ctest_args --output-junit test_results.xml" /dev/null < /dev/null) || rc=$?
     python3 scripts/collect-test-failures.py "build/$build_type" --ctest-status "$rc"
     return "$rc"
 }
@@ -522,6 +538,44 @@ ablation_build() {
     fi
 }
 
+# Odpowiednik joba build-debug-sanitize-mydocker: konfiguracja z RDB_SANITIZE
+# wprost (jak ablation_build), budowa z `--parallel 4`, potem zwykle testy.
+sanitize_build() {
+    step "Configure Debug tree with ASan/UBSan"
+    cmake \
+        -S . \
+        -B build/Debug \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Debug/generators/conan_toolchain.cmake" \
+        -DRDB_SANITIZE=address,undefined
+
+    step "Build and install sanitizer variant"
+    cmake --build build/Debug --parallel 4
+    (cd build/Debug && ninja -j 4 install)
+    # rm przed mkdir: z --reuse-build katalog przezywa poprzedni bieg, a stary
+    # raport zaczerwienilby nowy. W CI checkout jest zawsze czysty.
+    rm -rf build/sanitizer-logs
+    mkdir -p build/sanitizer-logs
+}
+
+# Odpowiednik kroku "Sanitizer reports": kazdy plik z log_path to raport ASan
+# albo LSan, takze taki, ktory skrypt testu schowal przed ctest. UBSan pisze na
+# stderr mimo log_path - jego trafienie wykrywa sam test (kod wyjscia 1).
+sanitizer_reports() {
+    step "Sanitizer reports (ASan/LSan)"
+    if [ ! -d build/sanitizer-logs ]; then
+        echo "brak katalogu build/sanitizer-logs - testy nie ruszyly"
+        return 1
+    fi
+    if compgen -G 'build/sanitizer-logs/*' > /dev/null; then
+        local f
+        for f in build/sanitizer-logs/*; do echo "== $f"; head -n 60 "$f"; done
+        return 1
+    fi
+    echo "brak raportow sanitizerow"
+}
+
 status=0
 case "$profile" in
     commit|nightly-debug|release)
@@ -534,6 +588,20 @@ case "$profile" in
         if [ "$status" -eq 0 ] && [ "$profile" = "nightly-debug" ]; then
             run_valgrind || status=$?
         fi
+        ;;
+    nightly-sanitize)
+        # `environment:` joba w config.yml - obowiazuje od pierwszego kroku.
+        export ASAN_OPTIONS="log_path=$work_dir/build/sanitizer-logs/asan"
+        export UBSAN_OPTIONS="print_stacktrace=1"
+        # `ctest_args` joba: wykluczenie decyzja czlowieka do rozstrzygniecia #652.
+        ctest_args="-E '^it_slot_schedule-run\$'"
+        prep_env
+        conan_install
+        sanitize_build
+        smoke_test
+        run_tests || status=$?
+        # W CI `when: always` - krok biegnie takze po czerwonych testach.
+        sanitizer_reports || status=1
         ;;
     make-build)
         prep_env_ci
@@ -598,6 +666,9 @@ if [ "$profile" = "nightly-debug" ]; then
         "$profile_out/valgrind_results.xml" > /dev/null 2>&1 || true
 fi
 copy_out "$work_dir/build/$build_type/test-failure-report"
+if [ "$profile" = "nightly-sanitize" ]; then
+    copy_out "$work_dir/build/sanitizer-logs"
+fi
 if [ "$profile" = "gate" ]; then
     copy_out "$work_dir/build/research-gate-work"
     copy_out "$work_dir/build/gate-profiles-logs"

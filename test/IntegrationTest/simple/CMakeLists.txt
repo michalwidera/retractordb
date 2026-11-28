@@ -2,8 +2,7 @@
 
 # Podstawowy test dymny arytmetyki na połączonych strumieniach. core0 (rate 0.1)
 # i core1 (rate 0.2) łączone operatorem +; SELECT oblicza wyrażenia arytmetyczne
-# na polach str1. Wynik porównywany z pattern-run.txt. Test -vg-run dodatkowo
-# uruchamia valgrind z wykrywaniem wycieków pamięci.
+# na polach str1. Wynik porównywany z pattern-run.txt.
 
 # K24/H10a: przebieg wydluzony z 10 na 11 taktow. Ogon `+` wzrosl o jeden slot
 # (rekord wolniejszej skladowej jest okreslony dopiero na koncu jej wlasnego
@@ -17,10 +16,6 @@ set(TestID "it_${TestID}")
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten
 # sam. Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera
 # -f znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
-add_test(
-  NAME ${TestID}-vg-run
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor query.rql -m 5 -f)
 
 # covers: launcher.xretractor.2~1, launcher.xretractor.4~1, launcher.xretractor.35~1
 add_test(
@@ -53,8 +48,3 @@ add_test(
   COMMAND bash -c "set -e && \
     xretractor query.rql -c -d -f -t -s > out.dot && \
     bash ../compare.sh pattern-dot.txt out.dot")
-
-add_test(
-  NAME ${TestID}-vg-compile
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor query.rql -c)

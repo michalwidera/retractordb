@@ -28,3 +28,16 @@ add_test(
   COMMAND bash reset.sh)
 
 set_tests_properties(${TestID} PROPERTIES TIMEOUT 120)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# `xqry --server` i przeladowanie planu uslugi (executorsmPlanReload) w trybie
+# --service.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  reset.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES TIMEOUT 300)

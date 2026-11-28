@@ -20,3 +20,16 @@ add_test(
   COMMAND bash value.sh)
 
 set_tests_properties(${TestID}-value PROPERTIES TIMEOUT 60)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Reduktory MAX/AVG/COUNT nad polami FLOAT/DOUBLE i 256-257 polami
+# (streamInstance.cpp).
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-value
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  value.sh)
+set_tests_properties(${TestID}-vg-value PROPERTIES TIMEOUT 300)

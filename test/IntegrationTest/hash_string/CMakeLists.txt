@@ -5,7 +5,6 @@
 # nad para INTEGER/DOUBLE na tej samej pozycji. Slot wejscia i pole wyjscia maja na kazdej
 # pozycji szerszy z dwoch elementow, a rekord skladnika wchodzi do slotu wejscia slot po slocie.
 #   -run     obie kolejnosci skladnikow wobec wzorca (szczegoly w run.sh)
-#   -vg-run  to samo pod valgrindem
 #   -adhoc   ten sam przeplot zgloszony przez `xqry -a` do dzialajacego serwera
 #   -adhoc-zero-step  zrodlo ad-hoc dolaczone przed krokiem ZERO (bramka -x, #574)
 # Do 2026-09-27 plan przechodzil `-c`, a przebieg konczyl sie w pierwszym slocie FatalError-em
@@ -22,11 +21,6 @@ add_test(
   COMMAND bash run.sh ${CMAKE_BINARY_DIR}/src/rdb/xtrdb)
 
 add_test(
-  NAME ${TestID}-vg-run
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash run.sh ${CMAKE_BINARY_DIR}/src/rdb/xtrdb ${IT_VALGRIND})
-
-add_test(
   NAME ${TestID}-adhoc
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash adhoc.sh)
@@ -36,5 +30,5 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash adhoc-zero-step.sh)
 
-set_tests_properties(${TestID}-run ${TestID}-vg-run ${TestID}-adhoc
-                     ${TestID}-adhoc-zero-step PROPERTIES TIMEOUT 120)
+set_tests_properties(${TestID}-run ${TestID}-adhoc ${TestID}-adhoc-zero-step
+                     PROPERTIES TIMEOUT 120)

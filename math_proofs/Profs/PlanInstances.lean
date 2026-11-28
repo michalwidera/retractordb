@@ -127,6 +127,47 @@ theorem ntheta_leastTail (P : ℕ → PlanNode) (W : ℕ → ℕ) (x i u v : ℕ
     nthetaTail_exact u v (W i) w (P x).origin hv tick htick
 -- ANCHOR_END: ntheta_least_tail
 
+/- Rozploty nad DOWOLNYM wejsciem (#651): zamiast interwalow przeplotu regula interwalu
+   kompilatora, Delta_x = Delta_i*o/(o - Delta_i) przy Delta_i < o, gdzie o jest argumentem
+   rozplotu, a u/v skroconym Delta_x/o. Takt tick = Delta_i/v wynika z theta_ratio_compiler. -/
+theorem dehash_ticks (P : ℕ → PlanNode) (x i u v : ℕ) (o : ℚ) (hv : 0 < v)
+    (hs : 0 < (P i).interval) (hso : (P i).interval < o)
+    (hΔx : (P x).interval = (P i).interval * o / (o - (P i).interval))
+    (huv : (P x).interval / o = (u : ℚ) / v) :
+    0 < (P i).interval / v ∧ (P x).interval = ((u + v : ℕ) : ℚ) * ((P i).interval / v) ∧
+      (P i).interval = v * ((P i).interval / v) := by
+  have hvq : (0 : ℚ) < v := by exact_mod_cast hv
+  have hr := theta_ratio_compiler (P i).interval o u v hs hso hv (hΔx ▸ huv)
+  rw [← hΔx] at hr
+  refine ⟨div_pos hs hvq, ?_, by field_simp⟩
+  rw [div_eq_div_iff hs.ne' hvq.ne'] at hr
+  field_simp
+  linarith
+
+-- ANCHOR: theta_least_tail_compiler
+theorem theta_leastTail_compiler (P : ℕ → PlanNode) (W : ℕ → ℕ) (x i u v : ℕ) (o : ℚ)
+    (hv : 0 < v) (hcop : Nat.Coprime u v)
+    (hs : 0 < (P i).interval) (hso : (P i).interval < o)
+    (hΔx : (P x).interval = (P i).interval * o / (o - (P i).interval))
+    (huv : (P x).interval / o = (u : ℚ) / v)
+    (hr : ∀ n, (P x).reads n = [(i, (affineRead (u + v) v (u + v - 1) n : ℤ))]) :
+    IsLeastTail P W x
+      (phaseStartupLatency (((u + v - 1 : ℕ) : ℚ) / v) (((u + v : ℕ) : ℚ) / v) (W i)) := by
+  obtain ⟨htick, hx, hi⟩ := dehash_ticks P x i u v o hv hs hso hΔx huv
+  exact theta_leastTail P W x i u v _ hv hcop htick hx hi hr
+-- ANCHOR_END: theta_least_tail_compiler
+
+-- ANCHOR: ntheta_least_tail_compiler
+theorem ntheta_leastTail_compiler (P : ℕ → PlanNode) (W : ℕ → ℕ) (x i u v : ℕ) (o : ℚ)
+    (hv : 0 < v) (hs : 0 < (P i).interval) (hso : (P i).interval < o)
+    (hΔx : (P x).interval = (P i).interval * o / (o - (P i).interval))
+    (huv : (P x).interval / o = (u : ℚ) / v)
+    (hr : ∀ n, (P x).reads n = [(i, (affineRead (u + v) v 0 n : ℤ))]) :
+    IsLeastTail P W x (phaseStartupLatency 0 (((u + v : ℕ) : ℚ) / v) (W i)) := by
+  obtain ⟨htick, hx, hi⟩ := dehash_ticks P x i u v o hv hs hso hΔx huv
+  exact ntheta_leastTail P W x i u v _ hv htick hx hi hr
+-- ANCHOR_END: ntheta_least_tail_compiler
+
 /- Okno AGSE @(h, w) nad zrodlem o F polach: rekord n czyta pozycje n*h-k, k < w, czyli
    rekordy (n*h-k)/F; pozycja ujemna nie istnieje. Okno rekordowe MIN/MAX/AVG/SUMC(e : N)
    to F = h = 1 i w = N. -/

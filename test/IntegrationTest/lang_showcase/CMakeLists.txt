@@ -55,8 +55,3 @@ add_test(
   xretractor query.rql -m 12 -f && \
   ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt &&  \
   bash ../compare.sh --ignore-eol pattern-run.txt out.txt")
-
-add_test(
-  NAME ${TestID}-vg-compile
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor query.rql -c)

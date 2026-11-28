@@ -18,7 +18,7 @@ Dla kazdego testu z LastTestsFailed.log zbierane sa:
 
 Mapowanie nazwy testu na katalog roboczy pochodzi z `ctest --show-only=json-v1`
 (wlasnosc WORKING_DIRECTORY), a nie ze zgadywania z nazwy: nazwa testu i nazwa katalogu
-rozjezdzaja sie (it_simple-vg-run, it_issue31_doc-q-31.a.rql-graph).
+rozjezdzaja sie (it_simple-run, it_issue31_doc-q-31.a.rql-graph).
 
 Skrypt jest DIAGNOSTYCZNY i konczy sie zerem takze wtedy, gdy nie ma czego zebrac -
 nie jego rola jest decydowac o wyniku joba.

@@ -123,10 +123,14 @@ theorem subtractTail_exact (p q Ws W N0 : ℕ) (hp : 0 < p) (hq : 0 < q) (hcop :
   exact affineTail_exact p q (q - 1) Ws W N0 hp hq tick htick
 ```
 
-Rozplot `Θ` czyta pozycję `n + ceil((n+1)*u/v)` przeplotu przy `u/v = Δ/Δ_b` po
-skróceniu. Model zakłada, że wejście jest przeplotem, czyli
-`Δ_S = Δ*Δ_b/(Δ + Δ_b)`. Wtedy `r = (u+v)/v` (`theta_ratio`), a ogon wynosi
-`Φ((u+v-1)/v, r, W_S)` (`ThetaStartupLatency`):
+Rozplot `Θ` czyta pozycję `n + ceil((n+1)*u/v)` wejścia przy `u/v = Δ/Δ_b` po
+skróceniu. Model wymaga relacji interwałów `Δ_S = Δ*Δ_b/(Δ + Δ_b)`, takiej jak
+nad przeplotem. Wtedy `r = (u+v)/v` (`theta_ratio`), a ogon wynosi
+`Φ((u+v-1)/v, r, W_S)` (`ThetaStartupLatency`). Wejście nie musi być przeplotem:
+kompilator nadaje wynikowi rozplotu interwał `Δ = Δ_S*Δ_b/(Δ_b - Δ_S)` i odmawia
+planu przy `Δ_b ≤ Δ_S`, a z tej reguły relacja wynika dla każdego wejścia
+(`dehash_interval_inverse`, `theta_ratio_compiler`, #651). Ogon nad tak
+przyjętym wejściem:
 
 ```anchor theta_tail_exact -showProofStates (module := Profs.StartupBoundaries)
 theorem thetaTail_exact (u v Ws W N0 : ℕ) (hv : 0 < v) (hcop : Nat.Coprime u v)

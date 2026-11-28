@@ -127,7 +127,9 @@ asercji nie ma, więc wymusza je kompilator, nie funkcja.
 - Reguły ogona: `addStartupLatencyCpp_eq`, `subtractStartupLatencyCpp_eq` i
   `nthetaStartupLatencyCpp_eq` dają `affineTail`; `phaseStartupLatencyCpp_eq` i
   `thetaStartupLatencyCpp_eq` dają `phaseStartupLatency`, a `thetaStartupLatencyCpp_eq_affine`
-  daje `affineTail` mapy `Div` przy wejściu będącym przeplotem (`s = t·o/(t+o)`, `theta_ratio`);
+  daje `affineTail` mapy `Div` przy relacji interwałów przeplotu (`s = t·o/(t+o)`, `theta_ratio`),
+  którą reguła interwału kompilatora ustanawia dla każdego wejścia (`dehash_hso`, wnioski
+  `thetaStartupLatencyCpp_exact_compiler` i `nthetaStartupLatencyCpp_exact_mod_compiler`, #651);
   `hashStartupLatencyCpp_eq` daje `exactInterleaveTail` pary skróconej. Wszystkie z nasyceniem
   na `INT64_MAX`.
 - Okno AGSE: `agseStartupLatencyCpp_eq` (`affineTail h F 0 W`) i `agseLogicalOriginCpp_eq`

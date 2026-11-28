@@ -284,6 +284,26 @@ theorem theta_ratio (d db : ℚ) (u v : ℕ) (hd : 0 < d) (hdb : 0 < db) (hv : 0
   rw [hu]
   field_simp
 
+/- Regula interwalu kompilatora (#651): resolveStreamIntervals (compiler.cpp) nadaje rozplotowi
+   S & o wynik o interwale s*o/(o-s), a ~Theta S % o tak samo, i odmawia planu przy o <= s.
+   Z tej reguly wynika hipoteza theta_ratio s = t*o/(t+o) dla t = s*o/(o-s), wiec dla KAZDEGO
+   wejscia S przyjetego przez kompilator, nie tylko dla przeplotu. -/
+theorem dehash_interval_inverse (s o : ℚ) (hs : 0 < s) (hso : s < o) :
+    s = s * o / (o - s) * o / (s * o / (o - s) + o) := by
+  have h : o - s ≠ 0 := by linarith
+  have ho : o ≠ 0 := by linarith
+  field_simp
+  ring_nf
+  exact (mul_inv_cancel₀ ho).symm
+
+/- theta_ratio przy regule interwalu kompilatora zamiast wejscia bedacego przeplotem. -/
+theorem theta_ratio_compiler (s o : ℚ) (u v : ℕ) (hs : 0 < s) (hso : s < o) (hv : 0 < v)
+    (huv : s * o / (o - s) / o = (u : ℚ) / v) :
+    s * o / (o - s) / s = ((u + v : ℕ) : ℚ) / v := by
+  have ht : 0 < s * o / (o - s) := div_pos (mul_pos hs (by linarith)) (by linarith)
+  have h := theta_ratio (s * o / (o - s)) o u v ht (by linarith) hv huv
+  rwa [← dehash_interval_inverse s o hs hso] at h
+
 -- ANCHOR: theta_tail_exact
 theorem thetaTail_exact (u v Ws W N0 : ℕ) (hv : 0 < v) (hcop : Nat.Coprime u v)
     (tick : ℚ) (htick : 0 < tick) :

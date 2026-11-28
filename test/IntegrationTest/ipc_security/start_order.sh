@@ -35,7 +35,11 @@ case "$MODE" in
       exit 77
     fi
     rc=0
-    run_timeout 30 strace -f -e trace=openat,write -o trace.txt "$XRETRACTOR" query.rql -k -m 3 </dev/null \
+    # LeakSanitizer nie dziala pod ptrace i konczy proces bledem, wiec w buildzie z ASan ten jeden
+    # przebieg idzie bez kontroli wyciekow; pozostale kontrole ASan zostaja. Binarka bez ASan
+    # zmienna ignoruje.
+    run_timeout 30 env ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0" \
+      strace -f -e trace=openat,write -o trace.txt "$XRETRACTOR" query.rql -k -m 3 </dev/null \
       > out.txt 2> err.txt || rc=$?
     if [ "$rc" -ne 0 ]; then
       echo "serwer pod strace zakonczyl sie kodem $rc"

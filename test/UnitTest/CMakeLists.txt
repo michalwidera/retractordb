@@ -36,6 +36,38 @@ endif()
 # wielkosci wieksze i zalezne od obciazenia, wiec tam limitu nie ustawiamy.
 set(RDB_UT_TIMEOUT 120)
 
+# Kopia -valgrind sprawdza kod, nie testy (2026-11-28, nightly job 1298: jeden
+# przypadek milczal pod Valgrindem ponad 10 min i CircleCI zabil krok).
+# Przypadek wypada z kopii, gdy jego koszt idzie w kod testu (niezalezny model,
+# tablice wyroczni) albo w powtorzenie sciezki juz sprawdzonej na wiekszych
+# danych, a suma wierszy src/ pokrytych przez binarki z kopia -valgrind sie nie
+# zmienia (gcovr w build/Coverage, zob. test/CLAUDE.md). Zwykly zestaw biegnie w
+# calosci.
+#
+# h10aGate: kazdy przypadek liczy model zdarzeniowy w kodzie testu; zaden wiersz
+# src/ nie jest pokryty tylko przez nie.
+set(RDB_UT_VALGRIND_SKIP h10aGate)
+# --gtest_filter kopii -valgrind, klucz to nazwa binarki bez przedrostka test_.
+# compiler: plan o 65536 polach, kompilacja 4,4 s natywnie i ~11 min pod
+# Valgrindem; ten sam komunikat originBeyondInt pokrywa
+# agse_logical_origin_beyond_int_is_a_plan_error.
+set(RDB_UT_VALGRIND_FILTER_compiler
+    -xcompiler.shift_and_record_window_origin_beyond_int_is_a_plan_error)
+# exprSimplify: macierz stalych i operatorow powtarza te sama sciezke (90 s).
+set(RDB_UT_VALGRIND_FILTER_exprSimplify
+    -exprSimplify.constant_tail_matrix_preserves_values_and_null_at_boundaries)
+# executorsmCommands: najszerszy plan nie pokrywa zadnego wiersza src/ ponad
+# pozostale przypadki (7,5 s).
+set(RDB_UT_VALGRIND_FILTER_executorsmCommands
+    -ExecutorsmCommandsTest.get_for_the_widest_plan_with_long_names_fits_a_response_slot
+)
+# proofOracle: tablice z Lean sprawdzaja arytmetyke pokryta takze przez inne
+# testy. Zostaje tylko przypadek, ktory jako jedyny w testach jednostkowych
+# wykonuje okna rekordowe w dataModel (computeWindowAggregates). Filtr jest
+# pozytywny, wiec nowy przypadek ProofOracle trafia pod Valgrind tylko po
+# dopisaniu tutaj.
+set(RDB_UT_VALGRIND_FILTER_proofOracle ProofOracle.plan_emission_schedule)
+
 list(FILTER V_GLOB EXCLUDE REGEX ".*test_qry\\.cpp$")
 
 # foreach(item ${V_GLOB}) message( ${item}) endforeach()
@@ -185,7 +217,12 @@ foreach(item ${V_GLOB})
     ut_${TEST_SHORT}
     PROPERTIES FIXTURES_REQUIRED ut_${TEST_SHORT}-fixture RESOURCE_LOCK
                ut_${TEST_SHORT} TIMEOUT ${RDB_UT_TIMEOUT})
-  if(PROG_VALGRIND)
+  if(PROG_VALGRIND AND NOT TEST_SHORT IN_LIST RDB_UT_VALGRIND_SKIP)
+    set(UT_VALGRIND_FILTER)
+    if(DEFINED RDB_UT_VALGRIND_FILTER_${TEST_SHORT})
+      set(UT_VALGRIND_FILTER
+          --gtest_filter=${RDB_UT_VALGRIND_FILTER_${TEST_SHORT}})
+    endif()
     add_test(
       NAME ut_${TEST_SHORT}-valgrind-setup
       WORKING_DIRECTORY
@@ -200,8 +237,10 @@ foreach(item ${V_GLOB})
       NAME ut_${TEST_SHORT}-valgrind
       WORKING_DIRECTORY
         ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
-      COMMAND ${RDB_UT_VALGRIND}
-              ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
+      COMMAND
+        ${RDB_UT_VALGRIND}
+        ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT}
+        ${UT_VALGRIND_FILTER})
     set_tests_properties(
       ut_${TEST_SHORT}-valgrind
       PROPERTIES LABELS valgrind FIXTURES_REQUIRED
