@@ -1520,6 +1520,40 @@ theorem nthetaStartupLatencyCpp_exact_mod {s t o : RatInt} (hs : s.Valid) (hs0 :
   have hv0 := cross_pos ho ho0 ht
   exact affineTail_exact _ _ _ W W' N0 (by omega) hv0 tick htick
 
+/- Hipoteza hso z regula interwalu kompilatora (#651): resolveStreamIntervals (compiler.cpp)
+   nadaje wynikowi rozplotu interwal t = s*o/(o-s) i odmawia przy o <= s, wiec s = t*o/(t+o)
+   zachodzi dla kazdego wejscia przyjetego przez kompilator (dehash_interval_inverse). -/
+theorem dehash_hso {s t o : RatInt} (hs0 : 0 < s.val) (hlt : s.val < o.val)
+    (hrule : t.val = s.val * o.val / (o.val - s.val)) : s.val = t.val * o.val / (t.val + o.val) := by
+  rw [hrule]
+  exact dehash_interval_inverse _ _ hs0 hlt
+
+theorem dehash_target_pos {s t o : RatInt} (hs0 : 0 < s.val) (hlt : s.val < o.val)
+    (hrule : t.val = s.val * o.val / (o.val - s.val)) : 0 < t.val := by
+  rw [hrule]
+  exact div_pos (mul_pos hs0 (by linarith)) (by linarith)
+
+/- thetaStartupLatencyCpp_exact nad dowolnym wejsciem przyjetym przez kompilator. -/
+theorem thetaStartupLatencyCpp_exact_compiler {s t o : RatInt} (hs : s.Valid) (hs0 : 0 < s.val)
+    (ht : t.Valid) (ho : o.Valid) (hlt : s.val < o.val)
+    (hrule : t.val = s.val * o.val / (o.val - s.val)) {W W' N0 : ℕ} (hW : W < 2 ^ 31)
+    (hW' : W' < 2 ^ 31) (tick : ℚ) (htick : 0 < tick) {v : ℤ}
+    (hv : thetaStartupLatencyCpp s t o W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n →
+      affineReady (cross t o + cross o t) (cross o t) (cross t o + cross o t - 1) W W' tick n :=
+  thetaStartupLatencyCpp_exact hs hs0 ht (dehash_target_pos hs0 hlt hrule) ho (by linarith)
+    (dehash_hso hs0 hlt hrule) hW hW' tick htick hv
+
+/- nthetaStartupLatencyCpp_exact_mod nad dowolnym wejsciem przyjetym przez kompilator. -/
+theorem nthetaStartupLatencyCpp_exact_mod_compiler {s t o : RatInt} (hs : s.Valid)
+    (hs0 : 0 < s.val) (ht : t.Valid) (ho : o.Valid) (hlt : s.val < o.val)
+    (hrule : t.val = s.val * o.val / (o.val - s.val)) {W W' N0 : ℕ} (hW : W < 2 ^ 31)
+    (hW' : W' < 2 ^ 31) (tick : ℚ) (htick : 0 < tick) {v : ℤ}
+    (hv : nthetaStartupLatencyCpp s t W = some v) :
+    v ≤ W' ↔ ∀ n, N0 ≤ n → affineReady (cross t o + cross o t) (cross o t) 0 W W' tick n :=
+  nthetaStartupLatencyCpp_exact_mod hs hs0 ht (dehash_target_pos hs0 hlt hrule) ho (by linarith)
+    (dehash_hso hs0 hlt hrule) hW hW' tick htick hv
+
 /- ===== HashStartupLatency ===== -/
 
 -- ANCHOR: hash_startup_latency_cpp
