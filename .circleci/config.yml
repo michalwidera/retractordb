@@ -661,11 +661,16 @@ jobs:
       # rozstrzygniecia #652: pod ASan na 4 vCPU padal w 3/3 biegach na asercji
       # czasowej (za kazdym razem inna podkontrola), bez raportu sanitizera. W
       # zwyklym Debug, Release i Valgrindzie biegnie dalej.
+      #
+      # it_packaging wykluczony decyzja czlowieka z 2026-11-28 (job 1302): cpack
+      # kompresuje binaria Debug+ASan i przekracza TIMEOUT 60 (zwykly Debug na
+      # tym samym CI: 31 s). Test nie uruchamia kodu silnika, wiec sanitizer nie
+      # ma tu czego sprawdzac; biegnie dalej w zwyklym Debug i Release.
       - run-test:
           build_type: Debug
           build_tool: ninja
           ctest_jobs: "4"
-          ctest_args: "-E '^it_slot_schedule-run$'"
+          ctest_args: "-E '^(it_slot_schedule-run|it_packaging)$'"
       - run:
           name: Sanitizer reports (ASan/LSan)
           when: always

@@ -593,8 +593,9 @@ case "$profile" in
         # `environment:` joba w config.yml - obowiazuje od pierwszego kroku.
         export ASAN_OPTIONS="log_path=$work_dir/build/sanitizer-logs/asan"
         export UBSAN_OPTIONS="print_stacktrace=1"
-        # `ctest_args` joba: wykluczenie decyzja czlowieka do rozstrzygniecia #652.
-        ctest_args="-E '^it_slot_schedule-run\$'"
+        # `ctest_args` joba: wykluczenia decyzja czlowieka (#652, it_packaging -
+        # limit czasu cpack na binariach ASan).
+        ctest_args="-E '^(it_slot_schedule-run|it_packaging)\$'"
         prep_env
         conan_install
         sanitize_build
