@@ -136,6 +136,8 @@ macro(add_test)
   if(_it_in_tree EQUAL 0)
     # Konfiguracja operatora nie moze zmieniac wyniku testow. Scenariusze
     # konfiguracji moga ustawic wlasny XDG_CONFIG_HOME wewnatrz skryptu.
+    # RDB_SANITIZE mowi skryptowi, ze programy maja sanitizer: ASan nie znosi
+    # `ulimit -v` (rezerwacja pamieci cienia), a LeakSanitizer - ptrace.
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/.config")
     # Jawne proby pamieci maja osobny cel; nazwy -vg-* sa ich konwencja.
     if(_it_test_name MATCHES "-vg-")
@@ -159,7 +161,7 @@ macro(add_test)
           RUN_SERIAL
           TRUE
           ENVIRONMENT_MODIFICATION
-          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config"
+          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config;RDB_SANITIZE=set:${RDB_SANITIZE}"
       )
     else()
       # Przydzial jest per KATALOG, nie per test. Makro jest wolane wielokrotnie
@@ -196,7 +198,7 @@ macro(add_test)
           ENVIRONMENT
           "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir}"
           ENVIRONMENT_MODIFICATION
-          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config"
+          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config;RDB_SANITIZE=set:${RDB_SANITIZE}"
       )
     endif()
   endif()

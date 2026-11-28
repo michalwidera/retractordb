@@ -4,13 +4,16 @@
 
 enum payloadStatusType : std::uint8_t { fetched, clean, stored, changed, error };
 
+// Domyslnie "" zamiast pustego string_view: `colors = {}` (noprompt) dawal
+// data() == nullptr, a std::print("{}", ...) w libstdc++ 14 wola wtedy
+// memcpy(dst, nullptr, 0) - zachowanie niezdefiniowane, ktore UBSan przerywa.
 /// @requirements-exempt Colors: Zestaw sekwencji kolorow terminala przekazywanych do formatowania.
 struct Colors {
-  std::string_view GREEN;
-  std::string_view RED;
-  std::string_view ORANGE;
-  std::string_view BLUE;
-  std::string_view YELLOW;
-  std::string_view RESET;
-  std::string_view BLINK;
+  std::string_view GREEN{""};
+  std::string_view RED{""};
+  std::string_view ORANGE{""};
+  std::string_view BLUE{""};
+  std::string_view YELLOW{""};
+  std::string_view RESET{""};
+  std::string_view BLINK{""};
 };

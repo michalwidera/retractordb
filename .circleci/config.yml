@@ -86,7 +86,8 @@ workflows:
   # Dwie warstwy, pierwsza odcina druga - ale tylko w polowie: L2 czeka wylacznie
   # na zielony Release z L1 (requires: build-release-ninja-mydocker), wiec
   # czerwony Debug ani Valgrind bramki i podlogi nie zatrzymuja:
-  #   L1  zwykle testy w Debug i Release oraz Valgrind tylko w Debug;
+  #   L1  zwykle testy w Debug i Release, Valgrind tylko w Debug oraz zwykle
+  #       testy w Debug z ASan/UBSan;
   #   L2  bramka badawcza H9/H10 (najdrozszy job przebiegu) i podloga ablacyjna.
   #
   # Do 2026-09-19 przed nimi stal smoke - sama kompilacja Debug, ktora miala
@@ -111,6 +112,7 @@ workflows:
       - build-debug-ninja-mydocker:
           check_skipci: false
           run_valgrind: true
+      - build-debug-sanitize-mydocker
       # -- L2 ---------------------------------------------------------------
       - research-gate:
           requires:
@@ -425,6 +427,16 @@ commands:
       build_tool:
         type: string
         default: "make"
+      # `nproc` w kontenerze to rdzenie hosta (36), nie przydzial 4 vCPU.
+      # Nadpisuje go tylko build-debug-sanitize-mydocker.
+      ctest_jobs:
+        type: string
+        default: "$(nproc)"
+      # Dodatkowe argumenty ctest, np. `-E` dla testu wykluczonego decyzja
+      # czlowieka. Pusty dla wszystkich jobow poza build-debug-sanitize-mydocker.
+      ctest_args:
+        type: string
+        default: ""
     steps:
       - run:
           name: Smoke test
@@ -462,7 +474,7 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             ( cd build/<< parameters.build_type >>/test \
-              && ctest -j "$(nproc)" -V -LE valgrind --output-junit test_results.xml ) && rc=0 || rc=$?
+              && ctest -j "<< parameters.ctest_jobs >>" -V -LE valgrind << parameters.ctest_args >> --output-junit test_results.xml ) && rc=0 || rc=$?
             python3 scripts/collect-test-failures.py build/<< parameters.build_type >> --ctest-status "$rc"
             exit "$rc"
       - store_test_results:
@@ -585,6 +597,92 @@ jobs:
           condition: << parameters.run_valgrind >>
           steps:
             - run-valgrind
+
+  # Debug z ASan i UBSan (-DRDB_SANITIZE=address,undefined), tylko w
+  # manual-nightly-full. Valgrind nie obejmuje testow z hakami RDB_FAULT_*,
+  # SIGKILL i asercjami czasowymi (test/CLAUDE.md, "Valgrind copies check code,
+  # not tests"); ASan spowalnia je ok. 1,7x zamiast 20-150x i nie szereguje
+  # watkow, wiec biegnie caly zwykly zestaw `-LE valgrind`, a UBSan doklada
+  # klase bledow, ktorej valgrind nie widzi. Pomiar lokalny 2026-11-28: 372
+  # testy, zero trafien.
+  #
+  # RDB_SANITIZE idzie do cmake wprost, jak w build-release-ablation - `conan
+  # build` nie przyjmuje zmiennych CMake. Bez ccache: flagi sanitizera daja inne
+  # obiekty niz zwykly Debug, a klucz cache jest per typ budowy.
+  #
+  # Raporty ASan i LSan ida do plikow (log_path), nie na stderr: skrypt testu,
+  # ktory przekierowuje stderr programu albo pomija jego kod wyjscia, schowalby
+  # raport, a test zostalby zielony. Krok "Sanitizer reports" konczy job bledem,
+  # gdy powstal jakikolwiek plik. Katalog poza build/Debug/test, bo konfiguracja
+  # odtwarza tamto poddrzewo. Sciezka bezwzgledna, bo w `environment:` `~` nie
+  # jest rozwijane - working_directory ~/retractordb to /home/developer/retractordb.
+  # UBSan z GCC 14 obrazu pisze na stderr mimo log_path (sprawdzone 2026-11-28),
+  # a dzieki -fno-sanitize-recover=undefined konczy proces kodem 1 - trafienie
+  # UBSan wykrywa wiec sam test, po kodzie wyjscia albo stderr.
+  build-debug-sanitize-mydocker:
+    working_directory: ~/retractordb
+    executor: debian-mydocker
+    environment:
+      ASAN_OPTIONS: log_path=/home/developer/retractordb/build/sanitizer-logs/asan
+      UBSAN_OPTIONS: print_stacktrace=1
+    steps:
+      - checkout:
+          method: blobless
+      - check-skipci:
+          enabled: false
+      - prep-env:
+          use_ninja: true
+      - conan-install:
+          build_type: Debug
+          build_param: --build missing
+          build_tool: ninja
+      - run:
+          name: Configure Debug tree with ASan/UBSan
+          command: |
+            cmake \
+              -S . \
+              -B build/Debug \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Debug/generators/conan_toolchain.cmake" \
+              -DRDB_SANITIZE=address,undefined
+      # Rownoleglosc 4 z tego samego powodu co w build-release-ablation.
+      - run:
+          name: Build and install sanitizer variant
+          command: |
+            cmake --build build/Debug --parallel 4
+            cd build/Debug && ninja -j 4 install
+            mkdir -p ../sanitizer-logs
+      # -j 4, nie `$(nproc)` (36): pod ASan przy -j 36 padalo piec testow z
+      # limitem czasu albo asercja czasowa, przy -j 4 jeden, przy tym samym
+      # czasie przebiegu (scripts/test-ci.sh --profile nightly-sanitize, 2026-11-28).
+      #
+      # it_slot_schedule-run wykluczony decyzja czlowieka z 2026-11-28 do
+      # rozstrzygniecia #652: pod ASan na 4 vCPU padal w 3/3 biegach na asercji
+      # czasowej (za kazdym razem inna podkontrola), bez raportu sanitizera. W
+      # zwyklym Debug, Release i Valgrindzie biegnie dalej.
+      - run-test:
+          build_type: Debug
+          build_tool: ninja
+          ctest_jobs: "4"
+          ctest_args: "-E '^it_slot_schedule-run$'"
+      - run:
+          name: Sanitizer reports (ASan/LSan)
+          when: always
+          command: |
+            if [ ! -d build/sanitizer-logs ]; then
+              echo "brak katalogu build/sanitizer-logs - testy nie ruszyly"
+              exit 1
+            fi
+            if compgen -G 'build/sanitizer-logs/*' > /dev/null; then
+              for f in build/sanitizer-logs/*; do echo "== $f"; head -n 60 "$f"; done
+              exit 1
+            fi
+            echo "brak raportow sanitizerow"
+      - store_artifacts:
+          when: always
+          path: build/sanitizer-logs
+          destination: sanitizer-logs
 
   # Bramka badawcza H9/H10 - ochrona osiagnietych wynikow przed regresja silnika
   # (test/research_gate/README.md). Celowo poza `ninja` i poza `ninja test`, wiec
