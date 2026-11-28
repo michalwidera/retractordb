@@ -1,4 +1,8 @@
-import Profs.CausalShift
+module
+
+public import Profs.CausalShift
+
+@[expose] public section
 
 namespace Profs
 

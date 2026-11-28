@@ -1,4 +1,8 @@
-import Profs.EventOrder
+module
+
+public import Profs.EventOrder
+
+@[expose] public section
 
 namespace Profs
 

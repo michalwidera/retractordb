@@ -1,5 +1,9 @@
-import Profs.Deinterleave
-import Profs.SumCommutativity
+module
+
+public import Profs.Deinterleave
+public import Profs.SumCommutativity
+
+@[expose] public section
 
 namespace Profs
 

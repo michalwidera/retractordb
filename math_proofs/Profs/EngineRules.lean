@@ -1,7 +1,11 @@
-import Profs.CppArith
-import Profs.InterleaveTailExact
-import Profs.ShiftMatching
-import Profs.StartupBoundaries
+module
+
+public import Profs.CppArith
+public import Profs.InterleaveTailExact
+public import Profs.ShiftMatching
+public import Profs.StartupBoundaries
+
+@[expose] public section
 
 namespace Profs
 
@@ -164,9 +168,9 @@ theorem awayFromZero_div {a b : ℤ} (hb : b ≠ 0) :
     rw [hdef]; push_cast; field_simp
   unfold awayFromZero
   by_cases hr : r = 0
-  · rw [if_pos hr, hx, hr]
+  · rw [ite_eq_left hr, hx, hr]
     simp
-  · rw [if_neg hr]
+  · rw [ite_eq_right hr]
     have hrb : r.natAbs < b.natAbs := by omega
     rcases lt_or_gt_of_ne hb with hbn | hbp
     · have hbq' : (b : ℚ) < 0 := by exact_mod_cast hbn
@@ -181,8 +185,8 @@ theorem awayFromZero_div {a b : ℤ} (hb : b ≠ 0) :
           have := Int.tdiv_nonneg (show 0 ≤ -a by omega) (show (0 : ℤ) ≤ -b by omega)
           rw [Int.neg_tdiv, Int.tdiv_neg, neg_neg] at this
           exact_mod_cast this
-        rw [if_pos (by rw [hx]; linarith)]
-        simp only [ha, hbn, decide_true, beq_self_eq_true, if_true]
+        rw [ite_eq_left (by rw [hx]; linarith)]
+        simp only [ha, hbn, decide_true, beq_self_eq_true, ite_true]
         rw [Int.ceil_eq_iff, hx]; push_cast; constructor <;> linarith
       · -- r > 0, r < -b: r/b w (-1, 0)
         have hr' : 0 < r := by have := hsgn1 (by omega); omega
@@ -199,9 +203,9 @@ theorem awayFromZero_div {a b : ℤ} (hb : b ≠ 0) :
               rw [Int.tdiv_neg] at this; omega
             exact_mod_cast hq0
           linarith
-        rw [if_neg hx0]
+        rw [ite_eq_right hx0]
         simp only [ha, hbn, decide_false, decide_true, Bool.false_beq, Bool.not_true,
-          Bool.false_eq_true, if_false]
+          Bool.false_eq_true, ite_false]
         rw [Int.floor_eq_iff, hx]; push_cast; constructor <;> linarith
     · have hbq' : (0 : ℚ) < b := by exact_mod_cast hbp
       by_cases ha : a < 0
@@ -220,9 +224,9 @@ theorem awayFromZero_div {a b : ℤ} (hb : b ≠ 0) :
               rw [Int.neg_tdiv] at this; omega
             exact_mod_cast hq0
           linarith
-        rw [if_neg hx0]
+        rw [ite_eq_right hx0]
         simp only [ha, show ¬ b < 0 by omega, decide_false, decide_true, Bool.true_beq,
-          Bool.false_eq_true, if_false]
+          Bool.false_eq_true, ite_false]
         rw [Int.floor_eq_iff, hx]; push_cast; constructor <;> linarith
       · -- r > 0, r < b: r/b w (0, 1)
         have hr' : 0 < r := by have := hsgn1 (by omega); omega
@@ -233,8 +237,8 @@ theorem awayFromZero_div {a b : ℤ} (hb : b ≠ 0) :
         have hq0 : (0 : ℚ) ≤ q := by
           have := Int.tdiv_nonneg (show 0 ≤ a by omega) hbp.le
           exact_mod_cast this
-        rw [if_pos (by rw [hx]; linarith)]
-        simp only [ha, show ¬ b < 0 by omega, decide_false, beq_self_eq_true, if_true]
+        rw [ite_eq_left (by rw [hx]; linarith)]
+        simp only [ha, show ¬ b < 0 by omega, decide_false, beq_self_eq_true, ite_true]
         rw [Int.ceil_eq_iff, hx]; push_cast; constructor <;> linarith
 
 theorem roundedAwayFromZeroCpp_eq {a b : ℤ} (ha : inRange wInt64 a) (hb : b ≠ 0)
@@ -247,7 +251,7 @@ theorem roundedAwayFromZeroCpp_eq {a b : ℤ} (ha : inRange wInt64 a) (hb : b �
   by_cases h0 : a.tmod b = 0
   · simp [h0]
   · have hs := tdiv_small_of_tmod_ne_zero ha h0 hb
-    rw [if_neg h0, if_neg h0]
+    rw [ite_eq_right h0, ite_eq_right h0]
     split_ifs
     · exact addC_of_inRange (by constructor <;> norm_num [wInt64] <;> omega)
     · exact subC_of_inRange (by constructor <;> norm_num [wInt64] <;> omega)
@@ -259,7 +263,7 @@ theorem roundedAwayFromZeroCpp_natCast (m n : ℕ) (hn : 0 < n) (hm : inRange wI
   rw [roundedAwayFromZeroCpp_eq hm (by exact_mod_cast hn.ne') (by omega)]
   unfold awayFromZero
   have h0 : (0 : ℚ) ≤ ((m : ℤ) : ℚ) / ((n : ℤ) : ℚ) := by positivity
-  rw [if_pos h0]
+  rw [ite_eq_left h0]
   congr 1
   rw [← natCeil_div m n hn, Int.natCast_ceil_eq_ceil (by positivity)]
   simp only [Int.cast_natCast]
@@ -455,8 +459,8 @@ theorem hashCpp_eq {a b : RatInt} (ha : a.Valid) (ha0 : 0 < a.val) (hb : b.Valid
       subC_of_inRange (inRange64_of_nonneg (by omega) (by unfold int64Max; omega))
     have hcast : castC wInt (i - P) = some (i - P) :=
       checked_of_inRange (by constructor <;> norm_num [wInt] <;> omega)
-    simp only [beq_self_eq_true, if_true, hsub, hcast, Option.bind_some, ne_eq, not_true_eq_false,
-      decide_false, Bool.not_false, Bool.false_eq_true, if_false, Option.some.injEq,
+    simp only [beq_self_eq_true, ite_true, hsub, hcast, Option.bind_some, ne_eq, not_true_eq_false,
+      decide_false, Bool.not_false, Bool.false_eq_true, ite_false, Option.some.injEq,
       Prod.mk.injEq, true_and]
     omega
   · have hne : ((P : ℤ) == (P1 : ℤ)) = false := by
