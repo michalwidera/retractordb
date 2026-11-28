@@ -16,8 +16,3 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-value PROPERTIES TIMEOUT 60)
-
-add_test(
-  NAME ${TestID}-vg-run
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor self.rql -k -f -u)

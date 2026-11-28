@@ -13,3 +13,15 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Ad hoc i komendy wykonawcy od strony serwera oraz raport `xqry --horizon`.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  run.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES TIMEOUT 300)

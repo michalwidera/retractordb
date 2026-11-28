@@ -24,7 +24,14 @@ foreach(
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND bash run.sh ${case} $<TARGET_FILE:xretractor>)
   set_tests_properties(${TestID}-${case} PROPERTIES TIMEOUT 120)
+endforeach()
 
+# Pod valgrindem tylko dwa przypadki: pokrycie src/ pozostalych miesci sie w
+# calosci w uc12 i uc15 (pomiar 2026-11-28, test/CLAUDE.md "Valgrind copies
+# check code, not tests"). uc15 jako jedyny prowadzi przez IS_NQ w parserze i
+# zatrzymanie po wyczerpaniu wejscia, uc12 przez porownanie FLOAT w
+# streamInstance. Najdluzszy dawny wariant, uc13 (~35 s), nie wnosil nic.
+foreach(case uc12 uc15)
   add_test(
     NAME ${TestID}-vg-${case}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

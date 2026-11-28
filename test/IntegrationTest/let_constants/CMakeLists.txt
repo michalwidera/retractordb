@@ -14,3 +14,15 @@ add_test(
   COMMAND bash verify.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Prezenter stalych LET (presenter.cpp) w zrzucie `xretractor -c`.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  verify.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES TIMEOUT 300)

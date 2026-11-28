@@ -20,3 +20,16 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID} PROPERTIES TIMEOUT 60)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Komenda meta xtrdb na sidecarze wygenerowanym przez silnik (reszta
+# cmdMeta.cpp).
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  run.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES TIMEOUT 300)

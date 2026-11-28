@@ -16,3 +16,15 @@ add_test(
 # sie dopiero limitem "brak danych" po stronie klienta
 # (kDefaultServerNoDataTimeoutMs = 10 s).
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 90)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Formaty wyjscia xqry (-r, -g, -f, -p) dla wiersza z polem tablicowym.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  run.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES TIMEOUT 300)

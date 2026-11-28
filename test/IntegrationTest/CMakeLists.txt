@@ -76,6 +76,50 @@ else()
       CACHE INTERNAL "opakowanie valgrindem dla testow integracyjnych")
 endif()
 
+# Podkladki .vgshim/{xretractor,xqry,xtrdb} dla wariantow -vg- calych
+# scenariuszy (it_add_vg_test nizej). Valgrind sprawdza kod silnika, a nie
+# testy: wariant dostaje ten scenariusz, ktory jako jedyny prowadzi przez kod
+# niewidziany przez kopie ut_*-valgrind, i wtedy pod valgrindem ma biec KAZDY
+# program projektu, ktory scenariusz uruchamia - takze xqry i xtrdb, ktore w
+# starszych testach -vg- biegly obok valgrinda (pomiar 2026-11-28: 279 z 848
+# wierszy "pokrytych" przez tamte testy szlo spoza valgrinda). Wywolanie z nazwy
+# trafia na podkladke przez PATH, wywolanie sciezka z drzewa budowy wariant
+# zapisuje jako ${IT_VG_SHIM}/<program>. Podkladka uruchamia binarium z drzewa
+# budowy, nie zainstalowane. --child-silent-after-fork wycisza dzieci po fork
+# (komenda `system` xtrdb, procesy pomocnicze uslugi): ich logi nie maja
+# podsumowania, bo dziecko od razu wykonuje exec, i myliloby to vg_check.sh.
+set(IT_VG_SHIM
+    ${CMAKE_CURRENT_BINARY_DIR}/.vgshim
+    CACHE INTERNAL "katalog podkladek valgrinda dla wariantow -vg-")
+set(IT_VG_CHECK
+    ${CMAKE_CURRENT_BINARY_DIR}/vg_check.sh
+    CACHE INTERNAL "straznik logow valgrinda dla wariantow -vg-")
+string(JOIN " " _it_vg_command ${IT_VALGRIND})
+foreach(_it_vg_program xretractor xqry xtrdb)
+  if(IT_VALGRIND)
+    set(_it_vg_exec
+        "exec ${_it_vg_command} --child-silent-after-fork=yes --log-file=\"\${RDB_VG_LOG_DIR:?}/${_it_vg_program}.%p.log\" $<TARGET_FILE:${_it_vg_program}> \"$@\""
+    )
+  else()
+    set(_it_vg_exec "exec $<TARGET_FILE:${_it_vg_program}> \"$@\"")
+  endif()
+  file(
+    GENERATE
+    OUTPUT ${IT_VG_SHIM}/${_it_vg_program}
+    CONTENT
+      "#!/bin/bash\n# Wygenerowane przez test/IntegrationTest/CMakeLists.txt.\n${_it_vg_exec}\n"
+      FILE_PERMISSIONS
+      OWNER_READ
+      OWNER_WRITE
+      OWNER_EXECUTE
+      GROUP_READ
+      GROUP_EXECUTE
+      WORLD_READ
+      WORLD_EXECUTE)
+endforeach()
+unset(_it_vg_command)
+unset(_it_vg_exec)
+
 macro(add_test)
   _add_test(${ARGV})
   cmake_parse_arguments(_at "" "NAME" "" ${ARGV})
@@ -157,6 +201,33 @@ macro(add_test)
     endif()
   endif()
   unset(_it_test_name)
+endmacro()
+
+# it_add_vg_test(NAME <nazwa z -vg-> WORKING_DIRECTORY <katalog> COMMAND ...)
+# rejestruje wariant -vg- scenariusza: PATH zaczyna sie od podkladek, a komende
+# obejmuje vg_check.sh, ktory po przebiegu ocenia logi valgrinda. Bez valgrinda
+# (Darwin) komenda biegnie bez straznika, a podkladki uruchamiaja programy bez
+# opakowania. Makro, nie funkcja: add_test przydziela przestrzen nazw w zakresie
+# katalogu (_it_namespace), a funkcja zgubilaby ten przydzial i rozdzielila
+# testy jednego katalogu na rozne RESOURCE_LOCK.
+macro(it_add_vg_test)
+  cmake_parse_arguments(_vg "" "NAME;WORKING_DIRECTORY" "COMMAND" ${ARGV})
+  if(IT_VALGRIND)
+    add_test(
+      NAME ${_vg_NAME}
+      WORKING_DIRECTORY ${_vg_WORKING_DIRECTORY}
+      COMMAND bash ${IT_VG_CHECK} ${CMAKE_CURRENT_BINARY_DIR}/vglog-${_vg_NAME}
+              ${_vg_COMMAND})
+  else()
+    add_test(
+      NAME ${_vg_NAME}
+      WORKING_DIRECTORY ${_vg_WORKING_DIRECTORY}
+      COMMAND ${_vg_COMMAND})
+  endif()
+  set_property(
+    TEST ${_vg_NAME}
+    APPEND
+    PROPERTY ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${IT_VG_SHIM}")
 endmacro()
 
 # Warstwy uzytkownika odcina XDG_CONFIG_HOME z makra, warstwy systemowej nie da

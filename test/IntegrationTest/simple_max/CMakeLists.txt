@@ -3,7 +3,7 @@
 # Weryfikuje operator .max na strumieniu: max_str0 zawiera dane z
 # max_core0+max_core1, max_str1 = max_str0.max (wartość maksymalna), max_str2 =
 # max_str0 + max_str1 (złączenie). Wynik porównywany z pattern-run.txt via
-# xtrdb. Test -vg-2 uruchamia valgrind z wykrywaniem wycieków pamięci.
+# xtrdb.
 
 # K24/H10a: przebieg wydluzony z 10 na 11 taktow. Ogon `+` wzrosl o jeden slot
 # (rekord wolniejszej skladowej jest okreslony dopiero na koncu jej wlasnego
@@ -17,11 +17,6 @@ set(TestID "it_${TestID}")
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten
 # sam. Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera
 # -f znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
-add_test(
-  NAME ${TestID}-vg-2
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor query.rql -m 5 -f)
-
 # Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
 # jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp i
 # tak czy tak nie dowodzila konca procesu - blokade kasuje destruktor przed
@@ -56,8 +51,3 @@ add_test(
   COMMAND bash -c "set -e && \
     xretractor query.rql -c -d -f -t -s > out.dot && \
     bash ../compare.sh pattern-dot.txt out.dot")
-
-add_test(
-  NAME ${TestID}-vg-1
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ${IT_VALGRIND} xretractor query.rql -c)

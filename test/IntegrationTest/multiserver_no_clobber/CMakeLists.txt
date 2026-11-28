@@ -25,3 +25,15 @@ add_test(
 # Test startuje serwer (blokada ${TMPDIR:-/tmp}/xretractor_service.lock), wiec
 # musi biec szeregowo wzgledem pozostalych testow serwerowych.
 set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Odmowa startu drugiej instancji w launcherach xretractor i xqry.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-run
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  no-clobber.sh)
+set_tests_properties(${TestID}-vg-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 300)

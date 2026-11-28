@@ -16,3 +16,15 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-value PROPERTIES TIMEOUT 120)
+
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Typowane zmienne VAR w executorsmCommands.cpp i `xqry --vars` z typami.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-value
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  run.sh)
+set_tests_properties(${TestID}-vg-value PROPERTIES TIMEOUT 300)

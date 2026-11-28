@@ -16,6 +16,19 @@ add_test(
   COMMAND python3 verify_contracts.py $<TARGET_FILE:xtrdb>)
 set_tests_properties(${TestID}-contracts PROPERTIES TIMEOUT 60)
 
+# Wariant -vg-: ten sam scenariusz z programami pod valgrindem (it_add_vg_test).
+# Jedyny scenariusz, ktory przechodzi `xtrdb -s` przez cale xtrdbStorageMap.cpp.
+it_add_vg_test(
+  NAME
+  ${TestID}-vg-contracts
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  python3
+  verify_contracts.py
+  ${IT_VG_SHIM}/xtrdb)
+set_tests_properties(${TestID}-vg-contracts PROPERTIES TIMEOUT 300)
+
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
